@@ -172,21 +172,21 @@ export default function DiscordClone() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [channelMessages]);
 
-  // Carregar servidores e canais do Supabase
+  // Carregar servidores e canais do Supabase (só após login)
   useEffect(() => {
+    if (!user) return;
     async function load() {
       setLoading(true);
       const { data: srvData, error: srvErr } = await supabase.from("servers").select("*").order("created_at");
       if (srvErr) {
         console.error("load servers", srvErr);
-        setServers(fallbackServers);
-        setSelectedServer(fallbackServers[0].id);
-        setSelectedChannel(fallbackServers[0].channels[0].id);
         setLoading(false);
         return;
       }
       if (!srvData || srvData.length === 0) {
-        // seed inicial
+        // seed só uma vez: verifica de novo para evitar duplicata por corrida
+        const { data: check } = await supabase.from("servers").select("id").limit(1);
+        if (check && check.length > 0) return load();
         const seed = [
           { name: "Casa dos Amigos", icon: "🏠", channels: [{ name: "geral", type: "text" }, { name: "memes", type: "text" }, { name: "jogos", type: "text" }, { name: "Geral", type: "voice" }] },
           { name: "Estudos", icon: "📚", channels: [{ name: "dúvidas", type: "text" }, { name: "projetos", type: "text" }] },
@@ -219,7 +219,7 @@ export default function DiscordClone() {
       setConnected(true);
     }
     load();
-  }, []);
+  }, [user]);
 
   // Carregar mensagens do canal selecionado + Realtime
   useEffect(() => {
