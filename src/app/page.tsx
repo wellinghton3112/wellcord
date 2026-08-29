@@ -27,6 +27,9 @@ import {
   EyeOff,
   Trash2,
   X,
+  Menu,
+  Users,
+  MessageCircle,
 } from "lucide-react";
 import { APP_VERSION } from "@/lib/version";
 import { createClient } from "@/lib/supabase";
@@ -547,6 +550,14 @@ export default function DiscordClone() {
       {showMobileSidebar && <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowMobileSidebar(false)} />}
       {showMobileMembers && <div className="fixed inset-0 bg-black/60 z-40" onClick={() => setShowMobileMembers(false)} />}
 
+      <button onClick={() => setShowMobileSidebar(!showMobileSidebar)} className="fixed top-3 left-3 z-[60] lg:hidden p-3 bg-[#5865F2] hover:bg-[#4752C4] rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
+        <Menu className="w-6 h-6 text-white" />
+      </button>
+
+      <button onClick={() => setShowMobileMembers(!showMobileMembers)} className="fixed top-3 right-3 z-[60] lg:hidden p-3 bg-[#404249] hover:bg-[#4A4D53] rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
+        <Users className="w-6 h-6 text-white" />
+      </button>
+
       <div className="flex h-full">
 
       <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} fixed lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
@@ -684,7 +695,7 @@ export default function DiscordClone() {
         {viewMode === "dm" ? (
           <>
             <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-              <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-1 hover:bg-[#35373C] rounded"><Hash className="w-5 h-5" /></button>
+              <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-[#2B2D31] hover:bg-[#404249] rounded-lg"><Menu className="w-5 h-5" /></button>
               {selectedDM ? (
                 <>
                   <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">{dmConversations.find((d) => d.id === selectedDM)?.otherUser?.avatar || "👤"}</div>
@@ -734,7 +745,7 @@ export default function DiscordClone() {
         ) : (
           <>
             <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-              <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-1 hover:bg-[#35373C] rounded"><Hash className="w-5 h-5" /></button>
+              <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-[#2B2D31] hover:bg-[#404249] rounded-lg"><Menu className="w-5 h-5" /></button>
               <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
               <span className="w-px h-6 bg-[#3F4147] mx-2" />
               <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
