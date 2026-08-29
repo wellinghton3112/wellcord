@@ -63,6 +63,21 @@ type Server = {
   channels: Channel[];
 };
 
+type DMConversation = {
+  id: string;
+  participants: { id: string; username: string; avatar: string }[];
+  otherUser?: { id: string; username: string; avatar: string };
+};
+
+type DMMessage = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  username: string;
+  content: string;
+  created_at: string;
+};
+
 const fallbackServers: Server[] = [
   {
     id: "fallback-1",
@@ -120,7 +135,16 @@ export default function DiscordClone() {
   const [status, setStatus] = useState<"online" | "idle" | "dnd" | "invisible">("online");
   const [onlineMembers, setOnlineMembers] = useState<PresenceUser[]>([]);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [viewMode, setViewMode] = useState<"server" | "dm">("server");
+  const [dmConversations, setDmConversations] = useState<DMConversation[]>([]);
+  const [selectedDM, setSelectedDM] = useState<string | null>(null);
+  const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
+  const [dmInput, setDmInput] = useState("");
+  const [showNewDMModal, setShowNewDMModal] = useState(false);
+  const [newDMUsername, setNewDMUsername] = useState("");
+  const [creatingDM, setCreatingDM] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const dmEndRef = useRef<HTMLDivElement>(null);
 
   const currentServer = servers.find((s) => s.id === selectedServer);
   const currentChannel = currentServer?.channels.find((c) => c.id === selectedChannel);
@@ -296,6 +320,85 @@ export default function DiscordClone() {
     return () => { supabase.removeChannel(srvSub); supabase.removeChannel(chSub); };
   }, []);
 
+  // DMs: carregar conversas
+  const loadDMs = async () => {
+    if (!user) return;
+    const { data: parts } = await supabase.from("dm_participants").select("conversation_id").eq("user_id", user.id);
+    if (!parts || parts.length === 0) { setDmConversations([]); return; }
+    const ids = parts.map((p: any) => p.conversation_id);
+    const { data: allParts } = await supabase.from("dm_participants").select("conversation_id, user_id").in("conversation_id", ids);
+    const { data: profiles } = await supabase.from("profiles").select("id, username, avatar");
+    const convs: DMConversation[] = ids.map((id: string) => {
+      const p = (allParts || []).filter((x: any) => x.conversation_id === id);
+      const participants = p.map((x: any) => {
+        const prof = (profiles || []).find((pr: any) => pr.id === x.user_id);
+        return { id: x.user_id, username: prof?.username || x.user_id.slice(0, 6), avatar: prof?.avatar || "😎" };
+      });
+      const other = participants.find((x) => x.id !== user.id);
+      return { id, participants, otherUser: other };
+    });
+    setDmConversations(convs);
+  };
+
+  useEffect(() => { if (user) loadDMs(); }, [user]);
+
+  useEffect(() => {
+    if (!selectedDM) return;
+    const load = async () => {
+      const { data } = await supabase.from("dm_messages").select("*").eq("conversation_id", selectedDM).order("created_at", { ascending: true }).limit(100);
+      if (data) {
+        const mapped = await Promise.all(data.map(async (r: any) => {
+          const { data: prof } = await supabase.from("profiles").select("username").eq("id", r.sender_id).single();
+          return { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: prof?.username || r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at };
+        }));
+        setDmMessages(mapped);
+      }
+    };
+    load();
+    const ch = supabase.channel(`dm-${selectedDM}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${selectedDM}` }, async (payload: any) => {
+      const r = payload.new;
+      const { data: prof } = await supabase.from("profiles").select("username").eq("id", r.sender_id).single();
+      setDmMessages((prev) => [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: prof?.username || r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at }]);
+    }).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [selectedDM]);
+
+  useEffect(() => { dmEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [dmMessages]);
+
+  const handleDMSend = async () => {
+    if (!dmInput.trim() || !selectedDM || !user) return;
+    const content = dmInput;
+    setDmInput("");
+    const { error } = await supabase.from("dm_messages").insert({ conversation_id: selectedDM, sender_id: user.id, content });
+    if (error) { alert(error.message); setDmInput(content); }
+  };
+
+  const createDM = async () => {
+    if (!newDMUsername.trim() || !user) return;
+    setCreatingDM(true);
+    const { data: prof } = await supabase.from("profiles").select("id, username").ilike("username", `%${newDMUsername.trim()}%`).limit(1).single();
+    if (!prof) { alert("Usuário não encontrado"); setCreatingDM(false); return; }
+    if (prof.id === user.id) { alert("Não pode criar DM consigo mesmo"); setCreatingDM(false); return; }
+    // verifica se já existe conversa
+    const { data: myConvs } = await supabase.from("dm_participants").select("conversation_id").eq("user_id", user.id);
+    let existing: string | null = null;
+    if (myConvs) {
+      for (const c of myConvs) {
+        const { data: parts } = await supabase.from("dm_participants").select("user_id").eq("conversation_id", c.conversation_id);
+        if (parts && parts.length === 2 && parts.some((p: any) => p.user_id === prof.id)) { existing = c.conversation_id; break; }
+      }
+    }
+    if (existing) { setSelectedDM(existing); setViewMode("dm"); setShowNewDMModal(false); setCreatingDM(false); return; }
+    const { data: conv, error } = await supabase.from("dm_conversations").insert({}).select().single();
+    if (error || !conv) { alert(error?.message || "Erro"); setCreatingDM(false); return; }
+    await supabase.from("dm_participants").insert([{ conversation_id: conv.id, user_id: user.id }, { conversation_id: conv.id, user_id: prof.id }]);
+    await loadDMs();
+    setSelectedDM(conv.id);
+    setViewMode("dm");
+    setShowNewDMModal(false);
+    setCreatingDM(false);
+  };
+
   const handleSend = async () => {
     if (!input.trim() || !selectedChannel || !user) return;
     const content = input;
@@ -430,18 +533,19 @@ export default function DiscordClone() {
     <VoiceProvider>
     <div className="flex h-screen w-screen bg-[#313338] text-zinc-100 overflow-hidden select-none">
       <div className="w-[72px] bg-[#1E1F22] flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto">
+        <button onClick={() => setViewMode("dm")} className={`w-12 h-12 flex items-center justify-center text-xl transition-all ${viewMode === "dm" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Mensagens Diretas">💬</button>
         <div className="w-8 h-0.5 bg-[#35363C] rounded-full my-1" />
         {servers.map((server) => (
           <button
             key={server.id}
-            onClick={() => { setSelectedServer(server.id); setSelectedChannel(server.channels[0]?.id || ""); }}
+            onClick={() => { setViewMode("server"); setSelectedServer(server.id); setSelectedChannel(server.channels[0]?.id || ""); }}
             onDoubleClick={() => openEditServer(server)}
             onContextMenu={(e) => { e.preventDefault(); openEditServer(server); }}
-            className={`w-12 h-12 flex items-center justify-center text-lg font-bold transition-all duration-200 relative group overflow-hidden ${selectedServer === server.id ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`}
+            className={`w-12 h-12 flex items-center justify-center text-lg font-bold transition-all duration-200 relative group overflow-hidden ${viewMode === "server" && selectedServer === server.id ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`}
             title={`${server.name} (duplo clique para editar)`}
           >
             {server.image_url ? <img src={server.image_url} alt={server.name} className="w-full h-full object-cover" /> : server.icon}
-            {selectedServer === server.id && <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />}
+            {viewMode === "server" && selectedServer === server.id && <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />}
           </button>
         ))}
         <button onClick={openCreateServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#23A559] text-[#23A559] hover:text-white flex items-center justify-center transition-all duration-200 group" title="Adicionar servidor">
@@ -450,47 +554,90 @@ export default function DiscordClone() {
       </div>
 
       <div className="w-60 bg-[#2B2D31] flex flex-col shrink-0">
-        <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            {currentServer?.image_url ? <img src={currentServer.image_url} alt="" className="w-6 h-6 rounded object-cover shrink-0" /> : <span className="text-sm shrink-0">{currentServer?.icon}</span>}
-            <span className="font-bold text-[15px] truncate">{currentServer?.name}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
-            {currentServer && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
-            {currentServer && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2 space-y-4">
-          <div>
-            <div className="flex items-center justify-between px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">
-              <span>⌄ CANAIS DE TEXTO</span>
-              <Plus onClick={createChannel} className="w-3.5 h-3.5 cursor-pointer hover:text-zinc-200" />
+        {viewMode === "dm" ? (
+          <>
+            <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
+              <span className="font-bold text-[15px]">Mensagens Diretas</span>
+              <button onClick={() => setShowNewDMModal(true)} className="w-7 h-7 rounded bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
             </div>
-            {currentServer?.channels.filter((c) => c.type === "text").map((ch) => (
-              <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-                <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
-                  {ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Hash className="w-4 h-4 shrink-0 text-zinc-500" />}<span className="truncate">{ch.name}</span>
+            <div className="p-2">
+              <div className="relative mb-2">
+                <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input placeholder="Buscar DM" className="w-full bg-[#1E1F22] rounded pl-7 pr-2 py-1.5 text-sm focus:outline-none placeholder:text-zinc-500" />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {dmConversations.length === 0 ? (
+                <p className="text-xs text-zinc-500 px-2">Nenhuma DM ainda. Clique + para iniciar.</p>
+              ) : dmConversations.map((dm) => (
+                <button key={dm.id} onClick={() => setSelectedDM(dm.id)} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+                  <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{dm.otherUser?.avatar || "👤"}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
+                    <div className="text-xs text-zinc-500 truncate">Clique para conversar</div>
+                  </div>
+                  <div className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dm.otherUser?.id) ? "bg-[#23A559]" : "bg-zinc-600"}`} />
                 </button>
-                <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="flex items-center gap-1 px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">⌄ CANAIS DE VOZ</div>
-            {currentServer?.channels.filter((c) => c.type === "voice").map((ch) => (
-              <div key={ch.id} className="flex flex-col">
-                <div className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-                  <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
-                    {ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" />}<span className="truncate">{ch.name}</span>
-                  </button>
-                  <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
+              ))}
+              <div className="mt-4 p-2 bg-[#232428] rounded">
+                <p className="text-xs font-bold text-zinc-300">Amigos Online — {onlineMembers.length}</p>
+                <div className="mt-2 space-y-1">
+                  {onlineMembers.slice(0, 5).map((m) => (
+                    <button key={m.id} onClick={() => { setNewDMUsername(m.username); setShowNewDMModal(true); }} className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[#35373C] text-left">
+                      <div className="w-6 h-6 rounded-full bg-[#41434A] flex items-center justify-center text-xs">{m.avatar}</div>
+                      <span className="text-xs text-zinc-300 truncate">{m.username}</span>
+                      <Plus className="w-3 h-3 ml-auto text-zinc-500" />
+                    </button>
+                  ))}
                 </div>
-                <VoicePreview channelId={ch.id} />
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                {currentServer?.image_url ? <img src={currentServer.image_url} alt="" className="w-6 h-6 rounded object-cover shrink-0" /> : <span className="text-sm shrink-0">{currentServer?.icon}</span>}
+                <span className="font-bold text-[15px] truncate">{currentServer?.name}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
+                {currentServer && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
+                {currentServer && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-4">
+              <div>
+                <div className="flex items-center justify-between px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">
+                  <span>⌄ CANAIS DE TEXTO</span>
+                  <Plus onClick={createChannel} className="w-3.5 h-3.5 cursor-pointer hover:text-zinc-200" />
+                </div>
+                {currentServer?.channels.filter((c) => c.type === "text").map((ch) => (
+                  <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+                    <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
+                      {ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Hash className="w-4 h-4 shrink-0 text-zinc-500" />}<span className="truncate">{ch.name}</span>
+                    </button>
+                    <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="flex items-center gap-1 px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">⌄ CANAIS DE VOZ</div>
+                {currentServer?.channels.filter((c) => c.type === "voice").map((ch) => (
+                  <div key={ch.id} className="flex flex-col">
+                    <div className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+                      <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
+                        {ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" />}<span className="truncate">{ch.name}</span>
+                      </button>
+                      <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
+                    </div>
+                    <VoicePreview channelId={ch.id} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
           <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0 relative">
           <div className="relative">
             <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
@@ -516,55 +663,106 @@ export default function DiscordClone() {
       </div>
 
       <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
-        <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-          <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
-          <span className="w-px h-6 bg-[#3F4147] mx-2" />
-          <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
-          <div className="ml-auto flex items-center gap-4 text-zinc-400">
-            <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><UserPlus className="w-5 h-5" />
-            <div className="relative hidden md:block"><Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" /><input placeholder="Buscar" className="bg-[#2B2D31] rounded pl-7 pr-2 py-1 text-sm w-36 focus:outline-none placeholder:text-zinc-500" /></div>
-            <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
-          {currentChannel?.type === "voice" ? (
-            <VoiceChannel channelId={selectedChannel} username={username} />
-          ) : (
-            <>
-              <div className="py-8 border-b border-[#3F4147] mb-4">
-                <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-3xl mb-3"><Hash className="w-8 h-8" /></div>
-                <h1 className="text-3xl font-bold">Bem-vindo(a) ao #{currentChannel?.name}!</h1>
-                <p className="text-zinc-400 mt-2">Mensagens agora são salvas no Supabase e aparecem em tempo real para todos.</p>
-                {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
-              </div>
-              {channelMessages.map((msg) => (
-                <div key={msg.id} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}>{msg.avatar}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
-                    <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>
-                  </div>
-                  <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg"><Smile className="w-4 h-4" /><MoreHorizontal className="w-4 h-4" /></div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </>
-          )}
-        </div>
-
-        {currentChannel?.type === "text" && (
-          <div className="p-4 shrink-0">
-            <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
-              <button className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0"><Plus className="w-4 h-4 text-[#383A40]" /></button>
-              <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
-              <div className="flex items-center gap-2 text-zinc-400 shrink-0">
-                <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
-                <button onClick={handleSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>
+        {viewMode === "dm" ? (
+          <>
+            <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
+              {selectedDM ? (
+                <>
+                  <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">{dmConversations.find((d) => d.id === selectedDM)?.otherUser?.avatar || "👤"}</div>
+                  <span className="font-bold">{dmConversations.find((d) => d.id === selectedDM)?.otherUser?.username || "DM"}</span>
+                  <span className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dmConversations.find((d) => d.id === selectedDM)?.otherUser?.id) ? "bg-[#23A559]" : "bg-zinc-500"}`} />
+                </>
+              ) : (
+                <span className="font-bold text-zinc-400">Selecione uma conversa</span>
+              )}
+              <div className="ml-auto flex items-center gap-3 text-zinc-400">
+                <Phone className="w-5 h-5" /><Video className="w-5 h-5" />
               </div>
             </div>
-            <p className="text-xs text-zinc-500 mt-2 hidden md:block">Enter para enviar • Realtime ativo • Compartilhe a URL com seus amigos</p>
-          </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-1">
+              {!selectedDM ? (
+                <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
+                  <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-2xl">💬</div>
+                  <p>Selecione uma DM ou crie uma nova com +</p>
+                </div>
+              ) : dmMessages.length === 0 ? (
+                <div className="py-8 text-center border-b border-[#3F4147]">
+                  <p className="text-zinc-400">Início da DM com {dmConversations.find((d) => d.id === selectedDM)?.otherUser?.username}</p>
+                  <p className="text-xs text-zinc-500 mt-1">Mensagens privadas em tempo real</p>
+                </div>
+              ) : (
+                dmMessages.map((m) => (
+                  <div key={m.id} className="flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
+                    <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{m.sender_id === user?.id ? "😎" : "👤"}</div>
+                    <div>
+                      <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === user?.id ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
+                      <p className="text-[15px] text-[#DBDEE1] break-words">{m.content}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={dmEndRef} />
+            </div>
+            {selectedDM && (
+              <div className="p-4 shrink-0">
+                <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
+                  <input value={dmInput} onChange={(e) => setDmInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmConversations.find((d) => d.id === selectedDM)?.otherUser?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                  <button onClick={handleDMSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
+              <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
+              <span className="w-px h-6 bg-[#3F4147] mx-2" />
+              <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
+              <div className="ml-auto flex items-center gap-4 text-zinc-400">
+                <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><UserPlus className="w-5 h-5" />
+                <div className="relative hidden md:block"><Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" /><input placeholder="Buscar" className="bg-[#2B2D31] rounded pl-7 pr-2 py-1 text-sm w-36 focus:outline-none placeholder:text-zinc-500" /></div>
+                <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
+              {currentChannel?.type === "voice" ? (
+                <VoiceChannel channelId={selectedChannel} username={username} />
+              ) : (
+                <>
+                  <div className="py-8 border-b border-[#3F4147] mb-4">
+                    <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-3xl mb-3"><Hash className="w-8 h-8" /></div>
+                    <h1 className="text-3xl font-bold">Bem-vindo(a) ao #{currentChannel?.name}!</h1>
+                    <p className="text-zinc-400 mt-2">Mensagens agora são salvas no Supabase e aparecem em tempo real para todos.</p>
+                    {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
+                  </div>
+                  {channelMessages.map((msg) => (
+                    <div key={msg.id} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}>{msg.avatar}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
+                        <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                      <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg"><Smile className="w-4 h-4" /><MoreHorizontal className="w-4 h-4" /></div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </>
+              )}
+            </div>
+            {currentChannel?.type === "text" && (
+              <div className="p-4 shrink-0">
+                <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
+                  <button className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0"><Plus className="w-4 h-4 text-[#383A40]" /></button>
+                  <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                  <div className="flex items-center gap-2 text-zinc-400 shrink-0">
+                    <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
+                    <button onClick={handleSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 mt-2 hidden md:block">Enter para enviar • Realtime ativo • Compartilhe a URL com seus amigos</p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -630,6 +828,20 @@ export default function DiscordClone() {
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowCreateServerModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
               <button onClick={handleServerSave} disabled={!newServerName.trim() || creatingServer} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingServer ? "Salvando..." : editingServer ? "Salvar" : "Criar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNewDMModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold mb-1">Nova DM</h2>
+            <p className="text-sm text-zinc-400 mb-4">Digite o username do amigo</p>
+            <input value={newDMUsername} onChange={(e) => setNewDMUsername(e.target.value)} placeholder="ex: wellington" className="w-full bg-[#2B2D31] border border-[#1E1F22] rounded px-3 py-2 text-white outline-none focus:border-[#5865F2]" autoFocus />
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowNewDMModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
+              <button onClick={createDM} disabled={!newDMUsername.trim() || creatingDM} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingDM ? "Criando..." : "Criar DM"}</button>
             </div>
           </div>
         </div>
