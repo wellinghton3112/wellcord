@@ -106,9 +106,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const join = async () => {
     setError("");
     try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const hasMic = devices.some((d) => d.kind === "audioinput");
-      if (!hasMic) throw new Error("Nenhum microfone detectado. Conecte um headset ou use o celular.");
+      // Chama direto para o navegador pedir permissão — enumerateDevices antes só mascara dispositivos
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
       localStreamRef.current = stream;
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
