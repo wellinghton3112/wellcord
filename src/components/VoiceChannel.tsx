@@ -159,9 +159,10 @@ export default function VoiceChannel({ channelId, username }: Props) {
       });
 
       ch.on("presence", { event: "sync" }, () => {
-        const state = ch.presenceState();
+        const state: any = ch.presenceState();
+        console.log("presence sync", state);
         const ids: string[] = [];
-        Object.values(state).forEach((arr: any) => arr.forEach((p: any) => ids.push(p.presence?.id || p.user_id)));
+        Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push(p.id || p.user_id || p.presence?.id)));
         // adicionar peers novos
         ids.forEach((id) => {
           if (id === myIdRef.current) return;
