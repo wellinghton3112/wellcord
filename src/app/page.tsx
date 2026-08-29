@@ -489,18 +489,18 @@ export default function DiscordClone() {
             ))}
           </div>
         </div>
-          <div className="h-[52px] bg-[#232428] flex flex-col justify-center px-2 gap-0 shrink-0 relative">
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />
-              </div>
-              <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
-                <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
-                <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
-              </div>
-              <span className="text-[9px] font-mono bg-[#1E1F22] px-1.5 py-0.5 rounded text-zinc-500 ml-auto">{APP_VERSION}</span>
-            </div>
+          <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0 relative">
+          <div className="relative">
+            <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />
+          </div>
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+            <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
+            <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
+          </div>
+          <span className="text-[8px] font-mono bg-[#1E1F22] px-1 py-0.5 rounded text-zinc-500 shrink-0">{APP_VERSION}</span>
+          <button onClick={() => setShowUsernameModal(true)} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
+          <button onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }} className="p-1 hover:bg-[#DA373C] rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
           {showStatusMenu && (
             <div className="absolute bottom-full left-2 mb-2 w-48 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">
               {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map((k) => (
@@ -510,11 +510,6 @@ export default function DiscordClone() {
               ))}
             </div>
           )}
-          <div className="flex items-center gap-1 mt-0.5">
-            <button onClick={() => setShowUsernameModal(true)} className="p-1 hover:bg-[#35373C] rounded"><Settings className="w-3 h-3 text-zinc-400" /></button>
-            <button onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }} className="p-1 hover:bg-[#DA373C] rounded group" title="Sair"><LogOut className="w-3 h-3 text-zinc-400 group-hover:text-white" /></button>
-            <span className="text-[9px] text-zinc-600 ml-auto hidden">v0.1.3</span>
-          </div>
         </div>
       </div>
 
