@@ -10,12 +10,11 @@ export default function VoicePreview({ channelId }: Props) {
 
   useEffect(() => {
     const supabase = createClient();
-    const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: `preview-${channelId}-${Math.random()}` } } });
+    const ch = supabase.channel(`voice-preview:${channelId}`, { config: { presence: { key: `preview-${channelId}` } } });
     ch.on("presence", { event: "sync" }, () => {
       const state: any = ch.presenceState();
       const ids: { id: string; username: string }[] = [];
       Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push({ id: p.id, username: p.username || p.id?.split("-")[0] })));
-      // dedup
       const uniq = Array.from(new Map(ids.map((m) => [m.id, m])).values());
       setPeers(uniq);
     });

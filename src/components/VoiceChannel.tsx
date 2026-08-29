@@ -29,6 +29,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
+  const previewChannelRef = useRef<any>(null);
   const myIdRef = useRef<string>(`${username}-${Math.random().toString(36).slice(2, 7)}`);
 
   useEffect(() => {
@@ -49,6 +50,10 @@ export default function VoiceChannel({ channelId, username }: Props) {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
+    }
+    if (previewChannelRef.current) {
+      supabase.removeChannel(previewChannelRef.current);
+      previewChannelRef.current = null;
     }
     setSpeaking({});
   };
@@ -205,6 +210,10 @@ export default function VoiceChannel({ channelId, username }: Props) {
         if (status === "SUBSCRIBED") {
           await ch.track({ id: myIdRef.current, username });
           setJoined(true);
+          // também anuncia no canal de preview da sidebar
+          const previewCh = supabase.channel(`voice-preview:${channelId}`, { config: { presence: { key: myIdRef.current } } });
+          previewChannelRef.current = previewCh;
+          previewCh.subscribe(async (s) => { if (s === "SUBSCRIBED") await previewCh.track({ id: myIdRef.current, username }); });
           // loop de detecção de voz
           const checkSpeaking = () => {
             const next: Record<string, boolean> = {};
