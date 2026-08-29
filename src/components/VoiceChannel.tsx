@@ -106,6 +106,9 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const join = async () => {
     setError("");
     try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const hasMic = devices.some((d) => d.kind === "audioinput");
+      if (!hasMic) throw new Error("Nenhum microfone detectado. Conecte um headset ou use o celular.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
       localStreamRef.current = stream;
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
@@ -160,7 +163,13 @@ export default function VoiceChannel({ channelId, username }: Props) {
         }
       });
     } catch (e: any) {
-      setError(e.message || "Permissão de microfone negada");
+      if (e.name === "NotFoundError" || e.message?.includes("Requested device")) {
+        setError("Microfone não encontrado. Verifique: 1) Windows > Configurações > Privacidade > Microfone > Permitir 2) Chrome > cadeado na barra de endereço > Microfone > Permitir 3) Nenhum outro app usando o mic. Tente no celular!");
+      } else if (e.name === "NotAllowedError") {
+        setError("Permissão negada. Clique no cadeado 🔒 ao lado da URL > Microfone > Permitir e recarregue.");
+      } else {
+        setError(e.message || "Erro ao acessar microfone");
+      }
     }
   };
 
