@@ -1,26 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase";
+import { useVoice } from "@/context/VoiceContext";
 
 type Props = { channelId: string };
 
 export default function VoicePreview({ channelId }: Props) {
-  const [peers, setPeers] = useState<{ id: string; username: string }[]>([]);
+  const { participants } = useVoice();
+  const peers = participants[channelId] || [];
   const [duration, setDuration] = useState("0:00");
-
-  useEffect(() => {
-    const supabase = createClient();
-    const ch = supabase.channel(`voice-preview:${channelId}`, { config: { presence: { key: `preview-${channelId}` } } });
-    ch.on("presence", { event: "sync" }, () => {
-      const state: any = ch.presenceState();
-      const ids: { id: string; username: string }[] = [];
-      Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push({ id: p.id, username: p.username || p.id?.split("-")[0] })));
-      const uniq = Array.from(new Map(ids.map((m) => [m.id, m])).values());
-      setPeers(uniq);
-    });
-    ch.subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [channelId]);
 
   useEffect(() => {
     if (peers.length === 0) return;
@@ -33,7 +20,7 @@ export default function VoicePreview({ channelId }: Props) {
       setDuration(h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`);
     }, 1000);
     return () => clearInterval(iv);
-  }, [peers.length > 0 ? "active" : "idle"]);
+  }, [peers.length]);
 
   if (peers.length === 0) return null;
 

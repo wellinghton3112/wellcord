@@ -32,6 +32,7 @@ import { APP_VERSION } from "@/lib/version";
 import { createClient } from "@/lib/supabase";
 import VoiceChannel from "@/components/VoiceChannel";
 import VoicePreview from "@/components/VoicePreview";
+import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
 
 type Message = {
@@ -426,6 +427,7 @@ export default function DiscordClone() {
   }
 
   return (
+    <VoiceProvider>
     <div className="flex h-screen w-screen bg-[#313338] text-zinc-100 overflow-hidden select-none">
       <div className="w-[72px] bg-[#1E1F22] flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto">
         <div className="w-8 h-0.5 bg-[#35363C] rounded-full my-1" />
@@ -672,5 +674,6 @@ export default function DiscordClone() {
         </div>
       )}
     </div>
+    </VoiceProvider>
   );
 }

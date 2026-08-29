@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2 } from "lucide-react";
+import { useVoice } from "@/context/VoiceContext";
 
 type Props = {
   channelId: string;
@@ -16,6 +17,7 @@ type Peer = {
 
 export default function VoiceChannel({ channelId, username }: Props) {
   const supabase = createClient();
+  const { setParticipants } = useVoice();
   const [joined, setJoined] = useState(false);
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
@@ -29,7 +31,6 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
-  const previewChannelRef = useRef<any>(null);
   const myIdRef = useRef<string>(`${username}-${Math.random().toString(36).slice(2, 7)}`);
 
   useEffect(() => {
@@ -51,11 +52,8 @@ export default function VoiceChannel({ channelId, username }: Props) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    if (previewChannelRef.current) {
-      supabase.removeChannel(previewChannelRef.current);
-      previewChannelRef.current = null;
-    }
     setSpeaking({});
+    setParticipants(channelId, []);
   };
 
   const setupAnalyser = (id: string, stream: MediaStream) => {
@@ -186,15 +184,12 @@ export default function VoiceChannel({ channelId, username }: Props) {
 
       ch.on("presence", { event: "sync" }, () => {
         const state: any = ch.presenceState();
-        console.log("presence sync", state);
         const ids: string[] = [];
         Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push(p.id || p.user_id || p.presence?.id)));
-        // adicionar peers novos
         ids.forEach((id) => {
           if (id === myIdRef.current) return;
           if (!peersRef.current.has(id)) createPeer(id, true);
         });
-        // remover desconectados
         peersRef.current.forEach((_, id) => {
           if (!ids.includes(id)) {
             peersRef.current.get(id)?.close();
@@ -203,17 +198,15 @@ export default function VoiceChannel({ channelId, username }: Props) {
             remoteAudiosRef.current.delete(id);
           }
         });
-        setPeers(ids.filter((id) => id !== myIdRef.current).map((id) => ({ id, username: id.split("-")[0] })));
+        const peerList = ids.map((id) => ({ id, username: id.split("-")[0] }));
+        setPeers(peerList.filter((p) => p.id !== myIdRef.current));
+        setParticipants(channelId, peerList);
       });
 
       ch.subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
           await ch.track({ id: myIdRef.current, username });
           setJoined(true);
-          // também anuncia no canal de preview da sidebar
-          const previewCh = supabase.channel(`voice-preview:${channelId}`, { config: { presence: { key: myIdRef.current } } });
-          previewChannelRef.current = previewCh;
-          previewCh.subscribe(async (s) => { if (s === "SUBSCRIBED") await previewCh.track({ id: myIdRef.current, username }); });
           // loop de detecção de voz
           const checkSpeaking = () => {
             const next: Record<string, boolean> = {};
