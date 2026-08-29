@@ -36,8 +36,31 @@ create policy "dm_conversations para participantes" on dm_conversations for all 
 drop policy if exists "criar dm_conversations" on dm_conversations;
 create policy "criar dm_conversations" on dm_conversations for insert with check (auth.role() = 'authenticated');
 
+-- FIX recursão: função SECURITY DEFINER bypassa RLS para checar participação
+create or replace function is_dm_participant(conv uuid)
+returns boolean language sql security definer set search_path = public as $$
+  select exists (select 1 from dm_participants where conversation_id = conv and user_id = auth.uid());
+$$;
+
 drop policy if exists "dm_participants visível" on dm_participants;
-create policy "dm_participants visível" on dm_participants for all using (auth.uid() = user_id or exists (select 1 from dm_participants dp where dp.conversation_id = dm_participants.conversation_id and dp.user_id = auth.uid())) with check (auth.role() = 'authenticated');
+create policy "dm_participants visível" on dm_participants for all
+  using (auth.uid() = user_id or is_dm_participant(conversation_id))
+  with check (auth.role() = 'authenticated');
+
+-- também corrige as policies que dependem de dm_participants para usar a função (evita recursão indireta)
+drop policy if exists "dm_conversations para participantes" on dm_conversations;
+create policy "dm_conversations para participantes" on dm_conversations for all using (
+  is_dm_participant(id)
+) with check (
+  is_dm_participant(id)
+);
+
+drop policy if exists "dm_messages para participantes" on dm_messages;
+create policy "dm_messages para participantes" on dm_messages for all using (
+  is_dm_participant(conversation_id)
+) with check (
+  is_dm_participant(conversation_id)
+);
 
 drop policy if exists "dm_messages para participantes" on dm_messages;
 create policy "dm_messages para participantes" on dm_messages for all using (
