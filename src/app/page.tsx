@@ -560,7 +560,7 @@ export default function DiscordClone() {
 
       <div className="flex h-full">
 
-      <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} fixed lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
+      <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed inset-y-0 left-0 lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex lg:flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
         <button onClick={() => setViewMode("dm")} className={`w-12 h-12 flex items-center justify-center text-xl transition-all ${viewMode === "dm" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Mensagens Diretas">💬</button>
         <div className="w-8 h-0.5 bg-[#35363C] rounded-full my-1" />
         {servers.map((server) => (
@@ -581,7 +581,7 @@ export default function DiscordClone() {
         </button>
       </div>
 
-      <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} fixed lg:relative z-50 lg:z-auto w-60 bg-[#2B2D31] flex flex-col shrink-0 h-full transition-transform duration-200`}>
+      <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed inset-y-0 left-[72px] lg:relative z-50 lg:z-auto w-60 bg-[#2B2D31] flex lg:flex flex-col shrink-0 h-full transition-transform duration-200`}>
         {viewMode === "dm" ? (
           <>
             <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
@@ -797,7 +797,7 @@ export default function DiscordClone() {
         )}
       </div>
 
-      <div className={`${showMobileMembers ? "fixed translate-x-0" : "hidden"} lg:relative lg:flex z-50 w-60 bg-[#2B2D31] flex-col shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
+      <div className={`${showMobileMembers ? "fixed inset-y-0 right-0 translate-x-0" : "hidden"} lg:translate-x-0 lg:relative lg:flex z-50 w-60 bg-[#2B2D31] flex-col shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
         <div className="p-3 space-y-4">
           <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2">ONLINE — {onlineMembers.length}</h3>
           {onlineMembers.map((m) => (
