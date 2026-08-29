@@ -90,7 +90,7 @@ const fallbackServers: Server[] = [
   },
 ];
 
-type PresenceUser = { id: string; username: string; avatar: string; status: "online" | "idle" | "dnd" | "invisible"; email?: string };
+type PresenceUser = { id: string; username: string; avatar: string; status: "online" | "idle" | "dnd" | "invisible" | "offline"; email?: string };
 const statusConfig = {
   online: { label: "Online", color: "bg-[#23A559]", icon: Circle },
   idle: { label: "Ausente", color: "bg-[#F0B132]", icon: Moon },
@@ -134,6 +134,7 @@ export default function DiscordClone() {
   const [user, setUser] = useState<any>(null);
   const [status, setStatus] = useState<"online" | "idle" | "dnd" | "invisible">("online");
   const [onlineMembers, setOnlineMembers] = useState<PresenceUser[]>([]);
+  const [allProfiles, setAllProfiles] = useState<PresenceUser[]>([]);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [viewMode, setViewMode] = useState<"server" | "dm">("server");
   const [dmConversations, setDmConversations] = useState<DMConversation[]>([]);
@@ -197,7 +198,6 @@ export default function DiscordClone() {
           if (p.status !== "invisible") members.push(p as PresenceUser);
         })
       );
-      // remove duplicados por id
       const uniq = Array.from(new Map(members.map((m) => [m.id, m])).values());
       setOnlineMembers(uniq);
     });
@@ -206,6 +206,14 @@ export default function DiscordClone() {
     });
     return () => { supabase.removeChannel(ch); };
   }, [user, username, status]);
+
+  // Carregar todos os perfis para lista offline
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("id, username, avatar").then(({ data }) => {
+      if (data) setAllProfiles(data.map((p: any) => ({ id: p.id, username: p.username, avatar: p.avatar || "😎", status: "offline" as const })));
+    });
+  }, [user, onlineMembers.length]);
 
   // Atualiza presença quando username/status mudam
   useEffect(() => {
@@ -777,8 +785,14 @@ export default function DiscordClone() {
           ))}
           {onlineMembers.length === 0 && <p className="text-xs text-zinc-500 px-2">Ninguém online além de você. Convide amigos!</p>}
           <div className="border-t border-[#3F4147] pt-3 space-y-1">
-            <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2">OFFLINE</h3>
-            <p className="text-xs text-zinc-600 px-2">Usuários offline aparecem quando desconectam (invisível também conta como offline).</p>
+            <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2">OFFLINE — {allProfiles.filter((p) => !onlineMembers.some((o) => o.id === p.id)).length}</h3>
+            {allProfiles.filter((p) => !onlineMembers.some((o) => o.id === p.id)).slice(0, 20).map((m) => (
+              <div key={m.id} className="flex items-center gap-3 px-2 py-1 rounded opacity-60 hover:opacity-100 hover:bg-[#35373C] cursor-pointer group">
+                <div className="relative"><div className="w-8 h-8 rounded-full bg-[#41434A] flex items-center justify-center text-sm grayscale">{m.avatar}</div><div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2B2D31] bg-zinc-500" /></div>
+                <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate text-zinc-500 group-hover:text-zinc-300">{m.username}</div><div className="text-xs text-zinc-600">Offline</div></div>
+              </div>
+            ))}
+            {allProfiles.filter((p) => !onlineMembers.some((o) => o.id === p.id)).length === 0 && <p className="text-xs text-zinc-600 px-2">Nenhum offline</p>}
           </div>
           <div className="bg-[#232428] rounded-lg p-3 mt-4">
             <h4 className="font-bold text-sm mb-1">✅ Presença Ativa</h4>
