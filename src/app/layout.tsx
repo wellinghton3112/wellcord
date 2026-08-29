@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wellcord BETA 0.1.21 - Chat com amigos",
-  description: "Wellcord BETA 0.1.21 - Clone do Discord com Next.js + Supabase",
+  title: "Wellcord BETA 0.1.22 - Chat com amigos",
+  description: "Wellcord BETA 0.1.22 - Clone do Discord com Next.js + Supabase",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
