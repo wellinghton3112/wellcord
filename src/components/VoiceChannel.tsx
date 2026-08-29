@@ -103,10 +103,24 @@ export default function VoiceChannel({ channelId, username }: Props) {
     return pc;
   };
 
+  const testMic = async () => {
+    setError("Testando microfone...");
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Seu navegador não suporta microfone ou não está em HTTPS. Use Chrome/Firefox no https://wellcord.vercel.app");
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+      s.getTracks().forEach((t) => t.stop());
+      setError("✅ Microfone OK! Agora clique em Entrar na voz.");
+    } catch (e: any) {
+      console.error(e);
+      setError(`Teste falhou: ${e.name}: ${e.message}. Veja o cadeado 🔒 > Microfone > Permitir ou teste no celular.`);
+    }
+  };
+
   const join = async () => {
     setError("");
+    console.log("join clicked, secureContext:", window.isSecureContext, "mediaDevices:", !!navigator.mediaDevices);
     try {
-      // Chama direto para o navegador pedir permissão — enumerateDevices antes só mascara dispositivos
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Navegador sem suporte a microfone. Use Chrome/Edge/Firefox em HTTPS.");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
       localStreamRef.current = stream;
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
@@ -206,7 +220,8 @@ export default function VoiceChannel({ channelId, username }: Props) {
         <button onClick={join} className="bg-[#23A559] hover:bg-[#1A7F44] text-white px-8 py-3 rounded-full font-bold flex items-center gap-2">
           <PhoneOff className="w-5 h-5 rotate-[-135deg]" /> Entrar na voz
         </button>
-        <p className="text-xs text-zinc-500">Seu navegador vai pedir permissão do microfone</p>
+        <button onClick={testMic} className="bg-[#35373C] hover:bg-[#404249] text-white px-6 py-2 rounded-full text-sm">Testar microfone</button>
+        <p className="text-xs text-zinc-500">Seu navegador vai pedir permissao do microfone - Abra F12 para ver logs</p>
       </div>
     );
   }
