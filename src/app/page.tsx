@@ -21,6 +21,10 @@ import {
   LogOut,
   Mic,
   Headphones,
+  Circle,
+  Moon,
+  MinusCircle,
+  EyeOff,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import VoiceChannel from "@/components/VoiceChannel";
@@ -63,13 +67,13 @@ const fallbackServers: Server[] = [
   },
 ];
 
-const members = [
-  { name: "Você", avatar: "😎", status: "online", role: "Admin" },
-  { name: "Ana", avatar: "🌸", status: "online", role: "Online — 2" },
-  { name: "Marcos", avatar: "⚡", status: "idle", role: "" },
-  { name: "Julia", avatar: "🦊", status: "online", role: "" },
-  { name: "Pedro", avatar: "🎧", status: "offline", role: "Offline — 1" },
-];
+type PresenceUser = { id: string; username: string; avatar: string; status: "online" | "idle" | "dnd" | "invisible"; email?: string };
+const statusConfig = {
+  online: { label: "Online", color: "bg-[#23A559]", icon: Circle },
+  idle: { label: "Ausente", color: "bg-[#F0B132]", icon: Moon },
+  dnd: { label: "Não perturbe", color: "bg-[#DA373C]", icon: MinusCircle },
+  invisible: { label: "Invisível", color: "bg-zinc-500", icon: EyeOff },
+};
 
 function formatTime(dateStr: string) {
   try {
@@ -91,11 +95,26 @@ export default function DiscordClone() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [status, setStatus] = useState<"online" | "idle" | "dnd" | "invisible">("online");
+  const [onlineMembers, setOnlineMembers] = useState<PresenceUser[]>([]);
+  const [showStatusMenu, setShowStatusMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentServer = servers.find((s) => s.id === selectedServer);
   const currentChannel = currentServer?.channels.find((c) => c.id === selectedChannel);
   const channelMessages = messages.filter((m) => m.channelId === selectedChannel);
+
+  // Se veio do email com ?code=..., troca por sessão
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(() => {
+        window.history.replaceState({}, "", window.location.pathname);
+        window.location.reload();
+      });
+    }
+  }, []);
 
   // Auth: exige login
   useEffect(() => {
@@ -116,6 +135,36 @@ export default function DiscordClone() {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  // Presença real: online/ausente/ocupado/invisível
+  useEffect(() => {
+    if (!user || status === "invisible") {
+      setOnlineMembers([]);
+      return;
+    }
+    const ch = supabase.channel("presence:global", { config: { presence: { key: user.id } } });
+    ch.on("presence", { event: "sync" }, () => {
+      const state: any = ch.presenceState();
+      const members: PresenceUser[] = [];
+      Object.values(state).forEach((arr: any) =>
+        (arr as any[]).forEach((p: any) => {
+          if (p.status !== "invisible") members.push(p as PresenceUser);
+        })
+      );
+      // remove duplicados por id
+      const uniq = Array.from(new Map(members.map((m) => [m.id, m])).values());
+      setOnlineMembers(uniq);
+    });
+    ch.subscribe(async (s) => {
+      if (s === "SUBSCRIBED") await ch.track({ id: user.id, username, avatar: "😎", status, email: user.email });
+    });
+    return () => { supabase.removeChannel(ch); };
+  }, [user, username, status]);
+
+  // Atualiza presença quando username/status mudam
+  useEffect(() => {
+    if (!user || status === "invisible") return;
+  }, [status, username]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -328,12 +377,24 @@ export default function DiscordClone() {
             ))}
           </div>
         </div>
-        <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0">
-          <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold leading-none truncate">{username}</div>
-            <div className="text-xs text-zinc-400 leading-none truncate">{user?.email}</div>
+        <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0 relative">
+          <div className="relative">
+            <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />
           </div>
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+            <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
+            <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
+          </div>
+          {showStatusMenu && (
+            <div className="absolute bottom-full left-2 mb-2 w-48 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">
+              {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map((k) => (
+                <button key={k} onClick={() => { setStatus(k); setShowStatusMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[#35373C] ${status === k ? "bg-[#35373C] text-white" : "text-zinc-300"}`}>
+                  <span className={`w-3 h-3 rounded-full ${statusConfig[k].color}`} /> {statusConfig[k].label}
+                </button>
+              ))}
+            </div>
+          )}
           <button onClick={() => setShowUsernameModal(true)} className="p-1.5 hover:bg-[#35373C] rounded"><Settings className="w-4 h-4 text-zinc-400" /></button>
           <button onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }} className="p-1.5 hover:bg-[#DA373C] rounded group" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
         </div>
@@ -394,22 +455,22 @@ export default function DiscordClone() {
 
       <div className="w-60 bg-[#2B2D31] hidden lg:flex flex-col shrink-0 overflow-y-auto">
         <div className="p-3 space-y-4">
-          {[{ role: "ONLINE — 3", users: members.slice(0, 3) }, { role: "OFFLINE — 2", users: members.slice(3) }].map((group) => (
-            <div key={group.role}>
-              <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2 mb-1">{group.role}</h3>
-              {group.users.map((m) => (
-                <div key={m.name} className="flex items-center gap-3 px-2 py-1 rounded hover:bg-[#35373C] cursor-pointer group">
-                  <div className="relative"><div className="w-8 h-8 rounded-full bg-[#41434A] flex items-center justify-center text-sm">{m.avatar}</div><div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2B2D31] ${m.status === "online" ? "bg-[#23A559]" : m.status === "idle" ? "bg-[#F0B132]" : "bg-zinc-500"}`} /></div>
-                  <div className="flex-1 min-w-0"><div className={`text-sm font-medium truncate ${m.status === "offline" ? "text-zinc-500" : "text-zinc-300 group-hover:text-white"}`}>{m.name}</div></div>
-                </div>
-              ))}
+          <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2">ONLINE — {onlineMembers.length}</h3>
+          {onlineMembers.map((m) => (
+            <div key={m.id} className="flex items-center gap-3 px-2 py-1 rounded hover:bg-[#35373C] cursor-pointer group">
+              <div className="relative"><div className="w-8 h-8 rounded-full bg-[#41434A] flex items-center justify-center text-sm">{m.avatar}</div><div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2B2D31] ${statusConfig[m.status as keyof typeof statusConfig]?.color || "bg-[#23A559]"}`} /></div>
+              <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate text-zinc-300 group-hover:text-white">{m.username}</div><div className="text-xs text-zinc-500 truncate">{statusConfig[m.status as keyof typeof statusConfig]?.label || m.status}</div></div>
             </div>
           ))}
-          <div className="bg-[#232428] rounded-lg p-3 mt-6">
-            <h4 className="font-bold text-sm mb-1">✅ Supabase Conectado</h4>
-            <p className="text-xs text-zinc-400">ID do projeto: idppxrb...btq</p>
-            <p className="text-xs text-[#23A559] mt-1">● Realtime funcionando</p>
-            <p className="text-xs text-zinc-500 mt-2">Próximos: voz WebRTC, Desktop (Tauri), Mobile (Capacitor)</p>
+          {onlineMembers.length === 0 && <p className="text-xs text-zinc-500 px-2">Ninguém online além de você. Convide amigos!</p>}
+          <div className="border-t border-[#3F4147] pt-3 space-y-1">
+            <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2">OFFLINE</h3>
+            <p className="text-xs text-zinc-600 px-2">Usuários offline aparecem quando desconectam (invisível também conta como offline).</p>
+          </div>
+          <div className="bg-[#232428] rounded-lg p-3 mt-4">
+            <h4 className="font-bold text-sm mb-1">✅ Presença Ativa</h4>
+            <p className="text-xs text-zinc-400">Seu status: {statusConfig[status].label}</p>
+            <p className="text-xs text-[#23A559] mt-1">● {onlineMembers.length} online agora</p>
           </div>
         </div>
       </div>
