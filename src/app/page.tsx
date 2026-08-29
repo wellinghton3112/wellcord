@@ -184,23 +184,10 @@ export default function DiscordClone() {
         return;
       }
       if (!srvData || srvData.length === 0) {
-        // seed só uma vez: verifica de novo para evitar duplicata por corrida
-        const { data: check } = await supabase.from("servers").select("id").limit(1);
-        if (check && check.length > 0) return load();
-        const seed = [
-          { name: "Casa dos Amigos", icon: "🏠", channels: [{ name: "geral", type: "text" }, { name: "memes", type: "text" }, { name: "jogos", type: "text" }, { name: "Geral", type: "voice" }] },
-          { name: "Estudos", icon: "📚", channels: [{ name: "dúvidas", type: "text" }, { name: "projetos", type: "text" }] },
-          { name: "Games", icon: "🎮", channels: [{ name: "valorant", type: "text" }, { name: "minecraft", type: "text" }] },
-        ];
-        for (const s of seed) {
-          const { data: insSrv } = await supabase.from("servers").insert({ name: s.name, icon: s.icon }).select().single();
-          if (insSrv) {
-            for (const ch of s.channels) {
-              await supabase.from("channels").insert({ server_id: insSrv.id, name: ch.name, type: ch.type });
-            }
-          }
-        }
-        return load(); // recarregar
+        setServers([]);
+        setLoading(false);
+        setConnected(true);
+        return;
       }
       // buscar canais
       const { data: chData } = await supabase.from("channels").select("*").order("created_at");
