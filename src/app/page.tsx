@@ -25,6 +25,8 @@ import {
   Moon,
   MinusCircle,
   EyeOff,
+  Trash2,
+  X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import VoiceChannel from "@/components/VoiceChannel";
@@ -319,6 +321,32 @@ export default function DiscordClone() {
     }, 500);
   };
 
+  const deleteServer = async () => {
+    if (!currentServer) return;
+    if (!confirm(`Excluir servidor "${currentServer.name}" e todos os canais?`)) return;
+    const { error } = await supabase.from("servers").delete().eq("id", currentServer.id);
+    if (error) return alert(error.message);
+    // seleciona outro servidor
+    const remaining = servers.filter((s) => s.id !== currentServer.id);
+    if (remaining.length > 0) {
+      setSelectedServer(remaining[0].id);
+      setSelectedChannel(remaining[0].channels[0]?.id || "");
+    } else {
+      setSelectedServer("");
+      setSelectedChannel("");
+    }
+  };
+
+  const deleteChannel = async (channelId: string, channelName: string) => {
+    if (!confirm(`Excluir canal #${channelName}? Mensagens serão perdidas.`)) return;
+    const { error } = await supabase.from("channels").delete().eq("id", channelId);
+    if (error) alert(error.message);
+    else if (selectedChannel === channelId) {
+      const next = currentServer?.channels.find((c) => c.id !== channelId);
+      if (next) setSelectedChannel(next.id);
+    }
+  };
+
   const createChannel = async () => {
     const name = prompt("Nome do novo canal (sem #):");
     if (!name || !currentServer) return;
@@ -354,7 +382,10 @@ export default function DiscordClone() {
       <div className="w-60 bg-[#2B2D31] flex flex-col shrink-0">
         <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
           <span className="font-bold text-[15px] truncate">{currentServer?.name}</span>
-          <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
+          <div className="flex items-center gap-1">
+            <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
+            {currentServer && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-4">
           <div>
@@ -363,17 +394,23 @@ export default function DiscordClone() {
               <Plus onClick={createChannel} className="w-3.5 h-3.5 cursor-pointer hover:text-zinc-200" />
             </div>
             {currentServer?.channels.filter((c) => c.type === "text").map((ch) => (
-              <button key={ch.id} onClick={() => setSelectedChannel(ch.id)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[15px] font-medium mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-                <Hash className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
-              </button>
+              <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+                <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
+                  <Hash className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
+                </button>
+                <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
+              </div>
             ))}
           </div>
           <div>
             <div className="flex items-center gap-1 px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">⌄ CANAIS DE VOZ</div>
             {currentServer?.channels.filter((c) => c.type === "voice").map((ch) => (
-              <button key={ch.id} onClick={() => setSelectedChannel(ch.id)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[15px] font-medium mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-                <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
-              </button>
+              <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+                <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
+                  <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
+                </button>
+                <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
+              </div>
             ))}
           </div>
         </div>
