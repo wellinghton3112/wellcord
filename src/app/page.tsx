@@ -18,12 +18,13 @@ import {
   Pin,
   UserPlus,
   MoreHorizontal,
-  Crown,
+  LogOut,
   Mic,
   Headphones,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import VoiceChannel from "@/components/VoiceChannel";
+import { useRouter } from "next/navigation";
 
 type Message = {
   id: string;
@@ -79,6 +80,7 @@ function formatTime(dateStr: string) {
 
 export default function DiscordClone() {
   const supabase = createClient();
+  const router = useRouter();
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServer, setSelectedServer] = useState<string>("");
   const [selectedChannel, setSelectedChannel] = useState<string>("");
@@ -88,20 +90,32 @@ export default function DiscordClone() {
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
+  const [user, setUser] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const currentServer = servers.find((s) => s.id === selectedServer);
   const currentChannel = currentServer?.channels.find((c) => c.id === selectedChannel);
   const channelMessages = messages.filter((m) => m.channelId === selectedChannel);
 
+  // Auth: exige login
   useEffect(() => {
-    const saved = localStorage.getItem("discord-username");
-    if (saved) setUsername(saved);
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      setUser(user);
+      // busca perfil
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+      if (profile?.username) setUsername(profile.username);
+      else if (user.user_metadata?.username) setUsername(user.user_metadata.username);
+      else setUsername(user.email?.split("@")[0] || "Você");
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT" || !session) router.push("/login");
+    });
+    return () => listener.subscription.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem("discord-username", username);
-  }, [username]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -224,11 +238,12 @@ export default function DiscordClone() {
   }, []);
 
   const handleSend = async () => {
-    if (!input.trim() || !selectedChannel) return;
+    if (!input.trim() || !selectedChannel || !user) return;
     const content = input;
     setInput("");
     const { error } = await supabase.from("messages").insert({
       channel_id: selectedChannel,
+      user_id: user.id,
       username,
       content,
       avatar: "😎",
@@ -317,10 +332,10 @@ export default function DiscordClone() {
           <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold leading-none truncate">{username}</div>
-            <div className="text-xs text-zinc-400 leading-none">{connected ? "Online • Realtime" : "Online"}</div>
+            <div className="text-xs text-zinc-400 leading-none truncate">{user?.email}</div>
           </div>
           <button onClick={() => setShowUsernameModal(true)} className="p-1.5 hover:bg-[#35373C] rounded"><Settings className="w-4 h-4 text-zinc-400" /></button>
-          <Mic className="w-4 h-4 text-zinc-400" /><Headphones className="w-4 h-4 text-zinc-400" />
+          <button onClick={async () => { await supabase.auth.signOut(); router.push("/login"); }} className="p-1.5 hover:bg-[#DA373C] rounded group" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
         </div>
       </div>
 
@@ -403,9 +418,9 @@ export default function DiscordClone() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
             <h2 className="text-xl font-bold mb-2">Editar perfil</h2>
-            <p className="text-sm text-zinc-400 mb-4">Este nome aparece nas mensagens para seus amigos.</p>
+            <p className="text-sm text-zinc-400 mb-4">Este nome aparece nas mensagens. Logado como {user?.email}</p>
             <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white" placeholder="Seu nome" autoFocus />
-            <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowUsernameModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button><button onClick={() => setShowUsernameModal(false)} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] rounded text-sm font-medium text-white">Salvar</button></div>
+            <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowUsernameModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button><button onClick={async () => { if (user) await supabase.from("profiles").update({ username }).eq("id", user.id); setShowUsernameModal(false); }} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] rounded text-sm font-medium text-white">Salvar</button></div>
           </div>
         </div>
       )}
