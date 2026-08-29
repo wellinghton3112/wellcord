@@ -542,10 +542,23 @@ export default function DiscordClone() {
 
   return (
     <VoiceProvider>
-    <div className="flex h-screen w-screen bg-[#313338] text-zinc-100 overflow-hidden select-none">
+    <div className="flex flex-col h-screen w-screen bg-[#313338] text-zinc-100 overflow-hidden select-none">
       {showMobileSidebar && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setShowMobileSidebar(false)} />}
       {showMobileMembers && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setShowMobileMembers(false)} />}
 
+      <div className="h-12 flex items-center px-3 gap-2 border-b border-[#1F2124] shadow-sm shrink-0 bg-[#313338] z-30">
+        <button onClick={() => setShowMobileSidebar(!showMobileSidebar)} className="lg:hidden p-1.5 hover:bg-[#35373C] rounded text-lg">☰</button>
+        <span className="font-bold text-sm truncate">
+          {viewMode === "dm" ? "Mensagens Diretas" : currentServer?.name || ""}
+          {viewMode === "server" && currentChannel ? ` / ${currentChannel.name}` : ""}
+          {viewMode === "dm" && selectedDM ? ` / ${dmConversations.find((d) => d.id === selectedDM)?.otherUser?.username || ""}` : ""}
+        </span>
+        <div className="ml-auto flex items-center gap-2 text-zinc-400">
+          <button onClick={() => setShowMobileMembers(!showMobileMembers)} className="lg:hidden p-1.5 hover:bg-[#35373C] rounded text-lg">👥</button>
+        </div>
+      </div>
+
+      <div className="flex flex-1 min-h-0">
       <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform`}>
         <button onClick={() => setViewMode("dm")} className={`w-12 h-12 flex items-center justify-center text-xl transition-all ${viewMode === "dm" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Mensagens Diretas">💬</button>
         <div className="w-8 h-0.5 bg-[#35363C] rounded-full my-1" />
@@ -680,7 +693,6 @@ export default function DiscordClone() {
         {viewMode === "dm" ? (
           <>
             <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-              <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-1 hover:bg-[#35373C] rounded"><span className="text-lg">☰</span></button>
               {selectedDM ? (
                 <>
                   <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">{dmConversations.find((d) => d.id === selectedDM)?.otherUser?.avatar || "👤"}</div>
@@ -730,7 +742,6 @@ export default function DiscordClone() {
         ) : (
           <>
             <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-              <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-1 hover:bg-[#35373C] rounded"><span className="text-lg">☰</span></button>
               <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
               <span className="w-px h-6 bg-[#3F4147] mx-2" />
               <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
@@ -738,7 +749,6 @@ export default function DiscordClone() {
                 <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><UserPlus className="w-5 h-5" />
                 <div className="relative hidden md:block"><Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" /><input placeholder="Buscar" className="bg-[#2B2D31] rounded pl-7 pr-2 py-1 text-sm w-36 focus:outline-none placeholder:text-zinc-500" /></div>
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
-                <button onClick={() => setShowMobileMembers(true)} className="lg:hidden p-1 hover:bg-[#35373C] rounded"><span className="text-lg">👥</span></button>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
@@ -783,7 +793,7 @@ export default function DiscordClone() {
         )}
       </div>
 
-      <div className={`${showMobileMembers ? "translate-x-0" : "translate-x-full"} lg:translate-x-0 fixed right-0 lg:relative z-50 lg:z-auto w-60 bg-[#2B2D31] hidden lg:flex flex-col shrink-0 overflow-y-auto h-full transition-transform`}>
+      <div className={`${showMobileMembers ? "fixed translate-x-0 flex z-50" : "hidden"} lg:relative lg:flex lg:translate-x-0 w-60 bg-[#2B2D31] flex-col shrink-0 overflow-y-auto h-full transition-transform`}>
         <div className="p-3 space-y-4">
           <h3 className="text-xs font-semibold text-zinc-400 tracking-wide px-2">ONLINE — {onlineMembers.length}</h3>
           {onlineMembers.map((m) => (
@@ -810,6 +820,7 @@ export default function DiscordClone() {
             <p className="text-[10px] text-zinc-500 mt-2 font-mono">{APP_VERSION}</p>
           </div>
         </div>
+      </div>
       </div>
 
       {showUsernameModal && (
