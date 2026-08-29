@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import { APP_VERSION } from "@/lib/version";
 
 export default function LoginPage() {
   const supabase = createClient();
@@ -77,6 +78,7 @@ export default function LoginPage() {
             </button>
           </form>
           <p className="text-xs text-zinc-500 text-center mt-6">Ao registrar, você concorda com os Termos do Wellcord. Perfil salvo em Supabase Auth.</p>
+          <p className="text-[10px] font-mono text-zinc-600 text-center mt-2">{APP_VERSION}</p>
         </div>
       </div>
     </div>
