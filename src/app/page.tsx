@@ -48,6 +48,8 @@ type Channel = {
   server_id?: string;
   name: string;
   type: "text" | "voice";
+  icon?: string;
+  image_url?: string;
 };
 
 type Server = {
@@ -94,6 +96,13 @@ export default function DiscordClone() {
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("Você");
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
+  const [newChannelName, setNewChannelName] = useState("");
+  const [newChannelType, setNewChannelType] = useState<"text" | "voice">("text");
+  const [newChannelIcon, setNewChannelIcon] = useState("💬");
+  const [newChannelImage, setNewChannelImage] = useState<File | null>(null);
+  const [newChannelPreview, setNewChannelPreview] = useState("");
+  const [creatingChannel, setCreatingChannel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -195,7 +204,7 @@ export default function DiscordClone() {
         id: s.id,
         name: s.name,
         icon: s.icon,
-        channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type })),
+        channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
       }));
       setServers(mapped);
       if (!selectedServer && mapped.length > 0) {
@@ -256,7 +265,7 @@ export default function DiscordClone() {
       if (srvData) {
         const mapped: Server[] = srvData.map((s: any) => ({
           id: s.id, name: s.name, icon: s.icon,
-          channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type })),
+          channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
         }));
         setServers(mapped);
       }
@@ -267,7 +276,7 @@ export default function DiscordClone() {
       if (srvData && chData) {
         const mapped: Server[] = srvData.map((s: any) => ({
           id: s.id, name: s.name, icon: s.icon,
-          channels: chData.filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type })),
+          channels: chData.filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
         }));
         setServers(mapped);
       }
@@ -334,12 +343,38 @@ export default function DiscordClone() {
     }
   };
 
-  const createChannel = async () => {
-    const name = prompt("Nome do novo canal (sem #):");
-    if (!name || !currentServer) return;
-    const type = confirm("OK = canal de texto, Cancelar = canal de voz") ? "text" : "voice";
-    const { error } = await supabase.from("channels").insert({ server_id: currentServer.id, name: name.toLowerCase().replace(/\s+/g, "-"), type });
+  const createChannel = () => {
+    if (!currentServer) return;
+    setNewChannelName("");
+    setNewChannelType("text");
+    setNewChannelIcon("💬");
+    setNewChannelImage(null);
+    setNewChannelPreview("");
+    setShowCreateChannelModal(true);
+  };
+
+  const handleCreateChannel = async () => {
+    if (!newChannelName.trim() || !currentServer) return;
+    setCreatingChannel(true);
+    let image_url: string | null = null;
+    if (newChannelImage) {
+      const ext = newChannelImage.name.split(".").pop();
+      const path = `${currentServer.id}/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("channel-icons").upload(path, newChannelImage);
+      if (upErr) { alert("Erro ao subir imagem: " + upErr.message); setCreatingChannel(false); return; }
+      const { data } = supabase.storage.from("channel-icons").getPublicUrl(path);
+      image_url = data.publicUrl;
+    }
+    const { error } = await supabase.from("channels").insert({
+      server_id: currentServer.id,
+      name: newChannelName.toLowerCase().replace(/\s+/g, "-"),
+      type: newChannelType,
+      icon: newChannelIcon,
+      image_url,
+    });
+    setCreatingChannel(false);
     if (error) alert(error.message);
+    else setShowCreateChannelModal(false);
   };
 
   if (loading) {
@@ -383,7 +418,7 @@ export default function DiscordClone() {
             {currentServer?.channels.filter((c) => c.type === "text").map((ch) => (
               <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
-                  <Hash className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
+                  {ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Hash className="w-4 h-4 shrink-0 text-zinc-500" />}<span className="truncate">{ch.name}</span>
                 </button>
                 <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
               </div>
@@ -394,7 +429,7 @@ export default function DiscordClone() {
             {currentServer?.channels.filter((c) => c.type === "voice").map((ch) => (
               <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
-                  <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
+                  {ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" />}<span className="truncate">{ch.name}</span>
                 </button>
                 <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
               </div>
@@ -506,6 +541,45 @@ export default function DiscordClone() {
             <p className="text-sm text-zinc-400 mb-4">Este nome aparece nas mensagens. Logado como {user?.email}</p>
             <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white" placeholder="Seu nome" autoFocus />
             <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowUsernameModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button><button onClick={async () => { if (user) await supabase.from("profiles").update({ username }).eq("id", user.id); setShowUsernameModal(false); }} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] rounded text-sm font-medium text-white">Salvar</button></div>
+          </div>
+        </div>
+      )}
+
+      {showCreateChannelModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold mb-1">Criar canal</h2>
+            <p className="text-sm text-zinc-400 mb-4">Em {currentServer?.name}</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Nome do canal *</label>
+                <input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="ex: geral" className="w-full mt-1 bg-[#2B2D31] border border-[#1E1F22] rounded px-3 py-2 text-white outline-none focus:border-[#5865F2]" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Tipo</label>
+                <div className="flex gap-2 mt-1">
+                  <button onClick={() => setNewChannelType("text")} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded border ${newChannelType === "text" ? "bg-[#404249] border-[#5865F2] text-white" : "bg-[#2B2D31] border-[#1E1F22] text-zinc-400"}`}><Hash className="w-4 h-4" /> Texto</button>
+                  <button onClick={() => setNewChannelType("voice")} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded border ${newChannelType === "voice" ? "bg-[#404249] border-[#5865F2] text-white" : "bg-[#2B2D31] border-[#1E1F22] text-zinc-400"}`}><Volume2 className="w-4 h-4" /> Voz</button>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Ícone predefinido</label>
+                <div className="grid grid-cols-8 gap-2 mt-2">
+                  {["💬","🔥","🎮","🎵","📚","💡","🚀","😂","❤️","📌","🔒","⭐","🎨","💻","📢","🎲","🎯","📝","🔔","💎"].map((ic) => (
+                    <button key={ic} onClick={() => { setNewChannelIcon(ic); setNewChannelImage(null); setNewChannelPreview(""); }} className={`w-9 h-9 rounded flex items-center justify-center text-lg border ${newChannelIcon === ic && !newChannelImage ? "bg-[#5865F2] border-[#5865F2]" : "bg-[#2B2D31] border-[#1E1F22] hover:bg-[#404249]"}`}>{ic}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Ou imagem do computador</label>
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewChannelImage(f); if (f) setNewChannelPreview(URL.createObjectURL(f)); else setNewChannelPreview(""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-[#404249] file:text-white hover:file:bg-[#4A4D53]" />
+                {newChannelPreview && <img src={newChannelPreview} alt="preview" className="w-12 h-12 rounded object-cover mt-2 border border-[#404249]" />}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowCreateChannelModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
+              <button onClick={handleCreateChannel} disabled={!newChannelName.trim() || creatingChannel} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingChannel ? "Criando..." : "Criar canal"}</button>
+            </div>
           </div>
         </div>
       )}
