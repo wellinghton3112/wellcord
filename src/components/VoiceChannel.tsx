@@ -21,6 +21,9 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const [deafened, setDeafened] = useState(false);
   const [peers, setPeers] = useState<Peer[]>([]);
   const [error, setError] = useState("");
+  const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -37,6 +40,8 @@ export default function VoiceChannel({ channelId, username }: Props) {
     peersRef.current.clear();
     remoteAudiosRef.current.forEach((a) => a.remove());
     remoteAudiosRef.current.clear();
+    analysersRef.current.clear();
+    if (audioContextRef.current) { try { audioContextRef.current.close(); } catch {} audioContextRef.current = null; }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
@@ -45,6 +50,20 @@ export default function VoiceChannel({ channelId, username }: Props) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
+    setSpeaking({});
+  };
+
+  const setupAnalyser = (id: string, stream: MediaStream) => {
+    try {
+      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const ctx = audioContextRef.current;
+      if (ctx.state === "suspended") ctx.resume();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analysersRef.current.set(id, analyser);
+    } catch {}
   };
 
   useEffect(() => {
@@ -82,6 +101,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
       }
       audio.srcObject = e.streams[0];
       audio.muted = deafened;
+      setupAnalyser(peerId, e.streams[0]);
     };
 
     pc.onconnectionstatechange = () => {
@@ -134,6 +154,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
         }
       }
       localStreamRef.current = stream;
+      if (stream) setupAnalyser("local", stream);
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
       channelRef.current = ch;
 
@@ -184,6 +205,19 @@ export default function VoiceChannel({ channelId, username }: Props) {
         if (status === "SUBSCRIBED") {
           await ch.track({ id: myIdRef.current, username });
           setJoined(true);
+          // loop de detecção de voz
+          const checkSpeaking = () => {
+            const next: Record<string, boolean> = {};
+            analysersRef.current.forEach((analyser, id) => {
+              const data = new Uint8Array(analyser.frequencyBinCount);
+              analyser.getByteFrequencyData(data);
+              const avg = data.reduce((a, b) => a + b, 0) / data.length;
+              next[id] = avg > 12;
+            });
+            setSpeaking(next);
+            if (channelRef.current) requestAnimationFrame(checkSpeaking);
+          };
+          requestAnimationFrame(checkSpeaking);
         }
       });
     } catch (e: any) {
@@ -247,16 +281,16 @@ export default function VoiceChannel({ channelId, username }: Props) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="bg-[#232428] rounded-lg p-4 flex flex-col items-center gap-3 border-2 border-[#23A559]">
-          <div className="w-20 h-20 rounded-full bg-[#5865F2] flex items-center justify-center text-3xl">😎</div>
+        <div className={`bg-[#232428] rounded-lg p-4 flex flex-col items-center gap-3 border-2 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30 animate-pulse" : "border-[#23A559]/30"}`}>
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] ring-offset-2 ring-offset-[#232428] scale-105" : ""} bg-[#5865F2]`}>😎</div>
           <span className="font-medium">{username} (você)</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : "bg-[#23A559]"} text-white`}>{muted ? "Mutado" : "Falando"}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : speaking["local"] ? "bg-[#23A559] animate-pulse" : "bg-zinc-600"} text-white`}>{muted ? "Mutado" : speaking["local"] ? "Falando..." : "Conectado"}</span>
         </div>
         {peers.map((p) => (
-          <div key={p.id} className="bg-[#2B2D31] rounded-lg p-4 flex flex-col items-center gap-3">
-            <div className="w-20 h-20 rounded-full bg-[#41434A] flex items-center justify-center text-3xl">🧑</div>
+          <div key={p.id} className={`bg-[#2B2D31] rounded-lg p-4 flex flex-col items-center gap-3 border-2 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30 animate-pulse" : "border-transparent"}`}>
+            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all ${speaking[p.id] ? "ring-4 ring-[#23A559] ring-offset-2 ring-offset-[#2B2D31] scale-105" : ""} bg-[#41434A]`}>🧑</div>
             <span className="font-medium truncate max-w-full">{p.username}</span>
-            <span className="text-xs text-zinc-400">Conectado</span>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${speaking[p.id] ? "bg-[#23A559] animate-pulse text-white" : "bg-zinc-700 text-zinc-400"}`}>{speaking[p.id] ? "Falando..." : "Conectado"}</span>
           </div>
         ))}
         {peers.length === 0 && <div className="col-span-2 md:col-span-2 text-zinc-400 text-sm flex items-center justify-center">Nenhum amigo na voz ainda. Compartilhe o link!</div>}
