@@ -1,13 +1,30 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useVoice } from "@/context/VoiceContext";
+import { createClient } from "@/lib/supabase";
 
 type Props = { channelId: string };
 
 export default function VoicePreview({ channelId }: Props) {
-  const { participants } = useVoice();
-  const peers = participants[channelId] || [];
+  const [peers, setPeers] = useState<{ id: string; username: string }[]>([]);
   const [duration, setDuration] = useState("0:00");
+
+  useEffect(() => {
+    const supabase = createClient();
+    const ch = supabase.channel(`voice:global`, { config: { presence: { key: `preview-${channelId}-${Math.random()}` } } });
+    const update = () => {
+      const state: any = ch.presenceState();
+      const ids: { id: string; username: string; channelId: string }[] = [];
+      Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push(p)));
+      const filtered = ids.filter((p) => p.channelId === channelId);
+      const uniq = Array.from(new Map(filtered.map((m) => [m.id, m])).values());
+      setPeers(uniq);
+    };
+    ch.on("presence", { event: "sync" }, update);
+    ch.on("presence", { event: "join" }, update);
+    ch.on("presence", { event: "leave" }, update);
+    ch.subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [channelId]);
 
   useEffect(() => {
     if (peers.length === 0) return;

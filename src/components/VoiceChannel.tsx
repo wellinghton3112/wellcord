@@ -39,6 +39,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
+  const globalVoiceRef = useRef<any>(null);
   const myIdRef = useRef<string>(`${username}-${Math.random().toString(36).slice(2, 7)}`);
 
   useEffect(() => {
@@ -62,6 +63,10 @@ export default function VoiceChannel({ channelId, username }: Props) {
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
+    }
+    if (globalVoiceRef.current) {
+      supabase.removeChannel(globalVoiceRef.current);
+      globalVoiceRef.current = null;
     }
     setSpeaking({});
     setRemoteStreams({});
@@ -182,6 +187,9 @@ export default function VoiceChannel({ channelId, username }: Props) {
       }
       localStreamRef.current = stream;
       if (stream) setupAnalyser("local", stream);
+      const globalCh = supabase.channel(`voice:global`, { config: { presence: { key: myIdRef.current } } });
+      globalVoiceRef.current = globalCh;
+      globalCh.subscribe(async (s) => { if (s === "SUBSCRIBED") await globalCh.track({ id: myIdRef.current, username, channelId }); });
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
       channelRef.current = ch;
 
