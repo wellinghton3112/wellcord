@@ -23,6 +23,7 @@ import {
   Headphones,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import VoiceChannel from "@/components/VoiceChannel";
 
 type Message = {
   id: string;
@@ -306,7 +307,7 @@ export default function DiscordClone() {
           <div>
             <div className="flex items-center gap-1 px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">⌄ CANAIS DE VOZ</div>
             {currentServer?.channels.filter((c) => c.type === "voice").map((ch) => (
-              <button key={ch.id} onClick={() => alert("Voz em breve! Próximo passo: WebRTC 🎙️")} className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-[15px] font-medium text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200 mt-0.5">
+              <button key={ch.id} onClick={() => setSelectedChannel(ch.id)} className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-[15px] font-medium mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <Volume2 className="w-4 h-4 shrink-0 text-zinc-500" /><span className="truncate">{ch.name}</span>
               </button>
             ))}
@@ -335,9 +336,9 @@ export default function DiscordClone() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+        <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
           {currentChannel?.type === "voice" ? (
-            <div className="h-full flex flex-col items-center justify-center gap-4 text-zinc-400"><Volume2 className="w-16 h-16" /><p className="text-lg">Canal de voz — em breve com WebRTC!</p></div>
+            <VoiceChannel channelId={selectedChannel} username={username} />
           ) : (
             <>
               <div className="py-8 border-b border-[#3F4147] mb-4">
