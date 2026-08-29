@@ -25,17 +25,6 @@ alter table dm_conversations enable row level security;
 alter table dm_participants enable row level security;
 alter table dm_messages enable row level security;
 
-drop policy if exists "dm_conversations para participantes" on dm_conversations;
-create policy "dm_conversations para participantes" on dm_conversations for all using (
-  exists (select 1 from dm_participants where dm_participants.conversation_id = dm_conversations.id and dm_participants.user_id = auth.uid())
-) with check (
-  exists (select 1 from dm_participants where dm_participants.conversation_id = dm_conversations.id and dm_participants.user_id = auth.uid())
-);
-
--- permite criar conversa
-drop policy if exists "criar dm_conversations" on dm_conversations;
-create policy "criar dm_conversations" on dm_conversations for insert with check (auth.role() = 'authenticated');
-
 -- FIX recursão: função SECURITY DEFINER bypassa RLS para checar participação
 create or replace function is_dm_participant(conv uuid)
 returns boolean language sql security definer set search_path = public as $$
@@ -47,27 +36,19 @@ create policy "dm_participants visível" on dm_participants for all
   using (auth.uid() = user_id or is_dm_participant(conversation_id))
   with check (auth.role() = 'authenticated');
 
--- também corrige as policies que dependem de dm_participants para usar a função (evita recursão indireta)
+-- dm_conversations: SELECT/UPDATE/DELETE só para participantes, INSERT via "criar"
 drop policy if exists "dm_conversations para participantes" on dm_conversations;
-create policy "dm_conversations para participantes" on dm_conversations for all using (
-  is_dm_participant(id)
-) with check (
-  is_dm_participant(id)
-);
+drop policy if exists "dm_conversations select" on dm_conversations;
+drop policy if exists "dm_conversations update" on dm_conversations;
+drop policy if exists "dm_conversations delete" on dm_conversations;
+create policy "dm_conversations select" on dm_conversations for select using (is_dm_participant(id));
+create policy "dm_conversations update" on dm_conversations for update using (is_dm_participant(id)) with check (is_dm_participant(id));
+create policy "dm_conversations delete" on dm_conversations for delete using (is_dm_participant(id));
+drop policy if exists "criar dm_conversations" on dm_conversations;
+create policy "criar dm_conversations" on dm_conversations for insert with check (auth.role() = 'authenticated');
 
 drop policy if exists "dm_messages para participantes" on dm_messages;
-create policy "dm_messages para participantes" on dm_messages for all using (
-  is_dm_participant(conversation_id)
-) with check (
-  is_dm_participant(conversation_id)
-);
-
-drop policy if exists "dm_messages para participantes" on dm_messages;
-create policy "dm_messages para participantes" on dm_messages for all using (
-  exists (select 1 from dm_participants where dm_participants.conversation_id = dm_messages.conversation_id and dm_participants.user_id = auth.uid())
-) with check (
-  exists (select 1 from dm_participants where dm_participants.conversation_id = dm_messages.conversation_id and dm_participants.user_id = auth.uid())
-);
+create policy "dm_messages para participantes" on dm_messages for all using (is_dm_participant(conversation_id)) with check (is_dm_participant(conversation_id));
 
 alter publication supabase_realtime add table dm_messages;
 alter publication supabase_realtime add table dm_conversations;
