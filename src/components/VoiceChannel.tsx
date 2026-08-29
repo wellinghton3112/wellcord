@@ -292,13 +292,12 @@ export default function VoiceChannel({ channelId, username }: Props) {
 
   const toggleCamera = async () => {
     if (cameraOn) {
-      localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); localStreamRef.current?.removeTrack(t); });
+      localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
       peersRef.current.forEach((pc) => {
-        pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => pc.removeTrack(s));
+        pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
       });
-      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
       setCameraOn(false);
-      if (screenOn) setScreenOn(false);
       await renegotiate();
       return;
     }
@@ -307,38 +306,48 @@ export default function VoiceChannel({ channelId, username }: Props) {
       const track = stream.getVideoTracks()[0];
       if (!localStreamRef.current) localStreamRef.current = new MediaStream();
       localStreamRef.current.addTrack(track);
-      if (localVideoRef.current) localVideoRef.current.srcObject = new MediaStream([track]);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = new MediaStream([track]);
+        await localVideoRef.current.play().catch(() => {});
+      }
       peersRef.current.forEach((pc) => pc.addTrack(track, localStreamRef.current!));
       setCameraOn(true);
+      if (screenOn) setScreenOn(false);
       await renegotiate();
     } catch (e: any) { setError(e.message); }
   };
 
   const toggleScreen = async () => {
     if (screenOn) {
-      localStreamRef.current?.getVideoTracks().forEach((t) => { if (t.label.includes("screen")) { t.stop(); localStreamRef.current?.removeTrack(t); }});
+      localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
       peersRef.current.forEach((pc) => {
-        pc.getSenders().filter((s) => s.track?.label.includes("screen")).forEach((s) => pc.removeTrack(s));
+        pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
       });
-      // se tinha câmera, volta câmera
+      if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
       setScreenOn(false);
       await renegotiate();
       return;
     }
     try {
-      const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: true, audio: true });
+      const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: { displaySurface: "monitor" } as any, audio: true });
       const track = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
       if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-      // remove câmera se tiver
-      localStreamRef.current.getVideoTracks().forEach((t) => { if (!t.label.includes("screen")) { t.stop(); localStreamRef.current?.removeTrack(t); }});
+      // remove câmera
+      localStreamRef.current.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
       localStreamRef.current.addTrack(track);
-      if (localVideoRef.current) localVideoRef.current.srcObject = new MediaStream([track]);
+      if (audioTrack) { try { localStreamRef.current.addTrack(audioTrack); } catch {} }
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = new MediaStream([track]);
+        await localVideoRef.current.play().catch(() => {});
+      }
       peersRef.current.forEach((pc) => pc.addTrack(track, localStreamRef.current!));
+      if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
       track.onended = () => toggleScreen();
       setScreenOn(true);
       setCameraOn(false);
       await renegotiate();
-    } catch (e: any) { setError(e.message); }
+    } catch (e: any) { if (e.name !== "NotAllowedError") setError(e.message); }
   };
 
   if (!joined) {
