@@ -5,14 +5,14 @@ import { createClient } from "@/lib/supabase";
 type Props = { channelId: string };
 
 export default function VoicePreview({ channelId }: Props) {
-  const [peers, setPeers] = useState<{ id: string; username: string }[]>([]);
+  const [peers, setPeers] = useState<{ id: string; username: string; joined_at: string }[]>([]);
   const [duration, setDuration] = useState("0:00");
 
   useEffect(() => {
     const supabase = createClient();
     const load = async () => {
-      const { data } = await supabase.from("voice_sessions").select("user_id, username").eq("channel_id", channelId);
-      if (data) setPeers(data.map((r: any) => ({ id: r.user_id, username: r.username })));
+      const { data } = await supabase.from("voice_sessions").select("user_id, username, joined_at").eq("channel_id", channelId).order("joined_at", { ascending: true });
+      if (data) setPeers(data.map((r: any) => ({ id: r.user_id, username: r.username, joined_at: r.joined_at })));
     };
     load();
     const ch = supabase
@@ -23,8 +23,8 @@ export default function VoicePreview({ channelId }: Props) {
   }, [channelId]);
 
   useEffect(() => {
-    if (peers.length === 0) return;
-    const start = Date.now();
+    if (peers.length === 0) { setDuration("0:00"); return; }
+    const start = new Date(peers[0].joined_at).getTime();
     const iv = setInterval(() => {
       const s = Math.floor((Date.now() - start) / 1000);
       const h = Math.floor(s / 3600);
@@ -33,7 +33,7 @@ export default function VoicePreview({ channelId }: Props) {
       setDuration(h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`);
     }, 1000);
     return () => clearInterval(iv);
-  }, [peers.length]);
+  }, [peers[0]?.joined_at, peers.length]);
 
   if (peers.length === 0) return null;
 
