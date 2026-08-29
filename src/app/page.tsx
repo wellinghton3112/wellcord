@@ -733,9 +733,9 @@ export default function DiscordClone() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
-              {currentChannel?.type === "voice" ? (
-                <VoiceChannel channelId={selectedChannel} username={username} />
-              ) : (
+          {currentChannel?.type === "voice" ? (
+            <VoiceChannel channelId={selectedChannel} username={username} status={status} />
+          ) : (
                 <>
                   <div className="py-8 border-b border-[#3F4147] mb-4">
                     <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-3xl mb-3"><Hash className="w-8 h-8" /></div>

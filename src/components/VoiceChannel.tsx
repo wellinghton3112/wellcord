@@ -7,6 +7,7 @@ import { useVoice } from "@/context/VoiceContext";
 type Props = {
   channelId: string;
   username: string;
+  status?: string;
 };
 
 type Peer = {
@@ -15,7 +16,7 @@ type Peer = {
   muted?: boolean;
 };
 
-export default function VoiceChannel({ channelId, username }: Props) {
+export default function VoiceChannel({ channelId, username, status }: Props) {
   const supabase = createClient();
   const { setParticipants } = useVoice();
   const [joined, setJoined] = useState(false);
@@ -87,6 +88,25 @@ export default function VoiceChannel({ channelId, username }: Props) {
   useEffect(() => {
     return () => cleanup();
   }, [channelId]);
+
+  // Só desconecta se ficar sem internet ou fechar o app, NÃO quando ficar invisível
+  useEffect(() => {
+    const handleOffline = () => {
+      if (joined) {
+        leave();
+        setError("Desconectado da voz porque ficou sem internet");
+      }
+    };
+    const handleBeforeUnload = () => {
+      if (joined) supabase.from("voice_sessions").delete().eq("channel_id", channelId).then(() => {});
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [joined, channelId]);
 
   const createPeer = (peerId: string, isInitiator: boolean) => {
     if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
