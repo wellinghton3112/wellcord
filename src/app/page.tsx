@@ -56,6 +56,7 @@ type Server = {
   id: string;
   name: string;
   icon: string;
+  image_url?: string;
   channels: Channel[];
 };
 
@@ -103,6 +104,13 @@ export default function DiscordClone() {
   const [newChannelImage, setNewChannelImage] = useState<File | null>(null);
   const [newChannelPreview, setNewChannelPreview] = useState("");
   const [creatingChannel, setCreatingChannel] = useState(false);
+  const [showCreateServerModal, setShowCreateServerModal] = useState(false);
+  const [newServerName, setNewServerName] = useState("");
+  const [newServerIcon, setNewServerIcon] = useState("🏠");
+  const [newServerImage, setNewServerImage] = useState<File | null>(null);
+  const [newServerPreview, setNewServerPreview] = useState("");
+  const [creatingServer, setCreatingServer] = useState(false);
+  const [editingServer, setEditingServer] = useState<Server | null>(null);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -204,6 +212,7 @@ export default function DiscordClone() {
         id: s.id,
         name: s.name,
         icon: s.icon,
+        image_url: s.image_url,
         channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
       }));
       setServers(mapped);
@@ -264,7 +273,7 @@ export default function DiscordClone() {
       const { data: chData } = await supabase.from("channels").select("*").order("created_at");
       if (srvData) {
         const mapped: Server[] = srvData.map((s: any) => ({
-          id: s.id, name: s.name, icon: s.icon,
+          id: s.id, name: s.name, icon: s.icon, image_url: (s as any).image_url,
           channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
         }));
         setServers(mapped);
@@ -275,7 +284,7 @@ export default function DiscordClone() {
       const { data: srvData } = await supabase.from("servers").select("*").order("created_at");
       if (srvData && chData) {
         const mapped: Server[] = srvData.map((s: any) => ({
-          id: s.id, name: s.name, icon: s.icon,
+          id: s.id, name: s.name, icon: s.icon, image_url: (s as any).image_url,
           channels: chData.filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
         }));
         setServers(mapped);
@@ -303,18 +312,51 @@ export default function DiscordClone() {
     }
   };
 
-  const createServer = async () => {
-    const name = prompt("Nome do novo servidor:");
-    if (!name) return;
-    const { data, error } = await supabase.from("servers").insert({ name, icon: name[0].toUpperCase() }).select().single();
-    if (error) return alert(error.message);
-    await supabase.from("channels").insert({ server_id: data.id, name: "geral", type: "text" });
-    setSelectedServer(data.id);
-    // canal será selecionado via realtime reload; pega após delay
-    setTimeout(async () => {
-      const { data: ch } = await supabase.from("channels").select("*").eq("server_id", data.id).limit(1).single();
-      if (ch) setSelectedChannel(ch.id);
-    }, 500);
+  const openCreateServer = () => {
+    setEditingServer(null);
+    setNewServerName("");
+    setNewServerIcon("🏠");
+    setNewServerImage(null);
+    setNewServerPreview("");
+    setShowCreateServerModal(true);
+  };
+  const openEditServer = (s: Server) => {
+    setEditingServer(s);
+    setNewServerName(s.name);
+    setNewServerIcon(s.icon);
+    setNewServerImage(null);
+    setNewServerPreview(s.image_url || "");
+    setShowCreateServerModal(true);
+  };
+  const handleServerSave = async () => {
+    if (!newServerName.trim()) return;
+    setCreatingServer(true);
+    let image_url: string | null = editingServer?.image_url || null;
+    if (newServerImage) {
+      const ext = newServerImage.name.split(".").pop();
+      const path = `servers/${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("server-icons").upload(path, newServerImage);
+      if (upErr) { alert("Erro ao subir imagem: " + upErr.message); setCreatingServer(false); return; }
+      const { data } = supabase.storage.from("server-icons").getPublicUrl(path);
+      image_url = data.publicUrl;
+    } else if (!newServerPreview && editingServer?.image_url) {
+      image_url = null;
+    }
+    if (editingServer) {
+      const { error } = await supabase.from("servers").update({ name: newServerName, icon: newServerIcon, image_url }).eq("id", editingServer.id);
+      if (error) alert(error.message);
+    } else {
+      const { data, error } = await supabase.from("servers").insert({ name: newServerName, icon: newServerIcon, image_url }).select().single();
+      if (error) { alert(error.message); setCreatingServer(false); return; }
+      await supabase.from("channels").insert({ server_id: data.id, name: "geral", type: "text", icon: "💬" });
+      setSelectedServer(data.id);
+      setTimeout(async () => {
+        const { data: ch } = await supabase.from("channels").select("*").eq("server_id", data.id).limit(1).single();
+        if (ch) setSelectedChannel(ch.id);
+      }, 500);
+    }
+    setCreatingServer(false);
+    setShowCreateServerModal(false);
   };
 
   const deleteServer = async () => {
@@ -389,23 +431,29 @@ export default function DiscordClone() {
           <button
             key={server.id}
             onClick={() => { setSelectedServer(server.id); setSelectedChannel(server.channels[0]?.id || ""); }}
-            className={`w-12 h-12 flex items-center justify-center text-lg font-bold transition-all duration-200 relative group ${selectedServer === server.id ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`}
-            title={server.name}
+            onDoubleClick={() => openEditServer(server)}
+            onContextMenu={(e) => { e.preventDefault(); openEditServer(server); }}
+            className={`w-12 h-12 flex items-center justify-center text-lg font-bold transition-all duration-200 relative group overflow-hidden ${selectedServer === server.id ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`}
+            title={`${server.name} (duplo clique para editar)`}
           >
-            {server.icon}
+            {server.image_url ? <img src={server.image_url} alt={server.name} className="w-full h-full object-cover" /> : server.icon}
             {selectedServer === server.id && <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />}
           </button>
         ))}
-        <button onClick={createServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#23A559] text-[#23A559] hover:text-white flex items-center justify-center transition-all duration-200 group" title="Adicionar servidor">
+        <button onClick={openCreateServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#23A559] text-[#23A559] hover:text-white flex items-center justify-center transition-all duration-200 group" title="Adicionar servidor">
           <Plus className="w-7 h-7 group-hover:rotate-90 transition-transform duration-200" />
         </button>
       </div>
 
       <div className="w-60 bg-[#2B2D31] flex flex-col shrink-0">
         <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
-          <span className="font-bold text-[15px] truncate">{currentServer?.name}</span>
+          <div className="flex items-center gap-2 min-w-0">
+            {currentServer?.image_url ? <img src={currentServer.image_url} alt="" className="w-6 h-6 rounded object-cover shrink-0" /> : <span className="text-sm shrink-0">{currentServer?.icon}</span>}
+            <span className="font-bold text-[15px] truncate">{currentServer?.name}</span>
+          </div>
           <div className="flex items-center gap-1">
             <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
+            {currentServer && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
             {currentServer && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
           </div>
         </div>
@@ -541,6 +589,39 @@ export default function DiscordClone() {
             <p className="text-sm text-zinc-400 mb-4">Este nome aparece nas mensagens. Logado como {user?.email}</p>
             <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white" placeholder="Seu nome" autoFocus />
             <div className="flex justify-end gap-3 mt-6"><button onClick={() => setShowUsernameModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button><button onClick={async () => { if (user) await supabase.from("profiles").update({ username }).eq("id", user.id); setShowUsernameModal(false); }} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] rounded text-sm font-medium text-white">Salvar</button></div>
+          </div>
+        </div>
+      )}
+
+      {showCreateServerModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
+            <h2 className="text-xl font-bold mb-1">{editingServer ? "Editar servidor" : "Criar servidor"}</h2>
+            <p className="text-sm text-zinc-400 mb-4">{editingServer ? `Editando ${editingServer.name}` : "Um novo espaço para seus amigos"}</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Nome *</label>
+                <input value={newServerName} onChange={(e) => setNewServerName(e.target.value)} placeholder="ex: Casa dos Amigos" className="w-full mt-1 bg-[#2B2D31] border border-[#1E1F22] rounded px-3 py-2 text-white outline-none focus:border-[#5865F2]" autoFocus />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Ícone</label>
+                <div className="grid grid-cols-8 gap-2 mt-2">
+                  {["🏠","🎮","📚","🔥","⭐","🚀","💬","🎵","🎨","💻","📢","🎲","🏆","🌟","💡","⚡","❤️","🍕"].map((ic) => (
+                    <button key={ic} onClick={() => { setNewServerIcon(ic); setNewServerImage(null); setNewServerPreview(""); }} className={`w-9 h-9 rounded flex items-center justify-center text-lg border ${newServerIcon === ic && !newServerImage ? "bg-[#5865F2] border-[#5865F2]" : "bg-[#2B2D31] border-[#1E1F22] hover:bg-[#404249]"}`}>{ic}</button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-zinc-300 uppercase">Ou imagem do computador</label>
+                <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewServerImage(f); if (f) setNewServerPreview(URL.createObjectURL(f)); else setNewServerPreview(editingServer?.image_url || ""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-[#404249] file:text-white hover:file:bg-[#4A4D53]" />
+                {newServerPreview && <img src={newServerPreview} alt="preview" className="w-16 h-16 rounded-2xl object-cover mt-2 border border-[#404249]" />}
+                {newServerPreview && <button onClick={() => { setNewServerImage(null); setNewServerPreview(""); }} className="text-xs text-red-400 hover:underline ml-2">Remover imagem</button>}
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowCreateServerModal(false)} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
+              <button onClick={handleServerSave} disabled={!newServerName.trim() || creatingServer} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingServer ? "Salvando..." : editingServer ? "Salvar" : "Criar"}</button>
+            </div>
           </div>
         </div>
       )}
