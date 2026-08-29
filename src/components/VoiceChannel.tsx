@@ -168,8 +168,8 @@ export default function VoiceChannel({ channelId, username }: Props) {
   };
 
   const join = async (asListener = false) => {
+    if (joined || channelRef.current) return;
     setError("");
-    console.log("join clicked, secureContext:", window.isSecureContext, "mediaDevices:", !!navigator.mediaDevices, "asListener:", asListener);
     let stream: MediaStream | null = null;
     try {
       if (!asListener) {
@@ -185,6 +185,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
       }
       localStreamRef.current = stream;
       if (stream) setupAnalyser("local", stream);
+      if (channelRef.current) { try { supabase.removeChannel(channelRef.current); } catch {} channelRef.current = null; }
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
       channelRef.current = ch;
 
