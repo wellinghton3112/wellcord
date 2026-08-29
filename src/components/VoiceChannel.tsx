@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 
 type Props = {
@@ -27,7 +27,9 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const [cameraOn, setCameraOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [expanded, setExpanded] = useState<string | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
+  const expandedRef = useRef<HTMLDivElement>(null);
   const remoteVideosRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
@@ -272,6 +274,13 @@ export default function VoiceChannel({ channelId, username }: Props) {
     cleanup();
     setJoined(false);
     setPeers([]);
+    setExpanded(null);
+  };
+
+  const toggleFullscreen = () => {
+    if (!expandedRef.current) return;
+    if (document.fullscreenElement) document.exitFullscreen();
+    else expandedRef.current.requestFullscreen().catch(() => {});
   };
 
   const toggleMute = () => {
@@ -385,11 +394,37 @@ export default function VoiceChannel({ channelId, username }: Props) {
         <button onClick={leave} className="bg-[#DA373C] hover:bg-[#A12828] text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><PhoneOff className="w-4 h-4" /> Sair</button>
       </div>
 
+      {expanded && (
+        <div ref={expandedRef} className="w-full bg-black rounded-lg overflow-hidden relative aspect-video group">
+          {expanded === "local" ? (
+            cameraOn || screenOn ? (
+              <video ref={(el) => { if (el && localVideoRef.current?.srcObject) el.srcObject = localVideoRef.current.srcObject as MediaStream; }} autoPlay playsInline muted className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-5xl bg-[#5865F2]">😎</div>
+            )
+          ) : (
+            (() => {
+              const s = remoteStreams[expanded];
+              const hasV = !!s && s.getVideoTracks().some((t) => t.readyState === "live");
+              return hasV ? (
+                <video ref={(el) => { if (el && s) { if (el.srcObject !== s) el.srcObject = s; el.play().catch(() => {}); } }} autoPlay playsInline className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-5xl bg-[#41434A]">🧑</div>
+              );
+            })()
+          )}
+          <span className="absolute bottom-3 left-3 bg-black/60 text-white text-sm px-2 py-1 rounded">{expanded === "local" ? `${username} (você)` : peers.find((p) => p.id === expanded)?.username || "Usuário"}</span>
+          <button onClick={() => setExpanded(null)} className="absolute top-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full"><X className="w-4 h-4" /></button>
+          <button onClick={toggleFullscreen} className="absolute bottom-3 right-3 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full"><Maximize2 className="w-4 h-4" /></button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"}`}>
-          <div className="w-full aspect-video bg-black rounded overflow-hidden relative">
+        <div onClick={() => setExpanded("local")} className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"} ${expanded === "local" ? "ring-2 ring-[#5865F2]" : ""}`}>
+          <div className="w-full aspect-video bg-black rounded overflow-hidden relative group">
             {cameraOn || screenOn ? <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center text-3xl ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[#5865F2]`}>😎</div>}
             <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{username} (você) {screenOn ? "• Tela" : cameraOn ? "• Câmera" : ""}</span>
+            <Maximize2 className="absolute top-1 right-1 w-3 h-3 text-white opacity-0 group-hover:opacity-100" />
           </div>
           <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : speaking["local"] ? "bg-[#23A559] animate-pulse" : "bg-zinc-600"} text-white`}>{muted ? "Mutado" : speaking["local"] ? "Falando..." : "Conectado"}</span>
         </div>
@@ -397,8 +432,8 @@ export default function VoiceChannel({ channelId, username }: Props) {
           const stream = remoteStreams[p.id];
           const hasVideo = !!stream && stream.getVideoTracks().some((t) => t.readyState === "live" && t.enabled);
           return (
-            <div key={p.id} className={`bg-[#2B2D31] rounded-lg p-3 flex flex-col items-center gap-2 border-2 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-transparent"}`}>
-              <div className="w-full aspect-video bg-black rounded overflow-hidden relative">
+            <div key={p.id} onClick={() => setExpanded(p.id)} className={`bg-[#2B2D31] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-transparent"} ${expanded === p.id ? "ring-2 ring-[#5865F2]" : ""}`}>
+              <div className="w-full aspect-video bg-black rounded overflow-hidden relative group">
                 {hasVideo ? (
                   <video
                     ref={(el) => {
