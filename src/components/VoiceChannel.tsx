@@ -26,10 +26,12 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
   const [cameraOn, setCameraOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideosRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
+  const prevSpeakingRef = useRef<Record<string, boolean>>({});
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -60,8 +62,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
       channelRef.current = null;
     }
     setSpeaking({});
-    setCameraOn(false);
-    setScreenOn(false);
+    setRemoteStreams({});
     setParticipants(channelId, []);
   };
 
@@ -117,19 +118,7 @@ export default function VoiceChannel({ channelId, username }: Props) {
         setupAnalyser(peerId, e.streams[0]);
       }
       if (e.track.kind === "video") {
-        let video = remoteVideosRef.current.get(peerId);
-        if (!video) {
-          video = document.createElement("video");
-          video.autoplay = true;
-          (video as any).playsInline = true;
-          video.muted = true;
-          video.className = "hidden";
-          document.body.appendChild(video);
-          remoteVideosRef.current.set(peerId, video);
-        }
-        video.srcObject = e.streams[0];
-        // força re-render para mostrar vídeo
-        setPeers((prev) => [...prev]);
+        setRemoteStreams((prev) => ({ ...prev, [peerId]: e.streams[0] }));
       }
     };
 
@@ -139,6 +128,13 @@ export default function VoiceChannel({ channelId, username }: Props) {
         peersRef.current.delete(peerId);
         remoteAudiosRef.current.get(peerId)?.remove();
         remoteAudiosRef.current.delete(peerId);
+        remoteVideosRef.current.get(peerId)?.remove();
+        remoteVideosRef.current.delete(peerId);
+        setRemoteStreams((prev) => {
+          const n = { ...prev };
+          delete n[peerId];
+          return n;
+        });
         setPeers((p) => p.filter((x) => x.id !== peerId));
       }
     };
@@ -222,6 +218,13 @@ export default function VoiceChannel({ channelId, username }: Props) {
             peersRef.current.delete(id);
             remoteAudiosRef.current.get(id)?.remove();
             remoteAudiosRef.current.delete(id);
+            remoteVideosRef.current.get(id)?.remove();
+            remoteVideosRef.current.delete(id);
+            setRemoteStreams((prev) => {
+              const n = { ...prev };
+              delete n[id];
+              return n;
+            });
           }
         });
         const peerList = ids.map((id) => ({ id, username: id.split("-")[0] }));
@@ -233,17 +236,23 @@ export default function VoiceChannel({ channelId, username }: Props) {
         if (status === "SUBSCRIBED") {
           await ch.track({ id: myIdRef.current, username });
           setJoined(true);
-          // loop de detecção de voz
+          // loop de detecção de voz com histerese para não piscar
           const checkSpeaking = () => {
             const next: Record<string, boolean> = {};
             analysersRef.current.forEach((analyser, id) => {
               const data = new Uint8Array(analyser.frequencyBinCount);
               analyser.getByteFrequencyData(data);
               const avg = data.reduce((a, b) => a + b, 0) / data.length;
-              next[id] = avg > 12;
+              const wasSpeaking = prevSpeakingRef.current[id] || false;
+              // histerese: 14 para começar a falar, 8 para parar
+              next[id] = wasSpeaking ? avg > 8 : avg > 14;
             });
-            setSpeaking(next);
-            if (channelRef.current) requestAnimationFrame(checkSpeaking);
+            const changed = Object.keys(next).some((k) => next[k] !== prevSpeakingRef.current[k]) || Object.keys(prevSpeakingRef.current).some((k) => !(k in next));
+            if (changed) {
+              prevSpeakingRef.current = next;
+              setSpeaking(next);
+            }
+            if (channelRef.current) setTimeout(() => requestAnimationFrame(checkSpeaking), 80);
           };
           requestAnimationFrame(checkSpeaking);
         }
@@ -385,16 +394,17 @@ export default function VoiceChannel({ channelId, username }: Props) {
           <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : speaking["local"] ? "bg-[#23A559] animate-pulse" : "bg-zinc-600"} text-white`}>{muted ? "Mutado" : speaking["local"] ? "Falando..." : "Conectado"}</span>
         </div>
         {peers.map((p) => {
-          const hasVideo = remoteVideosRef.current.has(p.id);
+          const stream = remoteStreams[p.id];
+          const hasVideo = !!stream && stream.getVideoTracks().some((t) => t.readyState === "live" && t.enabled);
           return (
             <div key={p.id} className={`bg-[#2B2D31] rounded-lg p-3 flex flex-col items-center gap-2 border-2 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-transparent"}`}>
               <div className="w-full aspect-video bg-black rounded overflow-hidden relative">
                 {hasVideo ? (
                   <video
                     ref={(el) => {
-                      if (el) {
-                        const v = remoteVideosRef.current.get(p.id);
-                        if (v && v.srcObject) el.srcObject = v.srcObject as MediaStream;
+                      if (el && stream) {
+                        if (el.srcObject !== stream) el.srcObject = stream;
+                        el.play().catch(() => {});
                       }
                     }}
                     autoPlay
