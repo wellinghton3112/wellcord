@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import { Mic, MicOff, PhoneOff, Headphones, Volume2 } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 
 type Props = {
@@ -24,6 +24,10 @@ export default function VoiceChannel({ channelId, username }: Props) {
   const [peers, setPeers] = useState<Peer[]>([]);
   const [error, setError] = useState("");
   const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
+  const [cameraOn, setCameraOn] = useState(false);
+  const [screenOn, setScreenOn] = useState(false);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideosRef = useRef<Map<string, HTMLVideoElement>>(new Map());
   const audioContextRef = useRef<AudioContext | null>(null);
   const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
 
@@ -42,17 +46,22 @@ export default function VoiceChannel({ channelId, username }: Props) {
     peersRef.current.clear();
     remoteAudiosRef.current.forEach((a) => a.remove());
     remoteAudiosRef.current.clear();
+    remoteVideosRef.current.forEach((v) => v.remove());
+    remoteVideosRef.current.clear();
     analysersRef.current.clear();
     if (audioContextRef.current) { try { audioContextRef.current.close(); } catch {} audioContextRef.current = null; }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
     setSpeaking({});
+    setCameraOn(false);
+    setScreenOn(false);
     setParticipants(channelId, []);
   };
 
@@ -94,17 +103,34 @@ export default function VoiceChannel({ channelId, username }: Props) {
     };
 
     pc.ontrack = (e) => {
-      let audio = remoteAudiosRef.current.get(peerId);
-      if (!audio) {
-        audio = document.createElement("audio");
-        audio.autoplay = true;
-        (audio as any).playsInline = true;
-        document.body.appendChild(audio);
-        remoteAudiosRef.current.set(peerId, audio);
+      if (e.track.kind === "audio") {
+        let audio = remoteAudiosRef.current.get(peerId);
+        if (!audio) {
+          audio = document.createElement("audio");
+          audio.autoplay = true;
+          (audio as any).playsInline = true;
+          document.body.appendChild(audio);
+          remoteAudiosRef.current.set(peerId, audio);
+        }
+        audio.srcObject = e.streams[0];
+        audio.muted = deafened;
+        setupAnalyser(peerId, e.streams[0]);
       }
-      audio.srcObject = e.streams[0];
-      audio.muted = deafened;
-      setupAnalyser(peerId, e.streams[0]);
+      if (e.track.kind === "video") {
+        let video = remoteVideosRef.current.get(peerId);
+        if (!video) {
+          video = document.createElement("video");
+          video.autoplay = true;
+          (video as any).playsInline = true;
+          video.muted = true;
+          video.className = "hidden";
+          document.body.appendChild(video);
+          remoteVideosRef.current.set(peerId, video);
+        }
+        video.srcObject = e.streams[0];
+        // força re-render para mostrar vídeo
+        setPeers((prev) => [...prev]);
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -256,6 +282,65 @@ export default function VoiceChannel({ channelId, username }: Props) {
     if (v && !muted) setMuted(true);
   };
 
+  const renegotiate = async () => {
+    for (const [peerId, pc] of peersRef.current) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (cameraOn) {
+      localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); localStreamRef.current?.removeTrack(t); });
+      peersRef.current.forEach((pc) => {
+        pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => pc.removeTrack(s));
+      });
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
+      setCameraOn(false);
+      if (screenOn) setScreenOn(false);
+      await renegotiate();
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 360 }, audio: false });
+      const track = stream.getVideoTracks()[0];
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      localStreamRef.current.addTrack(track);
+      if (localVideoRef.current) localVideoRef.current.srcObject = new MediaStream([track]);
+      peersRef.current.forEach((pc) => pc.addTrack(track, localStreamRef.current!));
+      setCameraOn(true);
+      await renegotiate();
+    } catch (e: any) { setError(e.message); }
+  };
+
+  const toggleScreen = async () => {
+    if (screenOn) {
+      localStreamRef.current?.getVideoTracks().forEach((t) => { if (t.label.includes("screen")) { t.stop(); localStreamRef.current?.removeTrack(t); }});
+      peersRef.current.forEach((pc) => {
+        pc.getSenders().filter((s) => s.track?.label.includes("screen")).forEach((s) => pc.removeTrack(s));
+      });
+      // se tinha câmera, volta câmera
+      setScreenOn(false);
+      await renegotiate();
+      return;
+    }
+    try {
+      const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: true, audio: true });
+      const track = stream.getVideoTracks()[0];
+      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+      // remove câmera se tiver
+      localStreamRef.current.getVideoTracks().forEach((t) => { if (!t.label.includes("screen")) { t.stop(); localStreamRef.current?.removeTrack(t); }});
+      localStreamRef.current.addTrack(track);
+      if (localVideoRef.current) localVideoRef.current.srcObject = new MediaStream([track]);
+      peersRef.current.forEach((pc) => pc.addTrack(track, localStreamRef.current!));
+      track.onended = () => toggleScreen();
+      setScreenOn(true);
+      setCameraOn(false);
+      await renegotiate();
+    } catch (e: any) { setError(e.message); }
+  };
+
   if (!joined) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-6 p-8 text-center">
@@ -282,30 +367,57 @@ export default function VoiceChannel({ channelId, username }: Props) {
         <button onClick={leave} className="bg-[#DA373C] hover:bg-[#A12828] text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><PhoneOff className="w-4 h-4" /> Sair</button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className={`bg-[#232428] rounded-lg p-4 flex flex-col items-center gap-3 border-2 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30 animate-pulse" : "border-[#23A559]/30"}`}>
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] ring-offset-2 ring-offset-[#232428] scale-105" : ""} bg-[#5865F2]`}>😎</div>
-          <span className="font-medium">{username} (você)</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"}`}>
+          <div className="w-full aspect-video bg-black rounded overflow-hidden relative">
+            {cameraOn || screenOn ? <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center text-3xl ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[#5865F2]`}>😎</div>}
+            <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{username} (você) {screenOn ? "• Tela" : cameraOn ? "• Câmera" : ""}</span>
+          </div>
           <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : speaking["local"] ? "bg-[#23A559] animate-pulse" : "bg-zinc-600"} text-white`}>{muted ? "Mutado" : speaking["local"] ? "Falando..." : "Conectado"}</span>
         </div>
-        {peers.map((p) => (
-          <div key={p.id} className={`bg-[#2B2D31] rounded-lg p-4 flex flex-col items-center gap-3 border-2 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30 animate-pulse" : "border-transparent"}`}>
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all ${speaking[p.id] ? "ring-4 ring-[#23A559] ring-offset-2 ring-offset-[#2B2D31] scale-105" : ""} bg-[#41434A]`}>🧑</div>
-            <span className="font-medium truncate max-w-full">{p.username}</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${speaking[p.id] ? "bg-[#23A559] animate-pulse text-white" : "bg-zinc-700 text-zinc-400"}`}>{speaking[p.id] ? "Falando..." : "Conectado"}</span>
-          </div>
-        ))}
-        {peers.length === 0 && <div className="col-span-2 md:col-span-2 text-zinc-400 text-sm flex items-center justify-center">Nenhum amigo na voz ainda. Compartilhe o link!</div>}
+        {peers.map((p) => {
+          const hasVideo = remoteVideosRef.current.has(p.id);
+          return (
+            <div key={p.id} className={`bg-[#2B2D31] rounded-lg p-3 flex flex-col items-center gap-2 border-2 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-transparent"}`}>
+              <div className="w-full aspect-video bg-black rounded overflow-hidden relative">
+                {hasVideo ? (
+                  <video
+                    ref={(el) => {
+                      if (el) {
+                        const v = remoteVideosRef.current.get(p.id);
+                        if (v && v.srcObject) el.srcObject = v.srcObject as MediaStream;
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className={`w-full h-full flex items-center justify-center text-3xl ${speaking[p.id] ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[#41434A]`}>🧑</div>
+                )}
+                <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{p.username}</span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${speaking[p.id] ? "bg-[#23A559] animate-pulse text-white" : "bg-zinc-700 text-zinc-400"}`}>{speaking[p.id] ? "Falando..." : "Conectado"}</span>
+            </div>
+          );
+        })}
+        {peers.length === 0 && <div className="col-span-1 md:col-span-2 text-zinc-400 text-sm flex items-center justify-center py-8">Nenhum amigo na voz ainda. Compartilhe o link!</div>}
       </div>
 
-      <div className="mt-auto flex items-center justify-center gap-3 p-4 bg-[#232428] rounded-lg">
-        <button onClick={toggleMute} className={`w-12 h-12 rounded-full flex items-center justify-center ${muted ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={muted ? "Ativar microfone" : "Mutar"}>
-          {muted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+      <div className="mt-auto flex items-center justify-center gap-2 p-3 bg-[#232428] rounded-lg flex-wrap">
+        <button onClick={toggleMute} className={`w-11 h-11 rounded-full flex items-center justify-center ${muted ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={muted ? "Ativar microfone" : "Mutar"}>
+          {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
         </button>
-        <button onClick={toggleDeafen} className={`w-12 h-12 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title="Surdo">
-          <Headphones className="w-6 h-6" />
+        <button onClick={toggleCamera} className={`w-11 h-11 rounded-full flex items-center justify-center ${cameraOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={cameraOn ? "Desligar câmera" : "Ligar câmera"}>
+          {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </button>
-        <button onClick={leave} className="w-12 h-12 rounded-full bg-[#DA373C] hover:bg-[#A12828] text-white flex items-center justify-center"><PhoneOff className="w-6 h-6" /></button>
+        <button onClick={toggleScreen} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={screenOn ? "Parar tela" : "Compartilhar tela"}>
+          {screenOn ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+        </button>
+        <button onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title="Surdo">
+          <Headphones className="w-5 h-5" />
+        </button>
+        <button onClick={leave} className="w-11 h-11 rounded-full bg-[#DA373C] hover:bg-[#A12828] text-white flex items-center justify-center"><PhoneOff className="w-5 h-5" /></button>
       </div>
       <p className="text-xs text-zinc-500 text-center">Dica: mutar/desmutar rápido. P2P mesh — funciona melhor com até 4 pessoas sem servidor TURN.</p>
     </div>
