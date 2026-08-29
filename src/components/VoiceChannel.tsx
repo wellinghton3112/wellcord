@@ -46,6 +46,9 @@ export default function VoiceChannel({ channelId, username }: Props) {
   }, [username]);
 
   const cleanup = () => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id).then(() => {});
+    });
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
     remoteAudiosRef.current.forEach((a) => a.remove());
@@ -237,6 +240,8 @@ export default function VoiceChannel({ channelId, username }: Props) {
       ch.subscribe(async (status: string) => {
         if (status === "SUBSCRIBED") {
           await ch.track({ id: myIdRef.current, username });
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) await supabase.from("voice_sessions").upsert({ channel_id: channelId, user_id: user.id, username }, { onConflict: "channel_id,user_id" });
           setJoined(true);
           // loop de detecção de voz com histerese para não piscar
           const checkSpeaking = () => {
@@ -270,7 +275,9 @@ export default function VoiceChannel({ channelId, username }: Props) {
     }
   };
 
-  const leave = () => {
+  const leave = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
     cleanup();
     setJoined(false);
     setPeers([]);

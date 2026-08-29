@@ -10,18 +10,15 @@ export default function VoicePreview({ channelId }: Props) {
 
   useEffect(() => {
     const supabase = createClient();
-    const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: `preview-${channelId}-${Math.random().toString(36).slice(2,5)}` } } });
-    const update = () => {
-      const state: any = ch.presenceState();
-      const ids: { id: string; username: string }[] = [];
-      Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push({ id: p.id || p.user_id, username: p.username || p.id?.split("-")[0] })));
-      const uniq = Array.from(new Map(ids.map((m) => [m.id, m])).values());
-      setPeers(uniq);
+    const load = async () => {
+      const { data } = await supabase.from("voice_sessions").select("user_id, username").eq("channel_id", channelId);
+      if (data) setPeers(data.map((r: any) => ({ id: r.user_id, username: r.username })));
     };
-    ch.on("presence", { event: "sync" }, update);
-    ch.on("presence", { event: "join" }, update);
-    ch.on("presence", { event: "leave" }, update);
-    ch.subscribe();
+    load();
+    const ch = supabase
+      .channel(`voice-sessions-${channelId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "voice_sessions", filter: `channel_id=eq.${channelId}` }, () => load())
+      .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [channelId]);
 
