@@ -304,7 +304,11 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         if (status === "SUBSCRIBED") {
           await ch.track({ id: myIdRef.current, username });
           const { data: { user } } = await supabase.auth.getUser();
-          if (user) await supabase.from("voice_sessions").upsert({ channel_id: channelId, user_id: user.id, username }, { onConflict: "channel_id,user_id" });
+          if (user) {
+            // Remove sessão fantasma anterior e grava horário fresco (timer conta daqui)
+            await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
+            await supabase.from("voice_sessions").upsert({ channel_id: channelId, user_id: user.id, username, joined_at: new Date().toISOString() }, { onConflict: "channel_id,user_id" });
+          }
           setJoined(true);
           // loop de detecção de voz com histerese para não piscar
           const checkSpeaking = () => {

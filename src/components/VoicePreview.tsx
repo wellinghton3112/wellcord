@@ -7,7 +7,12 @@ type Props = { channelId: string };
 export default function VoicePreview({ channelId }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [peers, setPeers] = useState<{ id: string; username: string; joined_at: string }[]>([]);
+  const [myId, setMyId] = useState<string | null>(null);
   const [duration, setDuration] = useState("0:00");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => { if (user) setMyId(user.id); });
+  }, [supabase]);
 
   useEffect(() => {
     const load = async () => {
@@ -22,18 +27,25 @@ export default function VoicePreview({ channelId }: Props) {
     return () => { supabase.removeChannel(ch); };
   }, [channelId]);
 
+  // Timer conta do MEU ingresso (minha linha), não do primeiro do canal.
+  // Sem minha linha (só espiando a lista), usa o mais antigo como referência.
   useEffect(() => {
     if (peers.length === 0) { setDuration("0:00"); return; }
-    const start = new Date(peers[0].joined_at).getTime();
-    const iv = setInterval(() => {
-      const s = Math.floor((Date.now() - start) / 1000);
+    const mine = myId ? peers.find((p) => p.id === myId) : undefined;
+    const ref = mine?.joined_at || peers[0].joined_at;
+    const start = new Date(ref).getTime();
+    if (Number.isNaN(start)) { setDuration("0:00"); return; }
+    const tick = () => {
+      const s = Math.max(0, Math.floor((Date.now() - start) / 1000));
       const h = Math.floor(s / 3600);
       const m = Math.floor((s % 3600) / 60);
       const sec = s % 60;
       setDuration(h > 0 ? `${h}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}` : `${m}:${String(sec).padStart(2,"0")}`);
-    }, 1000);
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
     return () => clearInterval(iv);
-  }, [peers[0]?.joined_at, peers.length]);
+  }, [peers, myId]);
 
   if (peers.length === 0) return null;
 
