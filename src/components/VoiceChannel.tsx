@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
+import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
 
 type Props = {
   channelId: string;
@@ -115,7 +116,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
 
   const createPeer = (peerId: string, isInitiator: boolean) => {
     if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
+    const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     peersRef.current.set(peerId, pc);
 
     // add local tracks
@@ -153,7 +154,35 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     };
 
     pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "failed" || pc.connectionState === "closed") {
+      if (pc.connectionState === "connected") {
+        // Diagnóstico (F12): host = direto, srflx = via STUN, relay = via TURN
+        pc.getStats().then((stats) => {
+          stats.forEach((r: any) => {
+            if (r.type === "candidate-pair" && (r.state === "succeeded" || r.nominated)) {
+              const local = (stats as any).get?.(r.localCandidateId);
+              console.log(`[voz] peer ${peerId} conectado via ${local?.candidateType || "?"}`);
+            }
+          });
+        }).catch(() => {});
+        return;
+      }
+      if (pc.connectionState === "failed") {
+        // 1ª falha: tenta ICE restart (troca de rede, NAT). Só remove o peer se falhar de novo.
+        const retries = Number((pc as any).__iceRestarts || 0);
+        if (retries < 1) {
+          (pc as any).__iceRestarts = retries + 1;
+          pc.restartIce();
+          if (peersRef.current.has(peerId)) {
+            pc.createOffer({ iceRestart: true }).then((offer) => {
+              pc.setLocalDescription(offer);
+              channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
+            }).catch(() => {});
+          }
+          return;
+        }
+        if (!hasTurnConfigured()) {
+          setError("Conexão de voz falhou (NAT restrito?). Sem TURN configurado, alguns pares não conectam — avise o admin.");
+        }
         pc.close();
         peersRef.current.delete(peerId);
         remoteAudiosRef.current.get(peerId)?.remove();
@@ -427,6 +456,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         <button onClick={() => join(true)} className="bg-[#5865F2] hover:bg-[#4752C4] text-white px-6 py-2 rounded-full text-sm">Entrar como ouvinte</button>
         <button onClick={testMic} className="bg-[#35373C] hover:bg-[#404249] text-white px-6 py-2 rounded-full text-sm">Testar microfone</button>
         <p className="text-xs text-zinc-500">Seu navegador vai pedir permissao do microfone - Abra F12 para ver logs</p>
+        {!hasTurnConfigured() && <p className="text-[11px] text-amber-400/80 max-w-md">Modo STUN: voz direta funciona na maioria das redes. Atrás de NAT restrito pode falhar — TURN será ativado pelo admin em breve.</p>}
       </div>
     );
   }
