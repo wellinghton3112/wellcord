@@ -19,17 +19,10 @@ import {
   UserPlus,
   MoreHorizontal,
   LogOut,
-  Mic,
-  Headphones,
-  Circle,
-  Moon,
-  MinusCircle,
-  EyeOff,
   Trash2,
   X,
   Menu,
   Users,
-  MessageCircle,
 } from "lucide-react";
 import { APP_VERSION } from "@/lib/version";
 import { createClient } from "@/lib/supabase";
@@ -38,75 +31,15 @@ import VoicePreview from "@/components/VoicePreview";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
 
-type Message = {
-  id: string;
-  user: string;
-  avatar: string;
-  color: string;
-  content: string;
-  timestamp: string;
-  channelId: string;
-  created_at?: string;
-};
-
-type Channel = {
-  id: string;
-  server_id?: string;
-  name: string;
-  type: "text" | "voice";
-  icon?: string;
-  image_url?: string;
-};
-
-type Server = {
-  id: string;
-  name: string;
-  icon: string;
-  image_url?: string;
-  channels: Channel[];
-};
-
-type DMConversation = {
-  id: string;
-  participants: { id: string; username: string; avatar: string }[];
-  otherUser?: { id: string; username: string; avatar: string };
-};
-
-type DMMessage = {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  username: string;
-  content: string;
-  created_at: string;
-};
-
-const fallbackServers: Server[] = [
-  {
-    id: "fallback-1",
-    name: "Casa dos Amigos",
-    icon: "🏠",
-    channels: [
-      { id: "fallback-1-1", name: "geral", type: "text" },
-      { id: "fallback-1-2", name: "memes", type: "text" },
-    ],
-  },
-];
-
-type PresenceUser = { id: string; username: string; avatar: string; status: "online" | "idle" | "dnd" | "invisible" | "offline"; email?: string };
-const statusConfig = {
-  online: { label: "Online", color: "bg-[#23A559]", icon: Circle },
-  idle: { label: "Ausente", color: "bg-[#F0B132]", icon: Moon },
-  dnd: { label: "Não perturbe", color: "bg-[#DA373C]", icon: MinusCircle },
-  invisible: { label: "Invisível", color: "bg-zinc-500", icon: EyeOff },
-};
-
-function formatTime(dateStr: string) {
-  try {
-    const d = new Date(dateStr);
-    return "Hoje às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  } catch { return dateStr; }
-}
+import type {
+  Message,
+  Channel,
+  Server,
+  DMConversation,
+  DMMessage,
+  PresenceUser,
+} from "@/lib/chat-types";
+import { statusConfig, formatTime } from "@/lib/chat-types";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
