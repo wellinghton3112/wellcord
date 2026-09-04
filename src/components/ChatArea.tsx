@@ -3,9 +3,9 @@ import { useState } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
-  Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X,
+  Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X, Reply,
 } from "lucide-react";
-import type { Channel, DMConversation, DMMessage, Message, PresenceUser, ReactionMap } from "@/lib/chat-types";
+import type { Channel, DMConversation, DMMessage, Message, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 
@@ -41,6 +41,10 @@ type Props = {
   onToggleReaction: (id: string, emoji: string) => void;
   dmReactions: ReactionMap;
   onToggleDMReaction: (id: string, emoji: string) => void;
+  replyTo: ReplyTarget | null;
+  setReplyTo: (r: ReplyTarget | null) => void;
+  dmReplyTo: ReplyTarget | null;
+  setDmReplyTo: (r: ReplyTarget | null) => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -51,6 +55,7 @@ export default function ChatArea(props: Props) {
     currentChannel, selectedChannel, channelMessages, messagesEndRef, input, setInput, handleSend, username, status,
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
+    replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -114,6 +119,45 @@ export default function ChatArea(props: Props) {
     </div>
   );
 
+  const scrollToMsg = (id: string | null | undefined) => {
+    if (!id) return;
+    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
+  const quoteBlock = (user: string | null | undefined, content: string | null | undefined, targetId: string | null | undefined) => {
+    if (!user && !content) return null;
+    return (
+      <button
+        onClick={() => scrollToMsg(targetId)}
+        title="Ir para a mensagem original"
+        className="mb-1 flex items-stretch gap-2 text-left bg-[#2B2D31]/70 hover:bg-[#2B2D31] rounded px-2 py-1 max-w-full transition-colors"
+      >
+        <span className="w-1 rounded-full bg-[#5865F2] shrink-0" />
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold text-[#B5BAC1] truncate">{user || "mensagem"}</span>
+          <span className="block text-xs text-zinc-400 truncate">{content || "(apagada)"}</span>
+        </span>
+      </button>
+    );
+  };
+
+  const replyPreview = (
+    target: ReplyTarget | null,
+    clear: () => void,
+  ) => {
+    if (!target) return null;
+    return (
+      <div className="mb-2 flex items-stretch gap-2 bg-[#2B2D31] rounded px-2 py-1.5">
+        <span className="w-1 rounded-full bg-[#5865F2] shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-xs text-zinc-400">Respondendo a <span className="font-semibold text-zinc-200">{target.user}</span></span>
+          <span className="block text-xs text-zinc-500 truncate">{target.content}</span>
+        </span>
+        <button onClick={clear} className="p-1 hover:bg-[#35373C] rounded self-start" title="Cancelar resposta"><X className="w-4 h-4 text-zinc-400" /></button>
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
       {viewMode === "dm" ? (
@@ -146,16 +190,18 @@ export default function ChatArea(props: Props) {
               </div>
             ) : (
               dmMessages.map((m) => (
-                <div key={m.id} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
+                <div key={m.id} id={`msg-${m.id}`} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20">
                   <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{m.sender_id === userId ? "😎" : "👤"}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
+                    {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
                     {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{m.content}</p>}
                     {editingId !== m.id && reactionBar(dmReactions[m.id], (e) => onToggleDMReaction(m.id, e))}
                     {pickFor === m.id && emojiPicker(m.id, onToggleDMReaction)}
                   </div>
                   {editingId !== m.id && (
                     <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
+                      <button onClick={() => { setDmReplyTo({ id: m.id, user: m.username, content: m.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
                       <button onClick={() => setPickFor(pickFor === m.id ? null : m.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
                       {m.sender_id === userId && (
                         <>
@@ -172,6 +218,7 @@ export default function ChatArea(props: Props) {
           </div>
           {selectedDM && (
             <div className="p-4 shrink-0">
+              {replyPreview(dmReplyTo, () => setDmReplyTo(null))}
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <input value={dmInput} onChange={(e) => setDmInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <button onClick={handleDMSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
@@ -204,16 +251,18 @@ export default function ChatArea(props: Props) {
                   {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
                 </div>
                 {channelMessages.map((msg) => (
-                  <div key={msg.id} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
+                  <div key={msg.id} id={`msg-${msg.id}`} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}>{msg.avatar}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
+                      {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
                       {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>}
                       {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
                       {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
                     </div>
                     {editingId !== msg.id && (
                       <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
+                        <button onClick={() => { setReplyTo({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
                         <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
                         {msg.user_id && msg.user_id === userId ? (
                           <>
@@ -232,6 +281,7 @@ export default function ChatArea(props: Props) {
           </div>
           {currentChannel?.type === "text" && (
             <div className="p-4 shrink-0">
+              {replyPreview(replyTo, () => setReplyTo(null))}
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0"><Plus className="w-4 h-4 text-[#383A40]" /></button>
                 <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />

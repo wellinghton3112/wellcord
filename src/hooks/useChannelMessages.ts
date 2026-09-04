@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Message, ReactionMap } from "@/lib/chat-types";
+import type { Message, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { formatTime, groupReactions } from "@/lib/chat-types";
 
-// Mensagens do canal: carga, realtime, envio e reações.
+// Mensagens do canal: carga, realtime, envio, reações e respostas.
 // Extraído de page.tsx sem mudança de comportamento.
 export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [reactions, setReactions] = useState<ReactionMap>({});
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
 
   // Carregar mensagens do canal selecionado + Realtime
   useEffect(() => {
@@ -30,6 +31,9 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
             timestamp: formatTime(r.created_at),
             channelId: r.channel_id,
             created_at: r.created_at,
+            reply_to: r.reply_to || null,
+            reply_user: r.reply_user || null,
+            reply_content: r.reply_content || null,
           }));
           return [...others, ...mapped];
         });
@@ -50,7 +54,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
         const r = payload.new;
         setMessages((prev) => {
           if (prev.some((m) => m.id === r.id)) return prev;
-          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at }];
+          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null }];
         });
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload: any) => {
@@ -95,7 +99,9 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
   const handleSend = async () => {
     if (!input.trim() || !selectedChannel || !user) return;
     const content = input;
+    const reply = replyTo;
     setInput("");
+    setReplyTo(null);
     const { error } = await supabase.from("messages").insert({
       channel_id: selectedChannel,
       user_id: user.id,
@@ -103,11 +109,15 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       content,
       avatar: "😎",
       color: "#5865F2",
+      reply_to: reply?.id || null,
+      reply_user: reply?.user || null,
+      reply_content: reply?.content || null,
     });
     if (error) {
       console.error(error);
       alert("Erro ao enviar: " + error.message);
       setInput(content);
+      setReplyTo(reply);
     }
   };
 
@@ -135,5 +145,5 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     }
   };
 
-  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction };
+  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo };
 }

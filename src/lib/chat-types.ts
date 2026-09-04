@@ -10,6 +10,9 @@ export type Message = {
   timestamp: string;
   channelId: string;
   created_at?: string;
+  reply_to?: string | null;
+  reply_user?: string | null;
+  reply_content?: string | null;
 };
 
 export type Channel = {
@@ -43,7 +46,12 @@ export type DMMessage = {
   username: string;
   content: string;
   created_at: string;
+  reply_to?: string | null;
+  reply_user?: string | null;
+  reply_content?: string | null;
 };
+
+export type ReplyTarget = { id: string; user: string; content: string };
 
 export type PresenceStatus = "online" | "idle" | "dnd" | "invisible";
 

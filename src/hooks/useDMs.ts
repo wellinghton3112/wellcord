@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { DMConversation, DMMessage, ReactionMap } from "@/lib/chat-types";
+import type { DMConversation, DMMessage, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { groupReactions } from "@/lib/chat-types";
 
 // DMs: conversas, mensagens com batch de profiles, envio e criação.
@@ -15,6 +15,7 @@ export function useDMs(
   const [selectedDM, setSelectedDM] = useState<string | null>(null);
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
   const [dmInput, setDmInput] = useState("");
+  const [dmReplyTo, setDmReplyTo] = useState<ReplyTarget | null>(null);
   const [dmReactions, setDmReactions] = useState<ReactionMap>({});
   const [newDMUsername, setNewDMUsername] = useState("");
   const [creatingDM, setCreatingDM] = useState(false);
@@ -103,6 +104,9 @@ export function useDMs(
           username: nameMap.get(r.sender_id) || r.sender_id.slice(0, 6),
           content: r.content,
           created_at: r.created_at,
+          reply_to: r.reply_to || null,
+          reply_user: r.reply_user || null,
+          reply_content: r.reply_content || null,
         }))
       );
       const ids = data.map((r: any) => r.id);
@@ -121,11 +125,11 @@ export function useDMs(
         if (prev.some((m) => m.id === r.id)) return prev;
         // Reusa nome já conhecido; senão insere temporário e resolve async (1 query só quando necessário)
         const known = prev.find((m) => m.sender_id === r.sender_id)?.username;
-        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at }];
+        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null }];
         supabase.from("profiles").select("username").eq("id", r.sender_id).single().then(({ data: prof }: any) => {
           setDmMessages((cur) => cur.map((m) => (m.id === r.id ? { ...m, username: prof?.username || r.sender_id.slice(0, 6) } : m)));
         });
-        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at }];
+        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null }];
       });
     }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "dm_messages" }, (payload: any) => {
       const r = payload.new;
@@ -163,9 +167,18 @@ export function useDMs(
   const handleDMSend = async () => {
     if (!dmInput.trim() || !selectedDM || !user) return;
     const content = dmInput;
+    const reply = dmReplyTo;
     setDmInput("");
-    const { error } = await supabase.from("dm_messages").insert({ conversation_id: selectedDM, sender_id: user.id, content });
-    if (error) { alert(error.message); setDmInput(content); }
+    setDmReplyTo(null);
+    const { error } = await supabase.from("dm_messages").insert({
+      conversation_id: selectedDM,
+      sender_id: user.id,
+      content,
+      reply_to: reply?.id || null,
+      reply_user: reply?.user || null,
+      reply_content: reply?.content || null,
+    });
+    if (error) { alert(error.message); setDmInput(content); setDmReplyTo(reply); }
   };
 
   const createDM = async () => {
@@ -226,6 +239,7 @@ export function useDMs(
     dmConversations, selectedDM, setSelectedDM,
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
     dmReactions, toggleDMReaction, unread,
+    dmReplyTo, setDmReplyTo,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   };
 }
