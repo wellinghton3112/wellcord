@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X, Waves } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
 
@@ -28,6 +28,9 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
   const [cameraOn, setCameraOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
+  // Supressão de ruído RNNoise (ML local). Ligada por padrão; cai p/ navegador se falhar.
+  const [denoise, setDenoise] = useState(true);
+  const [denoiseActive, setDenoiseActive] = useState(false);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -38,6 +41,9 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   const prevSpeakingRef = useRef<Record<string, boolean>>({});
 
   const localStreamRef = useRef<MediaStream | null>(null);
+  // Mic cru (sempre guardado p/ poder ligar/desligar o denoise ao vivo)
+  const rawStreamRef = useRef<MediaStream | null>(null);
+  const denoiseRef = useRef<{ stop: () => void } | null>(null);
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
@@ -63,6 +69,12 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   };
 
   const cleanup = () => {
+    if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} denoiseRef.current = null; }
+    setDenoiseActive(false);
+    if (rawStreamRef.current) {
+      rawStreamRef.current.getTracks().forEach((t) => t.stop());
+      rawStreamRef.current = null;
+    }
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) {
         supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id).then(() => {
@@ -236,6 +248,53 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     }
   };
 
+  // Troca a trilha de áudio enviada sem renegociar (usado pelo toggle de denoise)
+  const swapAudioTrack = async (track: MediaStreamTrack | null) => {
+    if (!track) return;
+    track.enabled = !muted;
+    for (const pc of peersRef.current.values()) {
+      const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
+      if (sender) {
+        try { await sender.replaceTrack(track); } catch {}
+      }
+    }
+  };
+
+  const toggleDenoise = async () => {
+    const next = !denoise;
+    setDenoise(next);
+    if (!joined || !rawStreamRef.current) return; // vale no próximo join
+    if (next) {
+      try {
+        const { createDenoiser } = await import("@/lib/noise");
+        if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} }
+        const d = await createDenoiser(rawStreamRef.current);
+        denoiseRef.current = d;
+        const track = d.output.getAudioTracks()[0] || null;
+        if (localStreamRef.current && track) {
+          localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
+          localStreamRef.current.addTrack(track);
+        }
+        await swapAudioTrack(track);
+        setDenoiseActive(true);
+        console.log("[voz] RNNoise ativado");
+      } catch (e) {
+        console.warn("[voz] falha ao ativar RNNoise, mantendo mic cru", e);
+        setDenoiseActive(false);
+      }
+    } else {
+      if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} denoiseRef.current = null; }
+      const track = rawStreamRef.current.getAudioTracks()[0] || null;
+      if (localStreamRef.current && track) {
+        localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
+        localStreamRef.current.addTrack(track);
+      }
+      await swapAudioTrack(track);
+      setDenoiseActive(false);
+      console.log("[voz] RNNoise desativado (mic cru)");
+    }
+  };
+
   const join = async (asListener = false) => {
     if (joined || channelRef.current) return;
     if (!myIdRef.current) myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
@@ -245,7 +304,8 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
       if (!asListener) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Navegador sem suporte a microfone. Use Chrome/Edge/Firefox em HTTPS.");
         try {
-          stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false });
+          // Com RNNoise ativo, desliga o supressor do navegador (duplo = áudio ruim)
+          stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: !denoise, autoGainControl: true }, video: false });
         } catch (e: any) {
           if (e.name === "NotFoundError") {
             setError("Sem microfone, entrando como ouvinte. Voce ouve mas nao fala. Plugue um mic para falar.");
@@ -254,7 +314,27 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         }
       }
       localStreamRef.current = stream;
-      if (stream) setupAnalyser("local", stream);
+      rawStreamRef.current = stream;
+      // RNNoise: troca o mic cru pelo tratado antes de negociar com os peers
+      if (stream && denoise) {
+        try {
+          const { createDenoiser } = await import("@/lib/noise");
+          const d = await createDenoiser(stream);
+          denoiseRef.current = d;
+          const clean = d.output.getAudioTracks()[0];
+          if (clean) {
+            localStreamRef.current = d.output;
+            setDenoiseActive(true);
+            console.log("[voz] RNNoise ativado");
+          }
+        } catch (e) {
+          console.warn("[voz] RNNoise indisponível, usando mic do navegador", e);
+          setDenoiseActive(false);
+        }
+      } else {
+        setDenoiseActive(false);
+      }
+      if (localStreamRef.current) setupAnalyser("local", localStreamRef.current);
       if (channelRef.current) { try { supabase.removeChannel(channelRef.current); } catch {} channelRef.current = null; }
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
       channelRef.current = ch;
@@ -594,9 +674,12 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         <button onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title="Surdo">
           <Headphones className="w-5 h-5" />
         </button>
+        <button onClick={toggleDenoise} className={`w-11 h-11 rounded-full flex items-center justify-center ${denoiseActive ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={denoiseActive ? "Supressão de ruído RNNoise ATIVADA (clique p/ desligar)" : "Supressão de ruído desligada (clique p/ ativar RNNoise)"}>
+          <Waves className="w-5 h-5" />
+        </button>
         <button onClick={leave} className="w-11 h-11 rounded-full bg-[#DA373C] hover:bg-[#A12828] text-white flex items-center justify-center"><PhoneOff className="w-5 h-5" /></button>
       </div>
-      <p className="text-xs text-zinc-500 text-center">Dica: mutar/desmutar rápido. P2P mesh — funciona melhor com até 4 pessoas sem servidor TURN.</p>
+      <p className="text-xs text-zinc-500 text-center">Dica: mutar/desmutar rápido. P2P mesh — funciona melhor com até 4 pessoas sem servidor TURN.{denoiseActive ? " RNNoise ligado: fundo suprimido por IA local." : ""}</p>
     </div>
   );
 }
