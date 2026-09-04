@@ -49,6 +49,7 @@ export function useServerActions(
   };
   const handleServerSave = async () => {
     if (!newServerName.trim()) return;
+    if (!userId) { alert("Sessão expirada — faça login de novo antes de criar o servidor."); return; }
     setCreatingServer(true);
     let image_url: string | null = editingServer?.image_url || null;
     if (newServerImage) {
@@ -68,8 +69,9 @@ export function useServerActions(
       const { data, error } = await supabase.from("servers").insert({ name: newServerName, icon: newServerIcon, image_url, owner_id: userId }).select().single();
       if (error) { alert(error.message); setCreatingServer(false); return; }
       await supabase.from("channels").insert({ server_id: data.id, name: "geral", type: "text", icon: "💬" });
-      // Dono entra como primeiro membro: servidor nasce privado
-      await supabase.from("server_members").insert({ server_id: data.id, user_id: userId, role: "owner" });
+      // Dono entra como primeiro membro: servidor nasce privado (erro aqui não pode passar batido)
+      const { error: memErr } = await supabase.from("server_members").insert({ server_id: data.id, user_id: userId, role: "owner" });
+      if (memErr) { alert("Servidor criado, mas falhou ao te registrar como dono: " + memErr.message); setCreatingServer(false); return; }
       setSelectedServer(data.id);
       setTimeout(async () => {
         const { data: ch } = await supabase.from("channels").select("*").eq("server_id", data.id).limit(1).single();
