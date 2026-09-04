@@ -92,7 +92,7 @@ export function useDMs(
   const createDM = async () => {
     if (!newDMUsername.trim() || !user) return;
     setCreatingDM(true);
-    const { data: prof } = await supabase.from("profiles").select("id, username").ilike("username", `%${newDMUsername.trim()}%`).limit(1).single();
+    const { data: prof } = await supabase.from("profiles").select("id, username").ilike("username", `%${newDMUsername.trim()}%`).limit(1).maybeSingle();
     if (!prof) { alert("Usuário não encontrado"); setCreatingDM(false); return; }
     if (prof.id === user.id) { alert("Não pode criar DM consigo mesmo"); setCreatingDM(false); return; }
     // verifica se já existe conversa
