@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
@@ -17,7 +17,7 @@ type Peer = {
 };
 
 export default function VoiceChannel({ channelId, username, status }: Props) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { setParticipants } = useVoice();
   const [joined, setJoined] = useState(false);
   const [muted, setMuted] = useState(false);

@@ -1,15 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 
 type Props = { channelId: string };
 
 export default function VoicePreview({ channelId }: Props) {
+  const supabase = useMemo(() => createClient(), []);
   const [peers, setPeers] = useState<{ id: string; username: string; joined_at: string }[]>([]);
   const [duration, setDuration] = useState("0:00");
 
   useEffect(() => {
-    const supabase = createClient();
     const load = async () => {
       const { data } = await supabase.from("voice_sessions").select("user_id, username, joined_at").eq("channel_id", channelId).order("joined_at", { ascending: true });
       if (data) setPeers(data.map((r: any) => ({ id: r.user_id, username: r.username, joined_at: r.joined_at })));

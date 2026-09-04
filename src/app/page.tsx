@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Hash,
   Volume2,
@@ -109,7 +109,7 @@ function formatTime(dateStr: string) {
 }
 
 export default function DiscordClone() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServer, setSelectedServer] = useState<string>("");
@@ -211,18 +211,13 @@ export default function DiscordClone() {
     return () => { supabase.removeChannel(ch); };
   }, [user, username, status]);
 
-  // Carregar todos os perfis para lista offline
+  // Carregar todos os perfis para lista offline (uma vez por login — sem loop por presença)
   useEffect(() => {
     if (!user) return;
     supabase.from("profiles").select("id, username, avatar").then(({ data }) => {
       if (data) setAllProfiles(data.map((p: any) => ({ id: p.id, username: p.username, avatar: p.avatar || "😎", status: "offline" as const })));
     });
-  }, [user, onlineMembers.length]);
-
-  // Atualiza presença quando username/status mudam
-  useEffect(() => {
-    if (!user) return;
-  }, [status, username]);
+  }, [user, supabase]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -356,24 +351,45 @@ export default function DiscordClone() {
 
   useEffect(() => {
     if (!selectedDM) return;
+    let cancelled = false;
     const load = async () => {
       const { data } = await supabase.from("dm_messages").select("*").eq("conversation_id", selectedDM).order("created_at", { ascending: true }).limit(100);
-      if (data) {
-        const mapped = await Promise.all(data.map(async (r: any) => {
-          const { data: prof } = await supabase.from("profiles").select("username").eq("id", r.sender_id).single();
-          return { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: prof?.username || r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at };
-        }));
-        setDmMessages(mapped);
+      if (!data || cancelled) return;
+      // Batch: 1 query de profiles para todos os senders (evita N+1)
+      const senderIds = [...new Set(data.map((r: any) => r.sender_id))];
+      const nameMap = new Map<string, string>();
+      if (senderIds.length > 0) {
+        const { data: profs } = await supabase.from("profiles").select("id, username").in("id", senderIds);
+        (profs || []).forEach((p: any) => nameMap.set(p.id, p.username));
       }
+      if (cancelled) return;
+      setDmMessages(
+        data.map((r: any) => ({
+          id: r.id,
+          conversation_id: r.conversation_id,
+          sender_id: r.sender_id,
+          username: nameMap.get(r.sender_id) || r.sender_id.slice(0, 6),
+          content: r.content,
+          created_at: r.created_at,
+        }))
+      );
     };
     load();
     const ch = supabase.channel(`dm-${selectedDM}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${selectedDM}` }, async (payload: any) => {
       const r = payload.new;
-      const { data: prof } = await supabase.from("profiles").select("username").eq("id", r.sender_id).single();
-      setDmMessages((prev) => [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: prof?.username || r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at }]);
+      setDmMessages((prev) => {
+        if (prev.some((m) => m.id === r.id)) return prev;
+        // Reusa nome já conhecido; senão insere temporário e resolve async (1 query só quando necessário)
+        const known = prev.find((m) => m.sender_id === r.sender_id)?.username;
+        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at }];
+        supabase.from("profiles").select("username").eq("id", r.sender_id).single().then(({ data: prof }) => {
+          setDmMessages((cur) => cur.map((m) => (m.id === r.id ? { ...m, username: prof?.username || r.sender_id.slice(0, 6) } : m)));
+        });
+        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at }];
+      });
     }).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [selectedDM]);
+    return () => { cancelled = true; supabase.removeChannel(ch); };
+  }, [selectedDM, supabase]);
 
   useEffect(() => { dmEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [dmMessages]);
 
