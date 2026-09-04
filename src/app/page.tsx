@@ -11,6 +11,9 @@ import UsernameModal from "@/components/modals/UsernameModal";
 import ServerModal from "@/components/modals/ServerModal";
 import NewDMModal from "@/components/modals/NewDMModal";
 import ChannelModal from "@/components/modals/ChannelModal";
+import InviteModal from "@/components/modals/InviteModal";
+import JoinModal from "@/components/modals/JoinModal";
+import { useInvites } from "@/hooks/useInvites";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,9 +32,15 @@ export default function DiscordClone() {
     selectedServer, setSelectedServer,
     selectedChannel, setSelectedChannel,
     currentServer, currentChannel,
-    loading, connected,
+    loading, connected, reload,
   } = useServers(supabase, user);
   const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage } = useChannelMessages(supabase, user, username, selectedChannel);
+  const { inviteCode, creatingInvite, openInvite, redeemInvite } = useInvites(supabase, user);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+  const pendingServer = useRef<string | null>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
@@ -74,6 +83,39 @@ export default function DiscordClone() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [channelMessages]);
+
+  // Convite via link (?server=ID): seleciona após a lista carregar
+  useEffect(() => {
+    const sid = pendingServer.current || new URLSearchParams(window.location.search).get("server");
+    if (sid && servers.some((s) => s.id === sid)) {
+      pendingServer.current = null;
+      setViewMode("server");
+      setSelectedServer(sid);
+      const srv = servers.find((s) => s.id === sid);
+      if (srv?.channels[0]) setSelectedChannel(srv.channels[0].id);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [servers]);
+
+  const openInviteModal = () => {
+    if (!currentServer) return;
+    setShowInviteModal(true);
+    openInvite(currentServer.id);
+  };
+
+  const joinWithCode = async () => {
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    const sid = await redeemInvite(joinCode);
+    setJoining(false);
+    if (sid) {
+      setShowJoinModal(false);
+      setJoinCode("");
+      pendingServer.current = sid;
+      setViewMode("server");
+      reload();
+    }
+  };
 
   useEffect(() => { dmEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [dmMessages]);
 
@@ -120,6 +162,7 @@ export default function DiscordClone() {
         onSelectServer={(server) => { setViewMode("server"); setSelectedServer(server.id); setSelectedChannel(server.channels[0]?.id || ""); setShowMobileSidebar(false); }}
         onEditServer={openEditServer}
         onAddServer={openCreateServer}
+        onJoinServer={() => setShowJoinModal(true)}
       />
 
       <ChannelSidebar
@@ -175,6 +218,7 @@ export default function DiscordClone() {
         onDeleteMessage={deleteMessage}
         onEditDM={editDMMessage}
         onDeleteDM={deleteDMMessage}
+        onInvite={openInviteModal}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />
@@ -233,6 +277,24 @@ export default function DiscordClone() {
           creatingChannel={creatingChannel}
           onClose={() => setShowCreateChannelModal(false)}
           onCreate={handleCreateChannel}
+        />
+      )}
+      {showInviteModal && (
+        <InviteModal
+          serverName={currentServer?.name}
+          code={inviteCode}
+          creating={creatingInvite}
+          onClose={() => setShowInviteModal(false)}
+        />
+      )}
+
+      {showJoinModal && (
+        <JoinModal
+          code={joinCode}
+          setCode={setJoinCode}
+          joining={joining}
+          onClose={() => setShowJoinModal(false)}
+          onJoin={joinWithCode}
         />
       )}
     </div>

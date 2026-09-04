@@ -1,5 +1,5 @@
 "use client";
-import { Plus } from "lucide-react";
+import { Plus, Ticket } from "lucide-react";
 import type { Server } from "@/lib/chat-types";
 
 type Props = {
@@ -11,12 +11,13 @@ type Props = {
   onSelectServer: (server: Server) => void;
   onEditServer: (server: Server) => void;
   onAddServer: () => void;
+  onJoinServer: () => void;
 };
 
 // Barra fina de servidores (72px). Extraído de page.tsx sem mudança visual.
 export default function ServerRail({
   servers, selectedServer, viewMode, showMobileSidebar,
-  onSelectDM, onSelectServer, onEditServer, onAddServer,
+  onSelectDM, onSelectServer, onEditServer, onAddServer, onJoinServer,
 }: Props) {
   return (
     <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed inset-y-0 left-0 lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex lg:flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
@@ -37,6 +38,9 @@ export default function ServerRail({
       ))}
       <button onClick={onAddServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#23A559] text-[#23A559] hover:text-white flex items-center justify-center transition-all duration-200 group" title="Adicionar servidor">
         <Plus className="w-7 h-7 group-hover:rotate-90 transition-transform duration-200" />
+      </button>
+      <button onClick={onJoinServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#5865F2] text-zinc-300 hover:text-white flex items-center justify-center transition-all duration-200" title="Entrar com convite">
+        <Ticket className="w-6 h-6" />
       </button>
     </div>
   );

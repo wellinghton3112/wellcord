@@ -35,6 +35,7 @@ type Props = {
   onDeleteMessage: (id: string) => void;
   onEditDM: (id: string, content: string) => void;
   onDeleteDM: (id: string) => void;
+  onInvite: () => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -43,7 +44,7 @@ export default function ChatArea(props: Props) {
     viewMode, setShowMobileSidebar,
     dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, dmEndRef, onlineMembers, userId,
     currentChannel, selectedChannel, channelMessages, messagesEndRef, input, setInput, handleSend, username, status,
-    onEditMessage, onDeleteMessage, onEditDM, onDeleteDM,
+    onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -136,7 +137,7 @@ export default function ChatArea(props: Props) {
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
             <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-              <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><UserPlus className="w-5 h-5" />
+              <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
               <div className="relative hidden md:block"><Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" /><input placeholder="Buscar" className="bg-[#2B2D31] rounded pl-7 pr-2 py-1 text-sm w-36 focus:outline-none placeholder:text-zinc-500" /></div>
               <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
             </div>

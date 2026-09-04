@@ -10,6 +10,8 @@ export function useServers(supabase: any, user: any) {
   const [selectedChannel, setSelectedChannel] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const reload = () => setReloadKey((k) => k + 1);
 
   // Carregar servidores e canais do Supabase (só após login)
   useEffect(() => {
@@ -48,7 +50,7 @@ export function useServers(supabase: any, user: any) {
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, reloadKey]);
 
   // Realtime para novos servidores/canais
   useEffect(() => {
@@ -85,6 +87,6 @@ export function useServers(supabase: any, user: any) {
     selectedServer, setSelectedServer,
     selectedChannel, setSelectedChannel,
     currentServer, currentChannel,
-    loading, connected,
+    loading, connected, reload,
   };
 }
