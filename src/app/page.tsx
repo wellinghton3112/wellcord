@@ -31,7 +31,7 @@ export default function DiscordClone() {
     currentServer, currentChannel,
     loading, connected,
   } = useServers(supabase, user);
-  const { channelMessages, input, setInput, handleSend } = useChannelMessages(supabase, user, username, selectedChannel);
+  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage } = useChannelMessages(supabase, user, username, selectedChannel);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
   const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
   const [showCreateServerModal, setShowCreateServerModal] = useState(false);
@@ -44,14 +44,14 @@ export default function DiscordClone() {
     creatingServer, editingServer,
     openCreateServer, openEditServer, handleServerSave,
     deleteServer, deleteChannel, createChannel, handleCreateChannel,
-  } = useServerActions(supabase, servers, currentServer, selectedChannel, setSelectedServer, setSelectedChannel, setShowCreateServerModal, setShowCreateChannelModal);
+  } = useServerActions(supabase, user?.id, servers, currentServer, selectedChannel, setSelectedServer, setSelectedChannel, setShowCreateServerModal, setShowCreateChannelModal);
   const { status, setStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [viewMode, setViewMode] = useState<"server" | "dm">("server");
   const [showNewDMModal, setShowNewDMModal] = useState(false);
   const {
     dmConversations, selectedDM, setSelectedDM,
-    dmMessages, dmInput, setDmInput, handleDMSend,
+    dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   } = useDMs(supabase, user, setViewMode, setShowNewDMModal);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -133,6 +133,7 @@ export default function DiscordClone() {
         setNewDMUsername={setNewDMUsername}
         setShowNewDMModal={setShowNewDMModal}
         currentServer={currentServer}
+        userId={user?.id}
         selectedChannel={selectedChannel}
         setSelectedChannel={setSelectedChannel}
         connected={connected}
@@ -170,6 +171,10 @@ export default function DiscordClone() {
         handleSend={handleSend}
         username={username}
         status={status}
+        onEditMessage={editMessage}
+        onDeleteMessage={deleteMessage}
+        onEditDM={editDMMessage}
+        onDeleteDM={deleteDMMessage}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />

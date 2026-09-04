@@ -18,6 +18,7 @@ type Props = {
   setShowNewDMModal: (v: boolean) => void;
   // Servidor
   currentServer?: Server;
+  userId?: string;
   selectedChannel: string;
   setSelectedChannel: (id: string) => void;
   connected: boolean;
@@ -41,15 +42,18 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId,
   } = props;
+
+  // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
+  const canManage = !currentServer?.owner_id || currentServer.owner_id === userId;
 
   const channelRow = (ch: Channel, icon: React.ReactNode) => (
     <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
       <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
         {icon}<span className="truncate">{ch.name}</span>
       </button>
-      <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>
+      {canManage && <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>}
     </div>
   );
 
@@ -102,18 +106,18 @@ export default function ChannelSidebar(props: Props) {
               {currentServer?.image_url ? <img src={currentServer.image_url} alt="" className="w-6 h-6 rounded object-cover shrink-0" /> : <span className="text-sm shrink-0">{currentServer?.icon}</span>}
               <span className="font-bold text-[15px] truncate">{currentServer?.name}</span>
             </div>
-            <div className="flex items-center gap-1">
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
-              {currentServer && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
-              {currentServer && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
-            </div>
+              <div className="flex items-center gap-1">
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
+                {currentServer && canManage && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
+                {currentServer && canManage && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
+              </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-4">
             <div>
-              <div className="flex items-center justify-between px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">
-                <span>⌄ CANAIS DE TEXTO</span>
-                <Plus onClick={createChannel} className="w-3.5 h-3.5 cursor-pointer hover:text-zinc-200" />
-              </div>
+                <div className="flex items-center justify-between px-1 py-1 text-xs font-semibold text-zinc-400 tracking-wide">
+                  <span>⌄ CANAIS DE TEXTO</span>
+                  {canManage && <Plus onClick={createChannel} className="w-3.5 h-3.5 cursor-pointer hover:text-zinc-200" />}
+                </div>
               {currentServer?.channels.filter((c) => c.type === "text").map((ch) => channelRow(ch,
                 ch.image_url ? <img src={ch.image_url} alt="" className="w-4 h-4 rounded object-cover shrink-0" /> : ch.icon ? <span className="w-4 h-4 flex items-center justify-center text-sm shrink-0">{ch.icon}</span> : <Hash className="w-4 h-4 shrink-0 text-zinc-500" />
               ))}

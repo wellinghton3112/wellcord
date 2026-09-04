@@ -35,6 +35,7 @@ export function useServers(supabase: any, user: any) {
         name: s.name,
         icon: s.icon,
         image_url: s.image_url,
+        owner_id: s.owner_id ?? null,
         channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
       }));
       setServers(mapped);
@@ -56,7 +57,7 @@ export function useServers(supabase: any, user: any) {
       const { data: chData } = await supabase.from("channels").select("*").order("created_at");
       if (srvData) {
         const mapped: Server[] = srvData.map((s: any) => ({
-          id: s.id, name: s.name, icon: s.icon, image_url: (s as any).image_url,
+          id: s.id, name: s.name, icon: s.icon, image_url: (s as any).image_url, owner_id: (s as any).owner_id ?? null,
           channels: (chData || []).filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
         }));
         setServers(mapped);
@@ -67,7 +68,7 @@ export function useServers(supabase: any, user: any) {
       const { data: srvData } = await supabase.from("servers").select("*").order("created_at");
       if (srvData && chData) {
         const mapped: Server[] = srvData.map((s: any) => ({
-          id: s.id, name: s.name, icon: s.icon, image_url: (s as any).image_url,
+          id: s.id, name: s.name, icon: s.icon, image_url: (s as any).image_url, owner_id: (s as any).owner_id ?? null,
           channels: chData.filter((c: any) => c.server_id === s.id).map((c: any) => ({ id: c.id, server_id: c.server_id, name: c.name, type: c.type, icon: c.icon, image_url: c.image_url })),
         }));
         setServers(mapped);

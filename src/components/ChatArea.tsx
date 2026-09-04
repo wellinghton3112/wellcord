@@ -1,8 +1,9 @@
 "use client";
+import { useState } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
-  Search, Inbox, HelpCircle, Plus, MoreHorizontal,
+  Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PresenceUser } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
@@ -30,6 +31,10 @@ type Props = {
   handleSend: () => void;
   username: string;
   status: string;
+  onEditMessage: (id: string, content: string) => void;
+  onDeleteMessage: (id: string) => void;
+  onEditDM: (id: string, content: string) => void;
+  onDeleteDM: (id: string) => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -38,8 +43,32 @@ export default function ChatArea(props: Props) {
     viewMode, setShowMobileSidebar,
     dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, dmEndRef, onlineMembers, userId,
     currentChannel, selectedChannel, channelMessages, messagesEndRef, input, setInput, handleSend, username, status,
+    onEditMessage, onDeleteMessage, onEditDM, onDeleteDM,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+
+  const startEdit = (id: string, content: string) => { setEditingId(id); setEditDraft(content); };
+  const cancelEdit = () => { setEditingId(null); setEditDraft(""); };
+  const saveEdit = (save: (id: string, content: string) => void) => {
+    if (editingId && editDraft.trim()) save(editingId, editDraft.trim());
+    cancelEdit();
+  };
+
+  const editBox = (save: (id: string, content: string) => void) => (
+    <div className="mt-1 flex items-center gap-2">
+      <input
+        value={editDraft}
+        onChange={(e) => setEditDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") saveEdit(save); if (e.key === "Escape") cancelEdit(); }}
+        className="flex-1 bg-[#2B2D31] rounded px-2 py-1 text-[15px] outline-none focus:ring-1 focus:ring-[#5865F2] min-w-0"
+        autoFocus
+      />
+      <button onClick={() => saveEdit(save)} className="text-xs text-[#5865F2] hover:underline shrink-0">Salvar</button>
+      <button onClick={cancelEdit} className="p-1 hover:bg-[#2B2D31] rounded shrink-0"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
@@ -73,12 +102,18 @@ export default function ChatArea(props: Props) {
               </div>
             ) : (
               dmMessages.map((m) => (
-                <div key={m.id} className="flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
+                <div key={m.id} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded">
                   <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{m.sender_id === userId ? "😎" : "👤"}</div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
-                    <p className="text-[15px] text-[#DBDEE1] break-words">{m.content}</p>
+                    {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{m.content}</p>}
                   </div>
+                  {m.sender_id === userId && editingId !== m.id && (
+                    <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
+                      <button onClick={() => startEdit(m.id, m.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+                      <button onClick={() => onDeleteDM(m.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -122,9 +157,20 @@ export default function ChatArea(props: Props) {
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}>{msg.avatar}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
-                      <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>
+                      {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>}
                     </div>
-                    <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg"><Smile className="w-4 h-4" /><MoreHorizontal className="w-4 h-4" /></div>
+                    {editingId !== msg.id && (
+                      <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
+                        <Smile className="w-4 h-4" />
+                        {msg.user_id && msg.user_id === userId ? (
+                          <>
+                            <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+                            <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
+                          </>
+                        ) : null}
+                        <MoreHorizontal className="w-4 h-4" />
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div ref={messagesEndRef} />

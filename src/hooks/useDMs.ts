@@ -78,7 +78,17 @@ export function useDMs(
         return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at }];
       });
     }).subscribe();
-    return () => { cancelled = true; supabase.removeChannel(ch); };
+    // Edições/exclusões: sem filtro (old só tem id) — filtra pelo id no handler
+    const upd = supabase.channel("dm-updates").on("postgres_changes", { event: "UPDATE", schema: "public", table: "dm_messages" }, (payload: any) => {
+      const r = payload.new;
+      if (!r?.id) return;
+      setDmMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, content: r.content } : m)));
+    }).on("postgres_changes", { event: "DELETE", schema: "public", table: "dm_messages" }, (payload: any) => {
+      const old = payload.old;
+      if (!old?.id) return;
+      setDmMessages((prev) => prev.filter((m) => m.id !== old.id));
+    }).subscribe();
+    return () => { cancelled = true; supabase.removeChannel(ch); supabase.removeChannel(upd); };
   }, [selectedDM, supabase]);
 
   const handleDMSend = async () => {
@@ -119,9 +129,21 @@ export function useDMs(
     setCreatingDM(false);
   };
 
+  const editDMMessage = async (id: string, content: string) => {
+    if (!content.trim()) return;
+    const { error } = await supabase.from("dm_messages").update({ content }).eq("id", id);
+    if (error) alert("Erro ao editar: " + error.message);
+  };
+
+  const deleteDMMessage = async (id: string) => {
+    if (!confirm("Excluir esta mensagem?")) return;
+    const { error } = await supabase.from("dm_messages").delete().eq("id", id);
+    if (error) alert("Erro ao excluir: " + error.message);
+  };
+
   return {
     dmConversations, selectedDM, setSelectedDM,
-    dmMessages, dmInput, setDmInput, handleDMSend,
+    dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   };
 }

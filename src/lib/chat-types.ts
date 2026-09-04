@@ -3,6 +3,7 @@ import { Circle, Moon, MinusCircle, EyeOff } from "lucide-react";
 export type Message = {
   id: string;
   user: string;
+  user_id?: string;
   avatar: string;
   color: string;
   content: string;
@@ -25,6 +26,7 @@ export type Server = {
   name: string;
   icon: string;
   image_url?: string;
+  owner_id?: string | null;
   channels: Channel[];
 };
 

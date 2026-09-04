@@ -22,6 +22,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
           const mapped = data.map((r: any) => ({
             id: r.id,
             user: r.username,
+            user_id: r.user_id,
             avatar: r.avatar || "😎",
             color: r.color || "#5865F2",
             content: r.content,
@@ -41,8 +42,18 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
         const r = payload.new;
         setMessages((prev) => {
           if (prev.some((m) => m.id === r.id)) return prev;
-          return [...prev, { id: r.id, user: r.username, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at }];
+          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at }];
         });
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload: any) => {
+        const r = payload.new;
+        if (!r || r.channel_id !== selectedChannel) return;
+        setMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, content: r.content } : m)));
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "messages" }, (payload: any) => {
+        const old = payload.old;
+        if (!old?.id) return;
+        setMessages((prev) => prev.filter((m) => m.id !== old.id));
       })
       .subscribe();
 
@@ -70,5 +81,17 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     }
   };
 
-  return { messages, channelMessages, input, setInput, handleSend };
+  const editMessage = async (id: string, content: string) => {
+    if (!content.trim()) return;
+    const { error } = await supabase.from("messages").update({ content }).eq("id", id);
+    if (error) alert("Erro ao editar: " + error.message);
+  };
+
+  const deleteMessage = async (id: string) => {
+    if (!confirm("Excluir esta mensagem?")) return;
+    const { error } = await supabase.from("messages").delete().eq("id", id);
+    if (error) alert("Erro ao excluir: " + error.message);
+  };
+
+  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage };
 }

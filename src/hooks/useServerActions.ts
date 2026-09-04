@@ -6,6 +6,7 @@ import type { Server } from "@/lib/chat-types";
 // Extraído de page.tsx sem mudança de comportamento.
 export function useServerActions(
   supabase: any,
+  userId: string | undefined,
   servers: Server[],
   currentServer: Server | undefined,
   selectedChannel: string,
@@ -35,7 +36,10 @@ export function useServerActions(
     setNewServerPreview("");
     setShowCreateServerModal(true);
   };
+  const canManage = (s: Server) => !s.owner_id || s.owner_id === userId;
+
   const openEditServer = (s: Server) => {
+    if (!canManage(s)) { alert("Só o dono do servidor pode editar."); return; }
     setEditingServer(s);
     setNewServerName(s.name);
     setNewServerIcon(s.icon);
@@ -49,7 +53,7 @@ export function useServerActions(
     let image_url: string | null = editingServer?.image_url || null;
     if (newServerImage) {
       const ext = newServerImage.name.split(".").pop();
-      const path = `servers/${Date.now()}.${ext}`;
+      const path = `${userId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("server-icons").upload(path, newServerImage);
       if (upErr) { alert("Erro ao subir imagem: " + upErr.message); setCreatingServer(false); return; }
       const { data } = supabase.storage.from("server-icons").getPublicUrl(path);
@@ -61,7 +65,7 @@ export function useServerActions(
       const { error } = await supabase.from("servers").update({ name: newServerName, icon: newServerIcon, image_url }).eq("id", editingServer.id);
       if (error) alert(error.message);
     } else {
-      const { data, error } = await supabase.from("servers").insert({ name: newServerName, icon: newServerIcon, image_url }).select().single();
+      const { data, error } = await supabase.from("servers").insert({ name: newServerName, icon: newServerIcon, image_url, owner_id: userId }).select().single();
       if (error) { alert(error.message); setCreatingServer(false); return; }
       await supabase.from("channels").insert({ server_id: data.id, name: "geral", type: "text", icon: "💬" });
       setSelectedServer(data.id);
@@ -116,7 +120,7 @@ export function useServerActions(
     let image_url: string | null = null;
     if (newChannelImage) {
       const ext = newChannelImage.name.split(".").pop();
-      const path = `${currentServer.id}/${Date.now()}.${ext}`;
+      const path = `${userId}/${currentServer.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("channel-icons").upload(path, newChannelImage);
       if (upErr) { alert("Erro ao subir imagem: " + upErr.message); setCreatingChannel(false); return; }
       const { data } = supabase.storage.from("channel-icons").getPublicUrl(path);
