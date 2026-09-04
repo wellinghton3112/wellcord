@@ -16,9 +16,13 @@ export async function createDenoiser(raw: MediaStream): Promise<Denoiser> {
   const ctx: AudioContext = new AC({ sampleRate: 48000 });
   try {
     await ctx.resume().catch(() => {});
+    const wasmBytes = await fetch("/rnnoise/rnnoise.wasm").then((r) => {
+      if (!r.ok) throw new Error(`WASM http ${r.status}`);
+      return r.arrayBuffer();
+    });
     const assets = await rnnoise_loadAssets({
       scriptSrc: "/rnnoise/rnnoise.worklet.js",
-      moduleSrc: fetch("/rnnoise/rnnoise.wasm"),
+      moduleSrc: wasmBytes,
     });
     await RNNoiseNode.register(ctx, assets as any);
     const src = ctx.createMediaStreamSource(raw);

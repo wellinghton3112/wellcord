@@ -261,37 +261,43 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   };
 
   const toggleDenoise = async () => {
-    const next = !denoise;
-    setDenoise(next);
-    if (!joined || !rawStreamRef.current) return; // vale no próximo join
-    if (next) {
-      try {
-        const { createDenoiser } = await import("@/lib/noise");
-        if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} }
-        const d = await createDenoiser(rawStreamRef.current);
-        denoiseRef.current = d;
-        const track = d.output.getAudioTracks()[0] || null;
-        if (localStreamRef.current && track) {
-          localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
-          localStreamRef.current.addTrack(track);
-        }
-        await swapAudioTrack(track);
-        setDenoiseActive(true);
-        console.log("[voz] RNNoise ativado");
-      } catch (e) {
-        console.warn("[voz] falha ao ativar RNNoise, mantendo mic cru", e);
-        setDenoiseActive(false);
-      }
-    } else {
-      if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} denoiseRef.current = null; }
+    if (!joined || !rawStreamRef.current) {
+      setError("Entre na voz com microfone para usar a supressão de ruído.");
+      return;
+    }
+    // Decisão pelo grafo real (denoiseRef), não por estado visual — nunca trava
+    if (denoiseRef.current) {
+      try { denoiseRef.current.stop(); } catch {}
+      denoiseRef.current = null;
       const track = rawStreamRef.current.getAudioTracks()[0] || null;
       if (localStreamRef.current && track) {
         localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
         localStreamRef.current.addTrack(track);
       }
       await swapAudioTrack(track);
+      setDenoise(false);
       setDenoiseActive(false);
       console.log("[voz] RNNoise desativado (mic cru)");
+      return;
+    }
+    setDenoise(true);
+    try {
+      const { createDenoiser } = await import("@/lib/noise");
+      const d = await createDenoiser(rawStreamRef.current);
+      denoiseRef.current = d;
+      const track = d.output.getAudioTracks()[0] || null;
+      if (localStreamRef.current && track) {
+        localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
+        localStreamRef.current.addTrack(track);
+      }
+      await swapAudioTrack(track);
+      setDenoiseActive(true);
+      console.log("[voz] RNNoise ativado");
+    } catch (e: any) {
+      console.warn("[voz] falha ao ativar RNNoise, mantendo mic cru", e);
+      setDenoise(false);
+      setDenoiseActive(false);
+      setError("RNNoise falhou (" + (e?.message || e) + "). Mic do navegador em uso.");
     }
   };
 
@@ -329,6 +335,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
           }
         } catch (e) {
           console.warn("[voz] RNNoise indisponível, usando mic do navegador", e);
+          setDenoise(false);
           setDenoiseActive(false);
         }
       } else {
