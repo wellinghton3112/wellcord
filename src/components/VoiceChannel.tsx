@@ -40,11 +40,15 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
-  const myIdRef = useRef<string>(`${username}-${Math.random().toString(36).slice(2, 7)}`);
+  const leaveRef = useRef<() => void>(() => {});
+  // ID estável por montagem: gerado uma vez (sem regenerar ao trocar username — evita peers fantasmas).
+  // O nome de exibição vem do payload de presença, não do prefixo do ID.
+  const myIdRef = useRef<string>("");
 
   useEffect(() => {
-    myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
-  }, [username]);
+    if (!myIdRef.current) myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cleanup = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -90,10 +94,11 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   }, [channelId]);
 
   // Só desconecta se ficar sem internet ou fechar o app, NÃO quando ficar invisível
+  // (efeito posicionado após `leave` — usa a função já declarada)
   useEffect(() => {
     const handleOffline = () => {
       if (joined) {
-        leave();
+        leaveRef.current();
         setError("Desconectado da voz porque ficou sem internet");
       }
     };
@@ -106,7 +111,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [joined, channelId]);
+  }, [joined, channelId, supabase]);
 
   const createPeer = (peerId: string, isInitiator: boolean) => {
     if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
@@ -189,6 +194,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
 
   const join = async (asListener = false) => {
     if (joined || channelRef.current) return;
+    if (!myIdRef.current) myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
     setError("");
     let stream: MediaStream | null = null;
     try {
@@ -232,8 +238,15 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
 
       ch.on("presence", { event: "sync" }, () => {
         const state: any = ch.presenceState();
-        const ids: string[] = [];
-        Object.values(state).forEach((arr: any) => (arr as any[]).forEach((p: any) => ids.push(p.id || p.user_id || p.presence?.id)));
+        // Nome de exibição vem do payload de presença (não do prefixo do ID — o ID é estável)
+        const seen = new Map<string, string>();
+        Object.values(state).forEach((arr: any) =>
+          (arr as any[]).forEach((p: any) => {
+            const pid = p.id || p.user_id;
+            if (pid && !seen.has(pid)) seen.set(pid, p.username || pid.split("-")[0]);
+          })
+        );
+        const ids = [...seen.keys()];
         ids.forEach((id) => {
           if (id === myIdRef.current) return;
           if (!peersRef.current.has(id)) createPeer(id, true);
@@ -253,7 +266,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
             });
           }
         });
-        const peerList = ids.map((id) => ({ id, username: id.split("-")[0] }));
+        const peerList = ids.map((id) => ({ id, username: seen.get(id) || id.split("-")[0] }));
         setPeers(peerList.filter((p) => p.id !== myIdRef.current));
         setParticipants(channelId, peerList);
       });
@@ -304,6 +317,9 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     setPeers([]);
     setExpanded(null);
   };
+
+  // Mantém a ref sempre apontando para o `leave` mais recente (usada pelo listener offline)
+  useEffect(() => { leaveRef.current = leave; });
 
   const toggleFullscreen = () => {
     if (!expandedRef.current) return;
