@@ -105,11 +105,15 @@ export function useDMs(
       }
     }
     if (existing) { setSelectedDM(existing); setViewMode("dm"); setShowNewDMModal(false); setCreatingDM(false); return; }
-    const { data: conv, error } = await supabase.from("dm_conversations").insert({}).select().single();
-    if (error || !conv) { alert(error?.message || "Erro"); setCreatingDM(false); return; }
-    await supabase.from("dm_participants").insert([{ conversation_id: conv.id, user_id: user.id }, { conversation_id: conv.id, user_id: prof.id }]);
+    // ID gerado no client: o insert NÃO usa .select() porque a policy de SELECT
+    // só libera para participantes — e no momento do INSERT ainda não somos.
+    // (insert().select() exige SELECT na linha nova e dava 403 RLS)
+    const convId = crypto.randomUUID();
+    const { error } = await supabase.from("dm_conversations").insert({ id: convId });
+    if (error) { alert(error?.message || "Erro"); setCreatingDM(false); return; }
+    await supabase.from("dm_participants").insert([{ conversation_id: convId, user_id: user.id }, { conversation_id: convId, user_id: prof.id }]);
     await loadDMs();
-    setSelectedDM(conv.id);
+    setSelectedDM(convId);
     setViewMode("dm");
     setShowNewDMModal(false);
     setCreatingDM(false);
