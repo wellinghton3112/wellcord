@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Message } from "@/lib/chat-types";
-import { formatTime } from "@/lib/chat-types";
+import type { Message, ReactionMap } from "@/lib/chat-types";
+import { formatTime, groupReactions } from "@/lib/chat-types";
 
-// Mensagens do canal: carga, realtime e envio.
+// Mensagens do canal: carga, realtime, envio e reações.
 // Extraído de page.tsx sem mudança de comportamento.
 export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [reactions, setReactions] = useState<ReactionMap>({});
 
   // Carregar mensagens do canal selecionado + Realtime
   useEffect(() => {
@@ -32,6 +33,13 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
           }));
           return [...others, ...mapped];
         });
+        const ids = data.map((r: any) => r.id);
+        if (ids.length > 0) {
+          const { data: reacts } = await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", ids);
+          setReactions(groupReactions((reacts || []) as any[], user?.id));
+        } else {
+          setReactions({});
+        }
       }
     }
     loadMessages();
@@ -58,6 +66,28 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       .subscribe();
 
     return () => { if (channelSub) supabase.removeChannel(channelSub); };
+  }, [selectedChannel, supabase]);
+
+  const refreshReactions = async () => {
+    const { data } = await supabase.from("messages").select("id").eq("channel_id", selectedChannel).limit(100);
+    const ids = (data || []).map((r: any) => r.id);
+    if (ids.length === 0) { setReactions({}); return; }
+    const { data: reacts } = await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", ids);
+    setReactions(groupReactions((reacts || []) as any[], user?.id));
+  };
+
+  // Reações em canal separado: se a tabela não existir (migration pendente),
+  // só esse canal falha — as mensagens seguem vivas
+  useEffect(() => {
+    if (!selectedChannel || selectedChannel.startsWith("fallback")) return;
+    let reactSub: any;
+    reactSub = supabase
+      .channel(`reactions-${selectedChannel}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "message_reactions" }, () => refreshReactions())
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "message_reactions" }, () => refreshReactions())
+      .subscribe();
+    return () => { if (reactSub) supabase.removeChannel(reactSub); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChannel, supabase]);
 
   const channelMessages = messages.filter((m) => m.channelId === selectedChannel);
@@ -93,5 +123,17 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     if (error) alert("Erro ao excluir: " + error.message);
   };
 
-  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage };
+  const toggleReaction = async (messageId: string, emoji: string) => {
+    if (!user) return;
+    const mine = reactions[messageId]?.find((r) => r.emoji === emoji)?.mine;
+    if (mine) {
+      const { error } = await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", user.id).eq("emoji", emoji);
+      if (error) alert("Erro ao remover reação: " + error.message);
+    } else {
+      const { error } = await supabase.from("message_reactions").insert({ message_id: messageId, user_id: user.id, emoji });
+      if (error) alert("Erro ao reagir: " + error.message);
+    }
+  };
+
+  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction };
 }

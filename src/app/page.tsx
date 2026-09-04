@@ -34,7 +34,7 @@ export default function DiscordClone() {
     currentServer, currentChannel,
     loading, connected, reload,
   } = useServers(supabase, user);
-  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage } = useChannelMessages(supabase, user, username, selectedChannel);
+  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction } = useChannelMessages(supabase, user, username, selectedChannel);
   const { inviteCode, creatingInvite, openInvite, redeemInvite } = useInvites(supabase, user);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -61,6 +61,7 @@ export default function DiscordClone() {
   const {
     dmConversations, selectedDM, setSelectedDM,
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
+    dmReactions, toggleDMReaction,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   } = useDMs(supabase, user, setViewMode, setShowNewDMModal);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -219,6 +220,10 @@ export default function DiscordClone() {
         onEditDM={editDMMessage}
         onDeleteDM={deleteDMMessage}
         onInvite={openInviteModal}
+        reactions={reactions}
+        onToggleReaction={toggleReaction}
+        dmReactions={dmReactions}
+        onToggleDMReaction={toggleDMReaction}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />

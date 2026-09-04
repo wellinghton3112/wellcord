@@ -68,3 +68,23 @@ export function formatTime(dateStr: string) {
     return "Hoje às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
   } catch { return dateStr; }
 }
+
+export type Reaction = { emoji: string; count: number; mine: boolean };
+export type ReactionMap = Record<string, Reaction[]>;
+
+export const QUICK_EMOJIS = ["❤️", "👍", "😂", "😮", "😢", "🔥"];
+
+export function groupReactions(
+  rows: { message_id: string; user_id: string; emoji: string }[],
+  myId?: string
+): ReactionMap {
+  const map: ReactionMap = {};
+  for (const r of rows) {
+    const list = (map[r.message_id] ||= []);
+    let g = list.find((x) => x.emoji === r.emoji);
+    if (!g) { g = { emoji: r.emoji, count: 0, mine: false }; list.push(g); }
+    g.count++;
+    if (myId && r.user_id === myId) g.mine = true;
+  }
+  return map;
+}

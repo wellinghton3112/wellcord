@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { DMConversation, DMMessage } from "@/lib/chat-types";
+import type { DMConversation, DMMessage, ReactionMap } from "@/lib/chat-types";
+import { groupReactions } from "@/lib/chat-types";
 
 // DMs: conversas, mensagens com batch de profiles, envio e criação.
 // Extraído de page.tsx sem mudança de comportamento.
@@ -14,6 +15,7 @@ export function useDMs(
   const [selectedDM, setSelectedDM] = useState<string | null>(null);
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
   const [dmInput, setDmInput] = useState("");
+  const [dmReactions, setDmReactions] = useState<ReactionMap>({});
   const [newDMUsername, setNewDMUsername] = useState("");
   const [creatingDM, setCreatingDM] = useState(false);
 
@@ -63,6 +65,13 @@ export function useDMs(
           created_at: r.created_at,
         }))
       );
+      const ids = data.map((r: any) => r.id);
+      if (ids.length > 0) {
+        const { data: reacts } = await supabase.from("dm_reactions").select("message_id, user_id, emoji").in("message_id", ids);
+        if (!cancelled) setDmReactions(groupReactions((reacts || []) as any[], user?.id));
+      } else if (!cancelled) {
+        setDmReactions({});
+      }
     };
     load();
     const ch = supabase.channel(`dm-${selectedDM}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${selectedDM}` }, async (payload: any) => {
@@ -89,6 +98,25 @@ export function useDMs(
       setDmMessages((prev) => prev.filter((m) => m.id !== old.id));
     }).subscribe();
     return () => { cancelled = true; supabase.removeChannel(ch); supabase.removeChannel(upd); };
+  }, [selectedDM, supabase]);
+
+  // Reações da DM em canal separado (fault isolation se a migration estiver pendente)
+  useEffect(() => {
+    if (!selectedDM) return;
+    const refresh = async () => {
+      const { data } = await supabase.from("dm_messages").select("id").eq("conversation_id", selectedDM).limit(100);
+      const ids = (data || []).map((r: any) => r.id);
+      if (ids.length === 0) { setDmReactions({}); return; }
+      const { data: reacts } = await supabase.from("dm_reactions").select("message_id, user_id, emoji").in("message_id", ids);
+      setDmReactions(groupReactions((reacts || []) as any[], user?.id));
+    };
+    const rc = supabase
+      .channel(`dm-reactions-${selectedDM}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_reactions" }, () => refresh())
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "dm_reactions" }, () => refresh())
+      .subscribe();
+    return () => { supabase.removeChannel(rc); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDM, supabase]);
 
   const handleDMSend = async () => {
@@ -141,9 +169,22 @@ export function useDMs(
     if (error) alert("Erro ao excluir: " + error.message);
   };
 
+  const toggleDMReaction = async (messageId: string, emoji: string) => {
+    if (!user) return;
+    const mine = dmReactions[messageId]?.find((r) => r.emoji === emoji)?.mine;
+    if (mine) {
+      const { error } = await supabase.from("dm_reactions").delete().eq("message_id", messageId).eq("user_id", user.id).eq("emoji", emoji);
+      if (error) alert("Erro ao remover reação: " + error.message);
+    } else {
+      const { error } = await supabase.from("dm_reactions").insert({ message_id: messageId, user_id: user.id, emoji });
+      if (error) alert("Erro ao reagir: " + error.message);
+    }
+  };
+
   return {
     dmConversations, selectedDM, setSelectedDM,
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
+    dmReactions, toggleDMReaction,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   };
 }

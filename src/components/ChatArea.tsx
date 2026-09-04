@@ -5,7 +5,8 @@ import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
   Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X,
 } from "lucide-react";
-import type { Channel, DMConversation, DMMessage, Message, PresenceUser } from "@/lib/chat-types";
+import type { Channel, DMConversation, DMMessage, Message, PresenceUser, ReactionMap } from "@/lib/chat-types";
+import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 
 type Props = {
@@ -36,6 +37,10 @@ type Props = {
   onEditDM: (id: string, content: string) => void;
   onDeleteDM: (id: string) => void;
   onInvite: () => void;
+  reactions: ReactionMap;
+  onToggleReaction: (id: string, emoji: string) => void;
+  dmReactions: ReactionMap;
+  onToggleDMReaction: (id: string, emoji: string) => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -45,10 +50,12 @@ export default function ChatArea(props: Props) {
     dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, dmEndRef, onlineMembers, userId,
     currentChannel, selectedChannel, channelMessages, messagesEndRef, input, setInput, handleSend, username, status,
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
+    reactions, onToggleReaction, dmReactions, onToggleDMReaction,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  const [pickFor, setPickFor] = useState<string | null>(null);
 
   const startEdit = (id: string, content: string) => { setEditingId(id); setEditDraft(content); };
   const cancelEdit = () => { setEditingId(null); setEditDraft(""); };
@@ -68,6 +75,42 @@ export default function ChatArea(props: Props) {
       />
       <button onClick={() => saveEdit(save)} className="text-xs text-[#5865F2] hover:underline shrink-0">Salvar</button>
       <button onClick={cancelEdit} className="p-1 hover:bg-[#2B2D31] rounded shrink-0"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
+    </div>
+  );
+
+  const reactionBar = (
+    list: { emoji: string; count: number; mine: boolean }[] | undefined,
+    toggle: (emoji: string) => void,
+  ) => {
+    if (!list || list.length === 0) return null;
+    return (
+      <div className="mt-1 flex flex-wrap gap-1">
+        {list.map((r) => (
+          <button
+            key={r.emoji}
+            onClick={() => toggle(r.emoji)}
+            title={r.mine ? "Remover minha reação" : "Reagir também"}
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${r.mine ? "bg-[#5865F2]/30 border-[#5865F2] text-white" : "bg-[#2B2D31] border-[#4A4D53] text-zinc-300 hover:border-zinc-400"}`}
+          >
+            <span>{r.emoji}</span><span className="font-semibold">{r.count}</span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const emojiPicker = (messageId: string, toggle: (id: string, emoji: string) => void) => (
+    <div className="mt-1 flex items-center gap-1 bg-[#2B2D31] border border-[#4A4D53] rounded-lg p-1.5 w-fit shadow-lg">
+      {QUICK_EMOJIS.map((e) => (
+        <button
+          key={e}
+          onClick={() => { toggle(messageId, e); setPickFor(null); }}
+          className="text-lg hover:scale-125 transition-transform p-0.5"
+        >
+          {e}
+        </button>
+      ))}
+      <button onClick={() => setPickFor(null)} className="p-1 hover:bg-[#35373C] rounded"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
     </div>
   );
 
@@ -108,11 +151,18 @@ export default function ChatArea(props: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
                     {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{m.content}</p>}
+                    {editingId !== m.id && reactionBar(dmReactions[m.id], (e) => onToggleDMReaction(m.id, e))}
+                    {pickFor === m.id && emojiPicker(m.id, onToggleDMReaction)}
                   </div>
-                  {m.sender_id === userId && editingId !== m.id && (
+                  {editingId !== m.id && (
                     <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
-                      <button onClick={() => startEdit(m.id, m.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-                      <button onClick={() => onDeleteDM(m.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
+                      <button onClick={() => setPickFor(pickFor === m.id ? null : m.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
+                      {m.sender_id === userId && (
+                        <>
+                          <button onClick={() => startEdit(m.id, m.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+                          <button onClick={() => onDeleteDM(m.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -159,10 +209,12 @@ export default function ChatArea(props: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
                       {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>}
+                      {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
+                      {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
                     </div>
                     {editingId !== msg.id && (
                       <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
-                        <Smile className="w-4 h-4" />
+                        <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
                         {msg.user_id && msg.user_id === userId ? (
                           <>
                             <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
