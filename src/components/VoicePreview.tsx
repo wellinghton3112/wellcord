@@ -7,26 +7,31 @@ type Props = { channelId: string };
 export default function VoicePreview({ channelId }: Props) {
   const supabase = useMemo(() => createClient(), []);
   const [peers, setPeers] = useState<{ id: string; username: string; joined_at: string }[]>([]);
+  const [callStart, setCallStart] = useState<string | null>(null);
   const [duration, setDuration] = useState("0:00");
 
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase.from("voice_sessions").select("user_id, username, joined_at").eq("channel_id", channelId).order("joined_at", { ascending: true });
       if (data) setPeers(data.map((r: any) => ({ id: r.user_id, username: r.username, joined_at: r.joined_at })));
+      const { data: call } = await supabase.from("voice_calls").select("started_at").eq("channel_id", channelId).maybeSingle();
+      setCallStart(call?.started_at || null);
     };
     load();
     const ch = supabase
       .channel(`voice-sessions-${channelId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "voice_sessions", filter: `channel_id=eq.${channelId}` }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "voice_calls", filter: `channel_id=eq.${channelId}` }, () => load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [channelId]);
 
-  // Timer da CHAMADA: conta desde o primeiro na lista (mais antigo).
-  // Zera sozinho quando o último sai (lista vazia some da tela).
+  // Timer da CHAMADA: início gravado quando o primeiro entrou; só zera quando
+  // o último sai (a linha some). Fallback: mais antigo da lista (banco pré-migration).
   useEffect(() => {
     if (peers.length === 0) { setDuration("0:00"); return; }
-    const start = new Date(peers[0].joined_at).getTime();
+    const ref = callStart || peers[0].joined_at;
+    const start = new Date(ref).getTime();
     if (Number.isNaN(start)) { setDuration("0:00"); return; }
     const tick = () => {
       const s = Math.max(0, Math.floor((Date.now() - start) / 1000));
@@ -38,7 +43,7 @@ export default function VoicePreview({ channelId }: Props) {
     tick();
     const iv = setInterval(tick, 1000);
     return () => clearInterval(iv);
-  }, [peers]);
+  }, [peers, callStart]);
 
   if (peers.length === 0) return null;
 

@@ -51,9 +51,24 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
+  const maybeEndCall = () => {
+    supabase
+      .from("voice_sessions")
+      .select("user_id", { count: "exact", head: true })
+      .eq("channel_id", channelId)
+      .then(({ count }) => {
+        if (!count) supabase.from("voice_calls").delete().eq("channel_id", channelId).then(() => {});
+      });
+  };
+
   const cleanup = () => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id).then(() => {});
+      if (user) {
+        supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id).then(() => {
+          maybeEndCall();
+        });
+      }
     });
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
@@ -305,8 +320,13 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
           await ch.track({ id: myIdRef.current, username });
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            // Remove sessão fantasma anterior e grava horário fresco (timer conta daqui)
+            // Remove sessão fantasma anterior
             await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
+            // Primeiro a entrar abre a chamada (início do timer); quem chega depois não mexe
+            const { count } = await supabase.from("voice_sessions").select("user_id", { count: "exact", head: true }).eq("channel_id", channelId);
+            if (!count) {
+              await supabase.from("voice_calls").upsert({ channel_id: channelId, started_at: new Date().toISOString() }, { onConflict: "channel_id" });
+            }
             await supabase.from("voice_sessions").upsert({ channel_id: channelId, user_id: user.id, username, joined_at: new Date().toISOString() }, { onConflict: "channel_id,user_id" });
           }
           setJoined(true);
@@ -344,7 +364,10 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
 
   const leave = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
+    if (user) {
+      await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
+      maybeEndCall();
+    }
     cleanup();
     setJoined(false);
     setPeers([]);
