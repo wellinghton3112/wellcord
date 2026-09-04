@@ -18,12 +18,17 @@ export default function VoicePreview({ channelId }: Props) {
       setCallStart(call?.started_at || null);
     };
     load();
-    const ch = supabase
+    // Canais separados: se a tabela voice_calls não existir/publicada (migration
+    // pendente), só o canal da chamada falha — a lista de presentes segue viva.
+    const chSessions = supabase
       .channel(`voice-sessions-${channelId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "voice_sessions", filter: `channel_id=eq.${channelId}` }, () => load())
+      .subscribe();
+    const chCall = supabase
+      .channel(`voice-call-${channelId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "voice_calls", filter: `channel_id=eq.${channelId}` }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { supabase.removeChannel(chSessions); supabase.removeChannel(chCall); };
   }, [channelId]);
 
   // Timer da CHAMADA: início gravado quando o primeiro entrou; só zera quando
