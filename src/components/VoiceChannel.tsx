@@ -262,22 +262,44 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
       ch.on("broadcast", { event: "offer" }, async ({ payload }: any) => {
         if (payload.to !== myIdRef.current) return;
         const pc = createPeer(payload.from, false);
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        ch.send({ type: "broadcast", event: "answer", payload: { from: myIdRef.current, to: payload.from, sdp: answer } });
+        // Negociação educada: id menor cede (rollback) em caso de oferta simultânea (glare)
+        const polite = myIdRef.current < payload.from;
+        try {
+          if (pc.signalingState !== "stable") {
+            if (!polite) return;
+            await pc.setLocalDescription({ type: "rollback" });
+          }
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ch.send({ type: "broadcast", event: "answer", payload: { from: myIdRef.current, to: payload.from, sdp: answer } });
+        } catch (e) {
+          console.warn(`[voz] oferta de ${payload.from} ignorada (glare resolvido pelo outro lado)`);
+        }
       });
 
       ch.on("broadcast", { event: "answer" }, async ({ payload }: any) => {
         if (payload.to !== myIdRef.current) return;
         const pc = peersRef.current.get(payload.from);
-        if (pc) await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+        if (!pc) return;
+        // Resposta tardia/duplicada fora de hora: ignora em vez de estourar
+        if (pc.signalingState !== "have-local-offer") return;
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+        } catch (e) {
+          console.warn(`[voz] resposta de ${payload.from} ignorada (fora de hora)`);
+        }
       });
 
       ch.on("broadcast", { event: "ice" }, async ({ payload }: any) => {
         if (payload.to !== myIdRef.current) return;
         const pc = peersRef.current.get(payload.from);
-        if (pc && payload.candidate) await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        if (!pc || !payload.candidate) return;
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+        } catch {
+          // Candidato chegou antes da descrição remota; o ICE restart cobre a recuperação
+        }
       });
 
       ch.on("presence", { event: "sync" }, () => {
