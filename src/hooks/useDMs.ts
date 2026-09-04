@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DMConversation, DMMessage, ReactionMap } from "@/lib/chat-types";
 import { groupReactions } from "@/lib/chat-types";
 
@@ -18,6 +18,12 @@ export function useDMs(
   const [dmReactions, setDmReactions] = useState<ReactionMap>({});
   const [newDMUsername, setNewDMUsername] = useState("");
   const [creatingDM, setCreatingDM] = useState(false);
+  const [unread, setUnread] = useState<Record<string, number>>({});
+  // Refs para usar estado atual dentro de subscriptions estáveis
+  const convIdsRef = useRef<Set<string>>(new Set());
+  const selectedDMRef = useRef<string | null>(null);
+  convIdsRef.current = new Set(dmConversations.map((c) => c.id));
+  selectedDMRef.current = selectedDM;
 
   // DMs: carregar conversas
   const loadDMs = async () => {
@@ -40,6 +46,40 @@ export function useDMs(
   };
 
   useEffect(() => { if (user) loadDMs(); }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Inbox global: pega msg de QUALQUER conversa (RLS filtra só as minhas).
+  // Sem isso, DM criada por outro depois do meu login nunca chega sem F5.
+  useEffect(() => {
+    if (!user) return;
+    const inbox = supabase
+      .channel("dm-inbox")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages" }, (payload: any) => {
+        const r = payload.new;
+        if (!r?.conversation_id || r.sender_id === user.id) return;
+        if (!convIdsRef.current.has(r.conversation_id)) {
+          loadDMs(); // conversa nova vinda de outro: atualiza a lista
+        }
+        if (selectedDMRef.current !== r.conversation_id) {
+          setUnread((prev) => ({ ...prev, [r.conversation_id]: (prev[r.conversation_id] || 0) + 1 }));
+        }
+      })
+      .subscribe((status: string) => {
+        if (status !== "SUBSCRIBED") console.warn("[dm] inbox status:", status);
+      });
+    return () => { supabase.removeChannel(inbox); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, supabase]);
+
+  // Abrir a conversa zera as não-lidas dela
+  useEffect(() => {
+    if (!selectedDM) return;
+    setUnread((prev) => {
+      if (!prev[selectedDM]) return prev;
+      const next = { ...prev };
+      delete next[selectedDM];
+      return next;
+    });
+  }, [selectedDM]);
 
   useEffect(() => {
     if (!selectedDM) return;
@@ -74,6 +114,7 @@ export function useDMs(
       }
     };
     load();
+    // Um canal por conversa: INSERT (filtrado) + UPDATE/DELETE (sem filtro, old só tem id)
     const ch = supabase.channel(`dm-${selectedDM}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "dm_messages", filter: `conversation_id=eq.${selectedDM}` }, async (payload: any) => {
       const r = payload.new;
       setDmMessages((prev) => {
@@ -86,18 +127,18 @@ export function useDMs(
         });
         return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at }];
       });
-    }).subscribe();
-    // Edições/exclusões: sem filtro (old só tem id) — filtra pelo id no handler
-    const upd = supabase.channel("dm-updates").on("postgres_changes", { event: "UPDATE", schema: "public", table: "dm_messages" }, (payload: any) => {
+    }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "dm_messages" }, (payload: any) => {
       const r = payload.new;
-      if (!r?.id) return;
+      if (!r?.id || r.conversation_id !== selectedDM) return;
       setDmMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, content: r.content } : m)));
     }).on("postgres_changes", { event: "DELETE", schema: "public", table: "dm_messages" }, (payload: any) => {
       const old = payload.old;
       if (!old?.id) return;
       setDmMessages((prev) => prev.filter((m) => m.id !== old.id));
-    }).subscribe();
-    return () => { cancelled = true; supabase.removeChannel(ch); supabase.removeChannel(upd); };
+    }).subscribe((status: string) => {
+      if (status !== "SUBSCRIBED") console.warn(`[dm] canal ${selectedDM} status:`, status);
+    });
+    return () => { cancelled = true; supabase.removeChannel(ch); };
   }, [selectedDM, supabase]);
 
   // Reações da DM em canal separado (fault isolation se a migration estiver pendente)
@@ -184,7 +225,7 @@ export function useDMs(
   return {
     dmConversations, selectedDM, setSelectedDM,
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
-    dmReactions, toggleDMReaction,
+    dmReactions, toggleDMReaction, unread,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   };
 }

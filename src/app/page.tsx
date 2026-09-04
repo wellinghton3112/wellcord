@@ -61,7 +61,7 @@ export default function DiscordClone() {
   const {
     dmConversations, selectedDM, setSelectedDM,
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
-    dmReactions, toggleDMReaction,
+    dmReactions, toggleDMReaction, unread,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   } = useDMs(supabase, user, setViewMode, setShowNewDMModal);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -173,6 +173,7 @@ export default function DiscordClone() {
         dmConversations={dmConversations}
         selectedDM={selectedDM}
         setSelectedDM={setSelectedDM}
+        unreadDMs={unread}
         onlineMembers={onlineMembers}
         setNewDMUsername={setNewDMUsername}
         setShowNewDMModal={setShowNewDMModal}

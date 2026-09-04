@@ -13,6 +13,7 @@ type Props = {
   dmConversations: DMConversation[];
   selectedDM: string | null;
   setSelectedDM: (id: string) => void;
+  unreadDMs?: Record<string, number>;
   onlineMembers: PresenceUser[];
   setNewDMUsername: (v: string) => void;
   setShowNewDMModal: (v: boolean) => void;
@@ -40,7 +41,7 @@ type Props = {
 export default function ChannelSidebar(props: Props) {
   const {
     showMobileSidebar, setShowMobileSidebar, viewMode,
-    dmConversations, selectedDM, setSelectedDM, onlineMembers, setNewDMUsername, setShowNewDMModal,
+    dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
     username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId,
   } = props;
@@ -81,6 +82,9 @@ export default function ChannelSidebar(props: Props) {
                   <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
                   <div className="text-xs text-zinc-500 truncate">Clique para conversar</div>
                 </div>
+                {(unreadDMs?.[dm.id] || 0) > 0 && (
+                  <span className="min-w-5 h-5 px-1.5 rounded-full bg-[#DA373C] text-white text-[11px] font-bold flex items-center justify-center shrink-0">{unreadDMs![dm.id] > 9 ? "9+" : unreadDMs![dm.id]}</span>
+                )}
                 <div className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dm.otherUser?.id) ? "bg-[#23A559]" : "bg-zinc-600"}`} />
               </button>
             ))}
