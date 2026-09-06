@@ -61,6 +61,22 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Retorno local (quadrinho): sincroniza APÓS o <video> montar.
+  // Atribuir srcObject no toggle falha porque o elemento ainda não existe.
+  useEffect(() => {
+    const v = localVideoRef.current;
+    if (!v) return;
+    if (cameraOn || screenOn) {
+      const vt = localStreamRef.current?.getVideoTracks()[0];
+      if (vt && (v.srcObject as MediaStream | null)?.getVideoTracks()[0] !== vt) {
+        v.srcObject = new MediaStream([vt]);
+        v.play().catch(() => {});
+      }
+    } else {
+      if (v.srcObject) v.srcObject = null;
+    }
+  }, [cameraOn, screenOn, joined]);
+
   // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
   const maybeEndCall = () => {
     supabase
