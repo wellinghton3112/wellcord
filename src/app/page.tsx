@@ -14,6 +14,7 @@ import ChannelModal from "@/components/modals/ChannelModal";
 import JoinModal from "@/components/modals/JoinModal";
 import MembersModal from "@/components/modals/MembersModal";
 import PinsModal from "@/components/modals/PinsModal";
+import PollModal from "@/components/modals/PollModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useServerManager } from "@/hooks/useServerManager";
@@ -29,6 +30,7 @@ import { useTyping } from "@/hooks/useTyping";
 import { useNotify } from "@/hooks/useNotify";
 import { useChannelUnread } from "@/hooks/useChannelUnread";
 import { usePins } from "@/hooks/usePins";
+import { usePolls } from "@/hooks/usePolls";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
@@ -52,6 +54,8 @@ export default function DiscordClone() {
   const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
   const { pins, pinnedIds, canPin, togglePin } = usePins(supabase, user, selectedChannel, isOwner);
   const [showPinsModal, setShowPinsModal] = useState(false);
+  const { polls, createPoll, toggleVote, deletePoll } = usePolls(supabase, user, username, selectedChannel);
+  const [showPollModal, setShowPollModal] = useState(false);
 
   const jumpToMessage = async (id: string) => {
     setShowPinsModal(false);
@@ -359,6 +363,10 @@ export default function DiscordClone() {
         onTogglePin={togglePin}
         onOpenPins={() => setShowPinsModal(true)}
         isOwner={isOwner}
+        polls={polls}
+        onToggleVote={toggleVote}
+        onDeletePoll={deletePoll}
+        onOpenPollModal={() => setShowPollModal(true)}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />
@@ -491,6 +499,12 @@ export default function DiscordClone() {
           onUnpin={togglePin}
           canManage={isOwner}
           onClose={() => setShowPinsModal(false)}
+        />
+      )}
+      {showPollModal && (
+        <PollModal
+          onClose={() => setShowPollModal(false)}
+          onCreate={createPoll}
         />
       )}
     </div>

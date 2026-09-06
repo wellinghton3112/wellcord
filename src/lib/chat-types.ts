@@ -65,6 +65,17 @@ export type PendingFile = { url: string; name: string; type: string };
 
 export const MAX_FILE_MB = 10;
 
+export type PollOption = { id: string; label: string; position: number; votes: number; mine: boolean };
+export type Poll = {
+  id: string;
+  question: string;
+  username: string;
+  user_id?: string | null;
+  created_at: string;
+  options: PollOption[];
+  totalVotes: number;
+};
+
 export type PresenceStatus = "online" | "idle" | "dnd" | "invisible";
 
 export type PresenceUser = {

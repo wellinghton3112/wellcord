@@ -4,9 +4,9 @@ import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
   Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X, Reply,
-  ChevronUp, ChevronDown, FileText, Download, Loader2,
+  ChevronUp, ChevronDown, FileText, Download, Loader2, BarChart3,
 } from "lucide-react";
-import type { Channel, DMConversation, DMMessage, Message, PendingFile, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
+import type { Channel, DMConversation, DMMessage, Message, PendingFile, Poll, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
 import Avatar from "@/components/Avatar";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
@@ -73,6 +73,10 @@ type Props = {
   onTogglePin: (id: string) => void;
   onOpenPins: () => void;
   isOwner: boolean;
+  polls: Poll[];
+  onToggleVote: (pollId: string, optionId: string) => void;
+  onDeletePoll: (pollId: string) => void;
+  onOpenPollModal: () => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -90,6 +94,7 @@ export default function ChatArea(props: Props) {
     mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
     hasMore, loadingOlder, onLoadOlder, dmHasMore, dmLoadingOlder, onLoadOlderDM,
     pinnedIds, canPinMsg, onTogglePin, onOpenPins, isOwner,
+    polls, onToggleVote, onDeletePoll, onOpenPollModal,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -449,6 +454,82 @@ export default function ChatArea(props: Props) {
     );
   };
 
+  // Feed cronológico: mensagens + enquetes intercaladas
+  const feed: ({ kind: "msg"; at: string; msg: Message } | { kind: "poll"; at: string; poll: Poll })[] = [
+    ...channelMessages.map((msg) => ({ kind: "msg" as const, at: msg.created_at || "", msg })),
+    ...polls.map((poll) => ({ kind: "poll" as const, at: poll.created_at, poll })),
+  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+
+  const renderPoll = (poll: Poll) => {
+    const total = poll.totalVotes;
+    return (
+      <div key={`poll-${poll.id}`} id={`poll-${poll.id}`} className="my-2 ml-14 mr-2 rounded-xl border border-[#5865F2]/40 bg-[#2B2D31] p-3 scroll-mt-20">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-[#8B9DFF]">
+          <BarChart3 className="w-3.5 h-3.5" /> Enquete • {poll.username}
+        </div>
+        <div className="mt-1 font-semibold text-[15px] text-white break-words">{poll.question}</div>
+        <div className="mt-2 space-y-1.5">
+          {poll.options.map((o) => {
+            const pct = total > 0 ? Math.round((o.votes / total) * 100) : 0;
+            return (
+              <button
+                key={o.id}
+                onClick={() => onToggleVote(poll.id, o.id)}
+                className={`relative w-full overflow-hidden rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${o.mine ? "border-[#5865F2] bg-[#5865F2]/20 text-white" : "border-[#4A4D53] bg-[#313338] text-zinc-200 hover:border-zinc-400"}`}
+              >
+                <span className="absolute inset-y-0 left-0 bg-[#5865F2]/25 transition-all" style={{ width: `${pct}%` }} />
+                <span className="relative flex items-center gap-2">
+                  <span className="flex-1 truncate">{o.label}</span>
+                  <span className="text-xs font-bold shrink-0">{o.votes} • {pct}%</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-500">
+          <span>{total} voto{total === 1 ? "" : "s"}</span>
+          {(poll.user_id === userId || isOwner) && (
+            <button onClick={() => onDeletePoll(poll.id)} className="hover:text-red-400 hover:underline">Apagar enquete</button>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderChannelMessage = (msg: Message) => (
+    <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
+      <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="shrink-0 mt-1 rounded-full" title="Ver perfil">
+        <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></span>
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span>{pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}</div>
+        {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
+        {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
+        {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
+        {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
+        {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
+      </div>
+      {editingId !== msg.id && (
+        <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
+          <button onClick={() => { setReplyTo({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+          <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
+          {canPinMsg(msg.user_id) && (
+            <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
+          )}
+          {msg.user_id && msg.user_id === userId ? (
+            <>
+              <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+              <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
+            </>
+          ) : isOwner ? (
+            <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação do dono)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
+          ) : null}
+          <MoreHorizontal className="w-4 h-4" />
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
       {viewMode === "dm" ? (
@@ -563,39 +644,9 @@ export default function ChatArea(props: Props) {
                   <p className="text-zinc-400 mt-2">Mensagens agora são salvas no Supabase e aparecem em tempo real para todos.</p>
                   {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
                 </div>
-                {channelMessages.map((msg) => (
-                  <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-                    <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="shrink-0 mt-1 rounded-full" title="Ver perfil">
-                      <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></span>
-                    </button>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span>{pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}</div>
-                      {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
-                      {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
-                      {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
-                      {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
-                      {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
-                    </div>
-                    {editingId !== msg.id && (
-                      <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
-                        <button onClick={() => { setReplyTo({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-                        <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
-                        {canPinMsg(msg.user_id) && (
-                          <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
-                        )}
-                        {msg.user_id && msg.user_id === userId ? (
-                          <>
-                            <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-                            <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
-                          </>
-                        ) : isOwner ? (
-                          <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação do dono)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
-                        ) : null}
-                        <MoreHorizontal className="w-4 h-4" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {feed.map((item) =>
+                  item.kind === "poll" ? renderPoll(item.poll) : renderChannelMessage(item.msg)
+                )}
               </>
             )}
           </div>
@@ -612,6 +663,7 @@ export default function ChatArea(props: Props) {
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
+                <button onClick={onOpenPollModal} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-500 shrink-0 text-zinc-400 hover:text-[#383A40]" title="Criar enquete"><BarChart3 className="w-4 h-4" /></button>
                 <input ref={channelInputRef} value={input} onChange={(e) => setInput(e.target.value)} onBlur={onBlurChannel} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
