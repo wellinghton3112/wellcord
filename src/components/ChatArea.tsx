@@ -320,7 +320,7 @@ export default function ChatArea(props: Props) {
             }}
             className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#35373C] text-left"
           >
-            <span className="w-6 h-6 rounded-full bg-[#5865F2] flex items-center justify-center text-xs shrink-0">{c.avatar || "👤"}</span>
+            <Avatar src={c.avatar} name={c.username} className="w-6 h-6 rounded-full bg-[#5865F2] text-xs" />
             <span className="text-sm text-zinc-200 truncate">{c.username}</span>
           </button>
         ))}
