@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { DMConversation, DMMessage, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
+import { extractMentions, sendNotify } from "@/lib/notify";
 import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 
 // DMs: conversas, mensagens com batch de profiles, envio e criação.
@@ -8,6 +9,7 @@ import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 export function useDMs(
   supabase: any,
   user: any,
+  username: string,
   setViewMode: (m: "server" | "dm") => void,
   setShowNewDMModal: (v: boolean) => void,
 ) {
@@ -111,6 +113,7 @@ export function useDMs(
           reply_to: r.reply_to || null,
           reply_user: r.reply_user || null,
           reply_content: r.reply_content || null,
+          mentions: r.mentions || [],
           file_url: r.file_url || null,
           file_name: r.file_name || null,
           file_type: r.file_type || null,
@@ -132,11 +135,11 @@ export function useDMs(
         if (prev.some((m) => m.id === r.id)) return prev;
         // Reusa nome já conhecido; senão insere temporário e resolve async (1 query só quando necessário)
         const known = prev.find((m) => m.sender_id === r.sender_id)?.username;
-        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
+        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, mentions: r.mentions || [], file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
         supabase.from("profiles").select("username").eq("id", r.sender_id).single().then(({ data: prof }: any) => {
           setDmMessages((cur) => cur.map((m) => (m.id === r.id ? { ...m, username: prof?.username || r.sender_id.slice(0, 6) } : m)));
         });
-        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
+        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, mentions: r.mentions || [], file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
       });
     }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "dm_messages" }, (payload: any) => {
       const r = payload.new;
@@ -197,6 +200,12 @@ export function useDMs(
     setDmInput("");
     setDmReplyTo(null);
     setPendingDmFile(null);
+    // @menções resolvidas contra os participantes (sem query extra)
+    const conv = dmConversations.find((c) => c.id === selectedDM);
+    const names = extractMentions(content);
+    const mentionIds = (conv?.participants || [])
+      .filter((p) => p.id !== user.id && names.some((n) => n.toLowerCase() === p.username.toLowerCase()))
+      .map((p) => p.id);
     const { error } = await supabase.from("dm_messages").insert({
       conversation_id: selectedDM,
       sender_id: user.id,
@@ -204,11 +213,20 @@ export function useDMs(
       reply_to: reply?.id || null,
       reply_user: reply?.user || null,
       reply_content: reply?.content || null,
+      mentions: mentionIds,
       file_url: file?.url || null,
       file_name: file?.name || null,
       file_type: file?.type || null,
     });
-    if (error) { alert(error.message); setDmInput(content); setDmReplyTo(reply); setPendingDmFile(file); }
+    if (error) { alert(error.message); setDmInput(content); setDmReplyTo(reply); setPendingDmFile(file); return; }
+    // DM sempre notifica o outro participante (fire-and-forget)
+    const other = conv?.participants.find((p) => p.id !== user.id);
+    if (other) {
+      sendNotify(supabase, other.id, {
+        kind: "dm", from: username, snippet: content.slice(0, 80) || "📎 arquivo",
+        messageId: "", conversationId: selectedDM,
+      }).catch(() => {});
+    }
   };
 
   const createDM = async () => {

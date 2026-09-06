@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import type { Message, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
+import { extractMentions, sendNotify } from "@/lib/notify";
 
 // Mensagens do canal: carga, realtime, envio, reações, respostas e anexos.
 export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string) {
@@ -37,6 +38,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
             reply_to: r.reply_to || null,
             reply_user: r.reply_user || null,
             reply_content: r.reply_content || null,
+            mentions: r.mentions || [],
             file_url: r.file_url || null,
             file_name: r.file_name || null,
             file_type: r.file_type || null,
@@ -60,7 +62,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
         const r = payload.new;
         setMessages((prev) => {
           if (prev.some((m) => m.id === r.id)) return prev;
-          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
+          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, mentions: r.mentions || [], file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
         });
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload: any) => {
@@ -128,6 +130,13 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     setInput("");
     setReplyTo(null);
     setPendingFile(null);
+    // @menções -> ids (para notificar)
+    const names = extractMentions(content);
+    let mentionIds: string[] = [];
+    if (names.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("id, username").in("username", names);
+      mentionIds = (profs || []).map((p: any) => p.id).filter((id: string) => id !== user.id);
+    }
     const { error } = await supabase.from("messages").insert({
       channel_id: selectedChannel,
       user_id: user.id,
@@ -138,6 +147,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       reply_to: reply?.id || null,
       reply_user: reply?.user || null,
       reply_content: reply?.content || null,
+      mentions: mentionIds,
       file_url: file?.url || null,
       file_name: file?.name || null,
       file_type: file?.type || null,
@@ -148,6 +158,17 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       setInput(content);
       setReplyTo(reply);
       setPendingFile(file);
+      return;
+    }
+    // Notifica mencionados (fire-and-forget)
+    if (mentionIds.length > 0) {
+      const snippet = content.slice(0, 80);
+      mentionIds.forEach((id) => {
+        sendNotify(supabase, id, {
+          kind: "channel", from: username, snippet, messageId: "",
+          serverId: serverId, channelId: selectedChannel,
+        }).catch(() => {});
+      });
     }
   };
 

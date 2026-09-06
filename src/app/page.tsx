@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Menu, Users } from "lucide-react";
+import { Menu, Users, Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import MembersSidebar from "@/components/MembersSidebar";
 import ServerRail from "@/components/ServerRail";
@@ -23,6 +23,7 @@ import { useChannelMessages } from "@/hooks/useChannelMessages";
 import { useDMs } from "@/hooks/useDMs";
 import { useServerActions } from "@/hooks/useServerActions";
 import { useTyping } from "@/hooks/useTyping";
+import { useNotify } from "@/hooks/useNotify";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
@@ -70,11 +71,38 @@ export default function DiscordClone() {
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
-  } = useDMs(supabase, user, setViewMode, setShowNewDMModal);
+  } = useDMs(supabase, user, username, setViewMode, setShowNewDMModal);
   const dmTyping = useTyping(supabase, user, username, selectedDM ? `dm-${selectedDM}` : null);
 
   const sendDM = () => { dmTyping.notifyStop(); handleDMSend(); };
   const typeDM = (v: string) => { setDmInput(v); if (v) dmTyping.notifyTyping(); else dmTyping.notifyStop(); };
+
+  // Notificações (menções + DMs): toast clicável que navega
+  const { toast, dismiss } = useNotify(supabase, user);
+  const pendingScrollMsg = useRef<string | null>(null);
+
+  const openToast = () => {
+    if (!toast) return;
+    if (toast.kind === "dm" && toast.conversationId) {
+      setViewMode("dm");
+      setSelectedDM(toast.conversationId);
+      if (toast.messageId) pendingScrollMsg.current = toast.messageId;
+    } else if (toast.kind === "channel" && toast.serverId && toast.channelId) {
+      setViewMode("server");
+      setSelectedServer(toast.serverId);
+      setSelectedChannel(toast.channelId);
+      if (toast.messageId) pendingScrollMsg.current = toast.messageId;
+    }
+    dismiss();
+  };
+
+  useEffect(() => {
+    if (pendingScrollMsg.current) {
+      const id = pendingScrollMsg.current;
+      pendingScrollMsg.current = null;
+      setTimeout(() => document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    }
+  }, [channelMessages, dmMessages]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -252,6 +280,8 @@ export default function DiscordClone() {
         typingDM={dmTyping.typingUsers}
         onBlurChannel={chTyping.notifyStop}
         onBlurDM={dmTyping.notifyStop}
+        mentionCandidates={allProfiles}
+        dmMentionCandidates={dmConversations.find((d) => d.id === selectedDM)?.participants || []}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />
@@ -329,6 +359,29 @@ export default function DiscordClone() {
           onClose={() => setShowJoinModal(false)}
           onJoin={joinWithCode}
         />
+      )}
+
+      {toast && (
+        <button
+          onClick={openToast}
+          className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-[#2B2D31] border border-[#5865F2] rounded-lg p-3 shadow-2xl flex items-start gap-3 text-left hover:brightness-110 transition"
+        >
+          <span className="w-9 h-9 rounded-full bg-[#5865F2] flex items-center justify-center shrink-0">
+            <Bell className="w-4 h-4 text-white" />
+          </span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-sm font-semibold text-white truncate">
+              {toast.kind === "dm" ? `DM de ${toast.from}` : `${toast.from} mencionou você`}
+            </span>
+            <span className="block text-xs text-zinc-400 truncate">{toast.snippet || "Nova mensagem"}</span>
+          </span>
+          <span
+            onClick={(e) => { e.stopPropagation(); dismiss(); }}
+            className="p-1 hover:bg-[#35373C] rounded shrink-0"
+          >
+            <X className="w-3.5 h-3.5 text-zinc-400" />
+          </span>
+        </button>
       )}
     </div>
     </VoiceProvider>

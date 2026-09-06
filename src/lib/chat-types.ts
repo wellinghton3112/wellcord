@@ -16,6 +16,7 @@ export type Message = {
   file_url?: string | null;
   file_name?: string | null;
   file_type?: string | null;
+  mentions?: string[];
 };
 
 export type Channel = {
@@ -55,6 +56,7 @@ export type DMMessage = {
   file_url?: string | null;
   file_name?: string | null;
   file_type?: string | null;
+  mentions?: string[];
 };
 
 export type ReplyTarget = { id: string; user: string; content: string };

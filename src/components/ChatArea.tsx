@@ -59,6 +59,8 @@ type Props = {
   typingDM: TypingUser[];
   onBlurChannel: () => void;
   onBlurDM: () => void;
+  mentionCandidates: { id: string; username: string; avatar?: string }[];
+  dmMentionCandidates: { id: string; username: string; avatar?: string }[];
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -73,6 +75,7 @@ export default function ChatArea(props: Props) {
     pendingFile, uploading, onAttachFile, onClearFile,
     pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
     typingChannel, typingDM, onBlurChannel, onBlurDM,
+    mentionCandidates, dmMentionCandidates,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -286,6 +289,51 @@ export default function ChatArea(props: Props) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dmFileInputRef = useRef<HTMLInputElement>(null);
+  const channelInputRef = useRef<HTMLInputElement>(null);
+  const dmInputRef = useRef<HTMLInputElement>(null);
+
+  // Autocomplete de @menções no fim do texto
+  const mentionBox = (
+    value: string,
+    candidates: { id: string; username: string; avatar?: string }[],
+    apply: (v: string) => void,
+    focusRef: RefObject<HTMLInputElement | null>,
+  ) => {
+    const m = value.match(/@([A-Za-z0-9_.-]*)$/);
+    if (!m) return null;
+    const frag = m[1].toLowerCase();
+    const list = candidates
+      .filter((c) => c.username.toLowerCase().includes(frag) && c.id !== userId)
+      .slice(0, 5);
+    if (list.length === 0) return null;
+    return (
+      <div className="mb-2 w-64 bg-[#2B2D31] border border-[#4A4D53] rounded-lg shadow-xl overflow-hidden">
+        {list.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => {
+              apply(value.slice(0, value.length - m[0].length) + `@${c.username} `);
+              setTimeout(() => focusRef.current?.focus(), 0);
+            }}
+            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#35373C] text-left"
+          >
+            <span className="w-6 h-6 rounded-full bg-[#5865F2] flex items-center justify-center text-xs shrink-0">{c.avatar || "👤"}</span>
+            <span className="text-sm text-zinc-200 truncate">{c.username}</span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const mentionize = (text: string) => {
+    const parts = text.split(/(@[A-Za-z0-9_.-]+)/g);
+    if (parts.length === 1) return text;
+    return parts.map((p, i) =>
+      /^@[A-Za-z0-9_.-]+$/.test(p)
+        ? <span key={i} className="bg-[#5865F2]/40 text-white rounded px-0.5">{p}</span>
+        : <span key={i}>{p}</span>
+    );
+  };
 
   const typingBar = (users: TypingUser[]) => {
     if (users.length === 0) return <div className="h-5" />;
@@ -341,12 +389,12 @@ export default function ChatArea(props: Props) {
               </div>
             ) : (
               dmMessages.map((m) => (
-                <div key={m.id} id={`msg-${m.id}`} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20">
+                <div key={m.id} id={`msg-${m.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${m.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
                   <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{m.sender_id === userId ? "😎" : "👤"}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
                     {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
-                    {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{highlight(m.content)}</p>}
+                    {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{q ? highlight(m.content) : mentionize(m.content)}</p>}
                     {editingId !== m.id && attachmentBlock(m.file_url, m.file_name, m.file_type)}
                     {editingId !== m.id && reactionBar(dmReactions[m.id], (e) => onToggleDMReaction(m.id, e))}
                     {pickFor === m.id && emojiPicker(m.id, onToggleDMReaction)}
@@ -377,10 +425,11 @@ export default function ChatArea(props: Props) {
             <div className="p-4 pt-1 shrink-0">
               {replyPreview(dmReplyTo, () => setDmReplyTo(null))}
               {pendingPreview(pendingDmFile, uploadingDm, onClearDmFile)}
+              {mentionBox(dmInput, dmMentionCandidates, setDmInput, dmInputRef)}
               <input ref={dmFileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachDmFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => dmFileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
-                <input value={dmInput} onChange={(e) => setDmInput(e.target.value)} onBlur={onBlurDM} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                <input ref={dmInputRef} value={dmInput} onChange={(e) => setDmInput(e.target.value)} onBlur={onBlurDM} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <button onClick={handleDMSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
               </div>
             </div>
@@ -411,12 +460,12 @@ export default function ChatArea(props: Props) {
                   {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
                 </div>
                 {channelMessages.map((msg) => (
-                  <div key={msg.id} id={`msg-${msg.id}`} className="group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20">
+                  <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}>{msg.avatar}</div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
                       {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
-                      {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{highlight(msg.content)}</p>}
+                      {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
                       {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
                       {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
                       {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
@@ -449,10 +498,11 @@ export default function ChatArea(props: Props) {
             <div className="p-4 pt-1 shrink-0">
               {replyPreview(replyTo, () => setReplyTo(null))}
               {pendingPreview(pendingFile, uploading, onClearFile)}
+              {mentionBox(input, mentionCandidates, setInput, channelInputRef)}
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
-                <input value={input} onChange={(e) => setInput(e.target.value)} onBlur={onBlurChannel} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                <input ref={channelInputRef} value={input} onChange={(e) => setInput(e.target.value)} onBlur={onBlurChannel} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
                   <button onClick={handleSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>
