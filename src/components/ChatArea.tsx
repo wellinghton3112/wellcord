@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
   Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X, Reply,
+  ChevronUp, ChevronDown,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
@@ -124,6 +125,70 @@ export default function ChatArea(props: Props) {
     document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  // Busca no texto das mensagens carregadas (canal ou DM atual)
+  const [search, setSearch] = useState("");
+  const [matchIdx, setMatchIdx] = useState(0);
+
+  const searchPool = viewMode === "dm" ? dmMessages : channelMessages;
+  const q = search.trim().toLowerCase();
+  const matchIds = q
+    ? searchPool.filter((m: any) => (m.content || "").toLowerCase().includes(q)).map((m: any) => m.id)
+    : [];
+  const activeMatchId = matchIds.length > 0 ? matchIds[matchIdx % matchIds.length] : null;
+
+  const runSearch = (v: string) => { setSearch(v); setMatchIdx(0); };
+  const stepMatch = (dir: 1 | -1) => {
+    if (matchIds.length === 0) return;
+    setMatchIdx((i) => (i + dir + matchIds.length) % matchIds.length);
+  };
+
+  // Ao trocar de conversa/canal, limpa a busca
+  useEffect(() => { setSearch(""); setMatchIdx(0); }, [selectedDM, selectedChannel, viewMode]);
+
+  // Rola até o resultado ativo
+  useEffect(() => {
+    if (activeMatchId) {
+      const t = setTimeout(() => scrollToMsg(activeMatchId), 50);
+      return () => clearTimeout(t);
+    }
+  }, [activeMatchId]);
+
+  const highlight = (text: string) => {
+    if (!q) return text;
+    const out: React.ReactNode[] = [];
+    const lower = text.toLowerCase();
+    let i = 0, k = 0;
+    while (true) {
+      const j = lower.indexOf(q, i);
+      if (j < 0) { out.push(text.slice(i)); break; }
+      if (j > i) out.push(text.slice(i, j));
+      out.push(<mark key={k++} className="bg-[#F0B132] text-black rounded-sm px-0.5">{text.slice(j, j + q.length)}</mark>);
+      i = j + q.length;
+    }
+    return out;
+  };
+
+  const searchBox = (placeholder: string) => (
+    <div className="relative hidden md:block">
+      <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+      <input
+        value={search}
+        onChange={(e) => runSearch(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") stepMatch(e.shiftKey ? -1 : 1); if (e.key === "Escape") runSearch(""); }}
+        placeholder={placeholder}
+        className="bg-[#2B2D31] rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-[#5865F2] placeholder:text-zinc-500 text-zinc-200"
+      />
+      {q && (
+        <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[11px] text-zinc-400">
+          {matchIds.length > 0 ? `${(matchIdx % matchIds.length) + 1}/${matchIds.length}` : "0"}
+          <button onClick={() => stepMatch(-1)} className="p-0.5 hover:bg-[#35373C] rounded" title="Anterior (Shift+Enter)"><ChevronUp className="w-3.5 h-3.5" /></button>
+          <button onClick={() => stepMatch(1)} className="p-0.5 hover:bg-[#35373C] rounded" title="Próximo (Enter)"><ChevronDown className="w-3.5 h-3.5" /></button>
+          <button onClick={() => runSearch("")} className="p-0.5 hover:bg-[#35373C] rounded" title="Limpar (Esc)"><X className="w-3.5 h-3.5" /></button>
+        </span>
+      )}
+    </div>
+  );
+
   const quoteBlock = (user: string | null | undefined, content: string | null | undefined, targetId: string | null | undefined) => {
     if (!user && !content) return null;
     return (
@@ -175,6 +240,7 @@ export default function ChatArea(props: Props) {
             )}
             <div className="ml-auto flex items-center gap-3 text-zinc-400">
               <Phone className="w-5 h-5" /><Video className="w-5 h-5" />
+              {searchBox("Buscar na DM")}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -195,7 +261,7 @@ export default function ChatArea(props: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
                     {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
-                    {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{m.content}</p>}
+                    {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{highlight(m.content)}</p>}
                     {editingId !== m.id && reactionBar(dmReactions[m.id], (e) => onToggleDMReaction(m.id, e))}
                     {pickFor === m.id && emojiPicker(m.id, onToggleDMReaction)}
                   </div>
@@ -233,11 +299,11 @@ export default function ChatArea(props: Props) {
             <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
-            <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-              <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
-              <div className="relative hidden md:block"><Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2" /><input placeholder="Buscar" className="bg-[#2B2D31] rounded pl-7 pr-2 py-1 text-sm w-36 focus:outline-none placeholder:text-zinc-500" /></div>
-              <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
-            </div>
+              <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
+                <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
+                {searchBox("Buscar")}
+                <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
+              </div>
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
             {currentChannel?.type === "voice" ? (
@@ -256,7 +322,7 @@ export default function ChatArea(props: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
                       {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
-                      {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{msg.content}</p>}
+                      {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{highlight(msg.content)}</p>}
                       {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
                       {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
                     </div>
