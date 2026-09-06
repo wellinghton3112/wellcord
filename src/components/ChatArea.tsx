@@ -68,6 +68,10 @@ type Props = {
   dmHasMore: boolean;
   dmLoadingOlder: boolean;
   onLoadOlderDM: () => Promise<number>;
+  pinnedIds: Set<string>;
+  canPinMsg: (userId?: string | null) => boolean;
+  onTogglePin: (id: string) => void;
+  onOpenPins: () => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -84,6 +88,7 @@ export default function ChatArea(props: Props) {
     typingChannel, typingDM, onBlurChannel, onBlurDM,
     mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
     hasMore, loadingOlder, onLoadOlder, dmHasMore, dmLoadingOlder, onLoadOlderDM,
+    pinnedIds, canPinMsg, onTogglePin, onOpenPins,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -526,7 +531,7 @@ export default function ChatArea(props: Props) {
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
               <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-                <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><Pin className="w-5 h-5 hidden md:block" /><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
+                <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><button onClick={onOpenPins} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
                 {searchBox("Buscar")}
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
               </div>
@@ -553,7 +558,7 @@ export default function ChatArea(props: Props) {
                       <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></span>
                     </button>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
+                      <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span>{pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}</div>
                       {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
                       {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
                       {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
@@ -564,6 +569,9 @@ export default function ChatArea(props: Props) {
                       <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
                         <button onClick={() => { setReplyTo({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
                         <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
+                        {canPinMsg(msg.user_id) && (
+                          <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
+                        )}
                         {msg.user_id && msg.user_id === userId ? (
                           <>
                             <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>

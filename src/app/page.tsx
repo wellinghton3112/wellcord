@@ -13,6 +13,7 @@ import NewDMModal from "@/components/modals/NewDMModal";
 import ChannelModal from "@/components/modals/ChannelModal";
 import JoinModal from "@/components/modals/JoinModal";
 import MembersModal from "@/components/modals/MembersModal";
+import PinsModal from "@/components/modals/PinsModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useServerManager } from "@/hooks/useServerManager";
@@ -27,6 +28,7 @@ import { useServerActions } from "@/hooks/useServerActions";
 import { useTyping } from "@/hooks/useTyping";
 import { useNotify } from "@/hooks/useNotify";
 import { useChannelUnread } from "@/hooks/useChannelUnread";
+import { usePins } from "@/hooks/usePins";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
@@ -47,6 +49,20 @@ export default function DiscordClone() {
   const { redeemInvite } = useInvites(supabase, user);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
+  const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
+  const { pins, pinnedIds, canPin, togglePin } = usePins(supabase, user, selectedChannel, isOwner);
+  const [showPinsModal, setShowPinsModal] = useState(false);
+
+  const jumpToMessage = async (id: string) => {
+    setShowPinsModal(false);
+    for (let i = 0; i < 5; i++) {
+      if (document.getElementById(`msg-${id}`)) break;
+      const got = await loadOlder();
+      if (!got) break;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+    setTimeout(() => document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+  };
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
@@ -338,6 +354,10 @@ export default function DiscordClone() {
         dmHasMore={dmHasMore}
         dmLoadingOlder={dmLoadingOlder}
         onLoadOlderDM={loadOlderDM}
+        pinnedIds={pinnedIds}
+        canPinMsg={canPin}
+        onTogglePin={togglePin}
+        onOpenPins={() => setShowPinsModal(true)}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />
@@ -460,6 +480,16 @@ export default function DiscordClone() {
           onClose={() => setViewProfile(null)}
           onEdit={() => { setViewProfile(null); setShowUsernameModal(true); }}
           onSendDM={dmFromCard}
+        />
+      )}
+      {showPinsModal && (
+        <PinsModal
+          channelName={currentChannel?.name}
+          pins={pins}
+          onJump={jumpToMessage}
+          onUnpin={togglePin}
+          canManage={isOwner}
+          onClose={() => setShowPinsModal(false)}
         />
       )}
     </div>
