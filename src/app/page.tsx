@@ -358,6 +358,7 @@ export default function DiscordClone() {
         canPinMsg={canPin}
         onTogglePin={togglePin}
         onOpenPins={() => setShowPinsModal(true)}
+        isOwner={isOwner}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />

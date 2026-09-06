@@ -72,6 +72,7 @@ type Props = {
   canPinMsg: (userId?: string | null) => boolean;
   onTogglePin: (id: string) => void;
   onOpenPins: () => void;
+  isOwner: boolean;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -88,7 +89,7 @@ export default function ChatArea(props: Props) {
     typingChannel, typingDM, onBlurChannel, onBlurDM,
     mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
     hasMore, loadingOlder, onLoadOlder, dmHasMore, dmLoadingOlder, onLoadOlderDM,
-    pinnedIds, canPinMsg, onTogglePin, onOpenPins,
+    pinnedIds, canPinMsg, onTogglePin, onOpenPins, isOwner,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -577,6 +578,8 @@ export default function ChatArea(props: Props) {
                             <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
                             <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
                           </>
+                        ) : isOwner ? (
+                          <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação do dono)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
                         ) : null}
                         <MoreHorizontal className="w-4 h-4" />
                       </div>
