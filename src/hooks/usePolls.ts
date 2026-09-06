@@ -13,17 +13,30 @@ export function usePolls(supabase: any, user: any, username: string, selectedCha
     const ids = data.map((p: any) => p.id);
     const { data: opts } = await supabase.from("poll_options").select("*").in("poll_id", ids).order("position");
     const { data: votes } = await supabase.from("poll_votes").select("poll_id, option_id, user_id").in("poll_id", ids);
+    const voterIds = [...new Set((votes || []).map((v: any) => v.user_id))];
+    let profMap = new Map<string, any>();
+    if (voterIds.length > 0) {
+      const { data: profs } = await supabase.from("profiles").select("id, username, avatar").in("id", voterIds);
+      profMap = new Map((profs || []).map((p: any) => [p.id, p]));
+    }
     setPolls(
       data.map((p: any) => {
         const po = (opts || []).filter((o: any) => o.poll_id === p.id);
         const pv = (votes || []).filter((v: any) => v.poll_id === p.id);
-        const options = po.map((o: any) => ({
-          id: o.id,
-          label: o.label,
-          position: o.position,
-          votes: pv.filter((v: any) => v.option_id === o.id).length,
-          mine: pv.some((v: any) => v.option_id === o.id && v.user_id === user?.id),
-        }));
+        const options = po.map((o: any) => {
+          const ov = pv.filter((v: any) => v.option_id === o.id);
+          return {
+            id: o.id,
+            label: o.label,
+            position: o.position,
+            votes: ov.length,
+            mine: ov.some((v: any) => v.user_id === user?.id),
+            voters: ov.map((v: any) => {
+              const pr = profMap.get(v.user_id);
+              return { id: v.user_id, username: pr?.username || "?", avatar: pr?.avatar || "😎" };
+            }),
+          };
+        });
         return {
           id: p.id,
           question: p.question,

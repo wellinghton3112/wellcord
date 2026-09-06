@@ -65,7 +65,7 @@ export type PendingFile = { url: string; name: string; type: string };
 
 export const MAX_FILE_MB = 10;
 
-export type PollOption = { id: string; label: string; position: number; votes: number; mine: boolean };
+export type PollOption = { id: string; label: string; position: number; votes: number; mine: boolean; voters: { id: string; username: string; avatar: string }[] };
 export type Poll = {
   id: string;
   question: string;

@@ -4,7 +4,7 @@ import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
   Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X, Reply,
-  ChevronUp, ChevronDown, FileText, Download, Loader2, BarChart3,
+  ChevronUp, ChevronDown, FileText, Download, Loader2, BarChart3, Check,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, Poll, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
@@ -100,6 +100,7 @@ export default function ChatArea(props: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [pickFor, setPickFor] = useState<string | null>(null);
+  const [votersOf, setVotersOf] = useState<string | null>(null);
 
   const startEdit = (id: string, content: string) => { setEditingId(id); setEditDraft(content); };
   const cancelEdit = () => { setEditingId(null); setEditDraft(""); };
@@ -462,36 +463,67 @@ export default function ChatArea(props: Props) {
 
   const renderPoll = (poll: Poll) => {
     const total = poll.totalVotes;
+    const time = new Date(poll.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return (
-      <div key={`poll-${poll.id}`} id={`poll-${poll.id}`} className="my-2 ml-14 mr-2 rounded-xl border border-[#5865F2]/40 bg-[#2B2D31] p-3 scroll-mt-20">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-[#8B9DFF]">
-          <BarChart3 className="w-3.5 h-3.5" /> Enquete • {poll.username}
-        </div>
-        <div className="mt-1 font-semibold text-[15px] text-white break-words">{poll.question}</div>
-        <div className="mt-2 space-y-1.5">
+      <div key={`poll-${poll.id}`} id={`poll-${poll.id}`} className="my-1 ml-14 mr-2 max-w-md rounded-lg bg-[#2B2D31] p-2.5 scroll-mt-20">
+        <div className="text-[14px] font-medium text-[#DBDEE1] break-words">{poll.question}</div>
+        <div className="mt-1.5">
           {poll.options.map((o) => {
             const pct = total > 0 ? Math.round((o.votes / total) * 100) : 0;
             return (
-              <button
-                key={o.id}
-                onClick={() => onToggleVote(poll.id, o.id)}
-                className={`relative w-full overflow-hidden rounded-lg border px-3 py-1.5 text-left text-sm transition-colors ${o.mine ? "border-[#5865F2] bg-[#5865F2]/20 text-white" : "border-[#4A4D53] bg-[#313338] text-zinc-200 hover:border-zinc-400"}`}
-              >
-                <span className="absolute inset-y-0 left-0 bg-[#5865F2]/25 transition-all" style={{ width: `${pct}%` }} />
-                <span className="relative flex items-center gap-2">
-                  <span className="flex-1 truncate">{o.label}</span>
-                  <span className="text-xs font-bold shrink-0">{o.votes} • {pct}%</span>
-                </span>
-              </button>
+              <div key={o.id}>
+                <button
+                  onClick={() => onToggleVote(poll.id, o.id)}
+                  className="w-full flex items-center gap-2 py-1 text-left group/opt"
+                >
+                  <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${o.mine ? "bg-[#23A559] border-[#23A559]" : "border-zinc-500 group-hover/opt:border-zinc-300"}`}>
+                    {o.mine && <Check className="w-3 h-3 text-white" />}
+                  </span>
+                  <span className="flex-1 truncate text-[13px] text-zinc-200">{o.label}</span>
+                  <span className="flex items-center shrink-0">
+                    <span className="flex -space-x-1.5">
+                      {o.voters.slice(0, 3).map((v) => (
+                        <Avatar key={v.id} src={v.avatar} name={v.username} className="w-4 h-4 rounded-full border border-[#2B2D31] text-[8px]" />
+                      ))}
+                    </span>
+                    <span className="ml-1 text-[11px] text-zinc-400 font-semibold w-4 text-right">{o.votes}</span>
+                  </span>
+                </button>
+                <div className="ml-6 h-1 rounded-full bg-[#1E1F22] overflow-hidden">
+                  <div className={`h-full rounded-full transition-all ${o.mine ? "bg-[#23A559]" : "bg-[#5865F2]"}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
             );
           })}
         </div>
-        <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-500">
-          <span>{total} voto{total === 1 ? "" : "s"}</span>
+        <div className="mt-1 flex items-center gap-2">
+          <button onClick={() => setVotersOf(votersOf === poll.id ? null : poll.id)} className="text-[12px] text-[#8B9DFF] hover:underline">
+            {votersOf === poll.id ? "Ocultar votos" : "Ver votos"}
+          </button>
+          <span className="ml-auto text-[10px] text-zinc-600">{time}</span>
           {(poll.user_id === userId || isOwner) && (
-            <button onClick={() => onDeletePoll(poll.id)} className="hover:text-red-400 hover:underline">Apagar enquete</button>
+            <button onClick={() => onDeletePoll(poll.id)} className="text-[10px] text-zinc-600 hover:text-red-400 hover:underline">apagar</button>
           )}
         </div>
+        {votersOf === poll.id && (
+          <div className="mt-1.5 space-y-1 border-t border-white/10 pt-1.5">
+            {poll.options.map((o) => (
+              <div key={o.id}>
+                <div className="text-[11px] font-semibold text-zinc-400">{o.label} ({o.votes})</div>
+                {o.voters.length === 0 ? (
+                  <div className="text-[11px] text-zinc-600">sem votos</div>
+                ) : (
+                  o.voters.map((v) => (
+                    <div key={v.id} className="flex items-center gap-1.5 py-0.5">
+                      <Avatar src={v.avatar} name={v.username} className="w-4 h-4 rounded-full text-[8px]" />
+                      <span className="text-[11px] text-zinc-300 truncate">{v.username}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
