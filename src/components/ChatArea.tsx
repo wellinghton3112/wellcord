@@ -476,7 +476,7 @@ export default function ChatArea(props: Props) {
                   onClick={() => onToggleVote(poll.id, o.id)}
                   className="w-full flex items-center gap-2 py-1 text-left group/opt"
                 >
-                  <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${o.mine ? "bg-[#23A559] border-[#23A559]" : "border-zinc-500 group-hover/opt:border-zinc-300"}`}>
+                  <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${o.mine ? "bg-[#5865F2] border-[#5865F2]" : "border-zinc-500 group-hover/opt:border-zinc-300"}`}>
                     {o.mine && <Check className="w-3 h-3 text-white" />}
                   </span>
                   <span className="flex-1 truncate text-[13px] text-zinc-200">{o.label}</span>
@@ -490,7 +490,7 @@ export default function ChatArea(props: Props) {
                   </span>
                 </button>
                 <div className="ml-6 h-1 rounded-full bg-[#1E1F22] overflow-hidden">
-                  <div className={`h-full rounded-full transition-all ${o.mine ? "bg-[#23A559]" : "bg-[#5865F2]"}`} style={{ width: `${pct}%` }} />
+                  <div className="h-full rounded-full bg-[#5865F2] transition-all" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             );
