@@ -100,7 +100,6 @@ export default function ChatArea(props: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [pickFor, setPickFor] = useState<string | null>(null);
-  const [votersOf, setVotersOf] = useState<string | null>(null);
 
   const startEdit = (id: string, content: string) => { setEditingId(id); setEditDraft(content); };
   const cancelEdit = () => { setEditingId(null); setEditDraft(""); };
@@ -497,33 +496,12 @@ export default function ChatArea(props: Props) {
           })}
         </div>
         <div className="mt-1 flex items-center gap-2">
-          <button onClick={() => setVotersOf(votersOf === poll.id ? null : poll.id)} className="text-[12px] text-[#8B9DFF] hover:underline">
-            {votersOf === poll.id ? "Ocultar votos" : "Ver votos"}
-          </button>
+          <span className="text-[11px] text-zinc-500">{total} voto{total === 1 ? "" : "s"}</span>
           <span className="ml-auto text-[10px] text-zinc-600">{time}</span>
           {(poll.user_id === userId || isOwner) && (
             <button onClick={() => onDeletePoll(poll.id)} className="text-[10px] text-zinc-600 hover:text-red-400 hover:underline">apagar</button>
           )}
         </div>
-        {votersOf === poll.id && (
-          <div className="mt-1.5 space-y-1 border-t border-white/10 pt-1.5">
-            {poll.options.map((o) => (
-              <div key={o.id}>
-                <div className="text-[11px] font-semibold text-zinc-400">{o.label} ({o.votes})</div>
-                {o.voters.length === 0 ? (
-                  <div className="text-[11px] text-zinc-600">sem votos</div>
-                ) : (
-                  o.voters.map((v) => (
-                    <div key={v.id} className="flex items-center gap-1.5 py-0.5">
-                      <Avatar src={v.avatar} name={v.username} className="w-4 h-4 rounded-full text-[8px]" />
-                      <span className="text-[11px] text-zinc-300 truncate">{v.username}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     );
   };
