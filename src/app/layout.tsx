@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WellCORD - Chat com amigos",
+  title: "WellCORD",
   description: "WellCORD - Clone do Discord com Next.js + Supabase",
 };
 
