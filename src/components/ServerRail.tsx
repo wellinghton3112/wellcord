@@ -44,7 +44,11 @@ export default function ServerRail({
           </span>
           {viewMode === "server" && selectedServer === server.id
             ? <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
-            : (unreadByServer?.[server.id] || 0) > 0 && <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-4 bg-white rounded-r-full" />}
+            : (unreadByServer?.[server.id] || 0) > 0 && (
+              <span className="absolute -bottom-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#DA373C] text-white text-[11px] font-bold flex items-center justify-center border-2 border-[#1E1F22]">
+                {unreadByServer![server.id] > 99 ? "99+" : unreadByServer![server.id]}
+              </span>
+            )}
         </button>
       ))}
       <button onClick={onAddServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#23A559] text-[#23A559] hover:text-white flex items-center justify-center transition-all duration-200 group" title="Adicionar servidor">
