@@ -11,10 +11,11 @@ import UsernameModal from "@/components/modals/UsernameModal";
 import ServerModal from "@/components/modals/ServerModal";
 import NewDMModal from "@/components/modals/NewDMModal";
 import ChannelModal from "@/components/modals/ChannelModal";
-import InviteModal from "@/components/modals/InviteModal";
 import JoinModal from "@/components/modals/JoinModal";
+import MembersModal from "@/components/modals/MembersModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
+import { useServerManager } from "@/hooks/useServerManager";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,8 +43,9 @@ export default function DiscordClone() {
 
   const sendChannel = () => { chTyping.notifyStop(); handleSend(); };
   const typeChannel = (v: string) => { setInput(v); if (v) chTyping.notifyTyping(); else chTyping.notifyStop(); };
-  const { inviteCode, creatingInvite, openInvite, redeemInvite } = useInvites(supabase, user);
-  const [showInviteModal, setShowInviteModal] = useState(false);
+  const { redeemInvite } = useInvites(supabase, user);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
@@ -59,7 +61,7 @@ export default function DiscordClone() {
     newServerImage, setNewServerImage, newServerPreview, setNewServerPreview,
     creatingServer, editingServer,
     openCreateServer, openEditServer, handleServerSave,
-    deleteServer, deleteChannel, createChannel, handleCreateChannel,
+    deleteServer, leaveServer, deleteChannel, createChannel, handleCreateChannel,
   } = useServerActions(supabase, user?.id, servers, currentServer, selectedChannel, setSelectedServer, setSelectedChannel, setShowCreateServerModal, setShowCreateChannelModal);
   const { status, setStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username, avatar);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -129,8 +131,7 @@ export default function DiscordClone() {
 
   const openInviteModal = () => {
     if (!currentServer) return;
-    setShowInviteModal(true);
-    openInvite(currentServer.id);
+    setShowMembersModal(true);
   };
 
   const joinWithCode = async () => {
@@ -274,6 +275,8 @@ export default function DiscordClone() {
         onSignOut={signOut}
         userAvatar={avatar}
         onViewProfile={openProfile}
+        onOpenMembers={() => setShowMembersModal(true)}
+        onLeaveServer={() => leaveServer(user?.id)}
       />
 
       <ChatArea
@@ -394,12 +397,17 @@ export default function DiscordClone() {
           onCreate={handleCreateChannel}
         />
       )}
-      {showInviteModal && (
-        <InviteModal
-          serverName={currentServer?.name}
-          code={inviteCode}
-          creating={creatingInvite}
-          onClose={() => setShowInviteModal(false)}
+      {showMembersModal && currentServer && (
+        <MembersModal
+          serverName={currentServer.name}
+          isOwner={!currentServer.owner_id || currentServer.owner_id === user?.id}
+          userId={user?.id}
+          members={serverMgr.members}
+          invites={serverMgr.invites}
+          onKick={(m) => serverMgr.kick(m, user?.id)}
+          onRevoke={serverMgr.revokeInvite}
+          onCreateInvite={(maxUses, expiresHours) => serverMgr.createInvite(user?.id, maxUses, expiresHours)}
+          onClose={() => setShowMembersModal(false)}
         />
       )}
 

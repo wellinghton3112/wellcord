@@ -1,5 +1,5 @@
 "use client";
-import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
@@ -38,6 +38,8 @@ type Props = {
   setShowUsernameModal: (v: boolean) => void;
   onSignOut: () => void;
   onViewProfile: (id: string) => void;
+  onOpenMembers: () => void;
+  onLeaveServer: () => void;
 };
 
 // Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
@@ -46,7 +48,7 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer,
   } = props;
 
   // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
@@ -117,8 +119,10 @@ export default function ChannelSidebar(props: Props) {
             </div>
               <div className="flex items-center gap-1">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
+                {currentServer && <button onClick={onOpenMembers} className="p-1 hover:bg-[#404249] rounded" title="Membros e convites"><Users className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
+                {currentServer && !canManage && <button onClick={onLeaveServer} className="p-1 hover:bg-[#404249] rounded" title="Sair do servidor"><DoorOpen className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
               </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-4">

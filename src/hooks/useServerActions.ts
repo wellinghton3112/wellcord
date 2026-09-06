@@ -82,12 +82,31 @@ export function useServerActions(
     setShowCreateServerModal(false);
   };
 
-  const deleteServer = async () => {
-    if (!currentServer) return;
+  const deleteServer = async () => {    if (!currentServer) return;
     if (!confirm(`Excluir servidor "${currentServer.name}" e todos os canais?`)) return;
     const { error } = await supabase.from("servers").delete().eq("id", currentServer.id);
     if (error) return alert(error.message);
     // seleciona outro servidor
+    const remaining = servers.filter((s) => s.id !== currentServer.id);
+    if (remaining.length > 0) {
+      setSelectedServer(remaining[0].id);
+      setSelectedChannel(remaining[0].channels[0]?.id || "");
+    } else {
+      setSelectedServer("");
+      setSelectedChannel("");
+    }
+  };
+
+  // Sair do servidor (membro comum). Dono precisa excluir em vez de sair.
+  const leaveServer = async (userIdSelf: string | undefined) => {
+    if (!currentServer || !userIdSelf) return;
+    if (currentServer.owner_id && currentServer.owner_id === userIdSelf) {
+      alert("Você é o dono — transfira ou exclua o servidor em vez de sair.");
+      return;
+    }
+    if (!confirm(`Sair de "${currentServer.name}"?`)) return;
+    const { error } = await supabase.from("server_members").delete().eq("server_id", currentServer.id).eq("user_id", userIdSelf);
+    if (error) return alert(error.message);
     const remaining = servers.filter((s) => s.id !== currentServer.id);
     if (remaining.length > 0) {
       setSelectedServer(remaining[0].id);
@@ -150,6 +169,6 @@ export function useServerActions(
     newServerImage, setNewServerImage, newServerPreview, setNewServerPreview,
     creatingServer, editingServer,
     openCreateServer, openEditServer, handleServerSave,
-    deleteServer, deleteChannel, createChannel, handleCreateChannel,
+    deleteServer, leaveServer, deleteChannel, createChannel, handleCreateChannel,
   };
 }
