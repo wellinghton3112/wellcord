@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Scrollbars finas estilo Discord (nada do padrão Windows) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1E1F22 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #1E1F22;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #4A4D53;
+}
+*::-webkit-scrollbar-button {
+  display: none;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
