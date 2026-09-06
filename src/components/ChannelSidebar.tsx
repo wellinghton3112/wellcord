@@ -40,6 +40,7 @@ type Props = {
   onViewProfile: (id: string) => void;
   onOpenMembers: () => void;
   onLeaveServer: () => void;
+  channelUnread?: Record<string, number>;
 };
 
 // Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
@@ -48,7 +49,7 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer, channelUnread,
   } = props;
 
   // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
@@ -57,8 +58,11 @@ export default function ChannelSidebar(props: Props) {
   const channelRow = (ch: Channel, icon: React.ReactNode) => (
     <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
       <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
-        {icon}<span className="truncate">{ch.name}</span>
+        {icon}<span className={`truncate ${selectedChannel !== ch.id && (channelUnread?.[ch.id] || 0) > 0 ? "font-bold text-white" : ""}`}>{ch.name}</span>
       </button>
+      {(channelUnread?.[ch.id] || 0) > 0 && selectedChannel !== ch.id && (
+        <span className="min-w-4 h-4 px-1 rounded-full bg-[#DA373C] text-white text-[10px] font-bold flex items-center justify-center shrink-0">{channelUnread![ch.id] > 9 ? "9+" : channelUnread![ch.id]}</span>
+      )}
       {canManage && <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>}
     </div>
   );

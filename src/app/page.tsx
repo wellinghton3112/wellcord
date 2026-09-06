@@ -26,6 +26,7 @@ import { useDMs } from "@/hooks/useDMs";
 import { useServerActions } from "@/hooks/useServerActions";
 import { useTyping } from "@/hooks/useTyping";
 import { useNotify } from "@/hooks/useNotify";
+import { useChannelUnread } from "@/hooks/useChannelUnread";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
@@ -82,6 +83,12 @@ export default function DiscordClone() {
 
   // Notificações (menções + DMs): toast clicável que navega
   const { toast, dismiss } = useNotify(supabase, user);
+  const { channelUnread } = useChannelUnread(supabase, user, selectedChannel);
+  const unreadByServer: Record<string, number> = {};
+  for (const s of servers) {
+    const total = s.channels.reduce((acc, c) => acc + (channelUnread[c.id] || 0), 0);
+    if (total > 0) unreadByServer[s.id] = total;
+  }
 
   const openToast = () => {
     if (!toast) return;
@@ -244,6 +251,7 @@ export default function DiscordClone() {
         onEditServer={openEditServer}
         onAddServer={openCreateServer}
         onJoinServer={() => setShowJoinModal(true)}
+        unreadByServer={unreadByServer}
       />
 
       <ChannelSidebar
@@ -277,6 +285,7 @@ export default function DiscordClone() {
         onViewProfile={openProfile}
         onOpenMembers={() => setShowMembersModal(true)}
         onLeaveServer={() => leaveServer(user?.id)}
+        channelUnread={channelUnread}
       />
 
       <ChatArea
