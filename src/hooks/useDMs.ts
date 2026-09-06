@@ -235,28 +235,35 @@ export function useDMs(
     const { data: prof } = await supabase.from("profiles").select("id, username").ilike("username", `%${newDMUsername.trim()}%`).limit(1).maybeSingle();
     if (!prof) { alert("Usuário não encontrado"); setCreatingDM(false); return; }
     if (prof.id === user.id) { alert("Não pode criar DM consigo mesmo"); setCreatingDM(false); return; }
+    await openWithId(prof.id);
+    setShowNewDMModal(false);
+    setCreatingDM(false);
+  };
+
+  // Abre (ou cria) DM direto pelo id — usado pelo card de perfil
+  const openWithId = async (otherId: string) => {
+    if (!user || otherId === user.id) return;
     // verifica se já existe conversa
     const { data: myConvs } = await supabase.from("dm_participants").select("conversation_id").eq("user_id", user.id);
     let existing: string | null = null;
     if (myConvs) {
       for (const c of myConvs) {
         const { data: parts } = await supabase.from("dm_participants").select("user_id").eq("conversation_id", c.conversation_id);
-        if (parts && parts.length === 2 && parts.some((p: any) => p.user_id === prof.id)) { existing = c.conversation_id; break; }
+        if (parts && parts.length === 2 && parts.some((p: any) => p.user_id === otherId)) { existing = c.conversation_id; break; }
       }
     }
-    if (existing) { setSelectedDM(existing); setViewMode("dm"); setShowNewDMModal(false); setCreatingDM(false); return; }
-    // ID gerado no client: o insert NÃO usa .select() porque a policy de SELECT
-    // só libera para participantes — e no momento do INSERT ainda não somos.
-    // (insert().select() exige SELECT na linha nova e dava 403 RLS)
+    if (existing) { setSelectedDM(existing); setViewMode("dm"); return; }
     const convId = crypto.randomUUID();
     const { error } = await supabase.from("dm_conversations").insert({ id: convId });
-    if (error) { alert(error?.message || "Erro"); setCreatingDM(false); return; }
-    await supabase.from("dm_participants").insert([{ conversation_id: convId, user_id: user.id }, { conversation_id: convId, user_id: prof.id }]);
+    if (error) { alert(error?.message || "Erro"); return; }
+    await supabase.from("dm_participants").insert([{ conversation_id: convId, user_id: user.id }, { conversation_id: convId, user_id: otherId }]);
     await loadDMs();
     setSelectedDM(convId);
     setViewMode("dm");
-    setShowNewDMModal(false);
-    setCreatingDM(false);
+  };
+
+  const startDMWith = async (otherId: string) => {
+    await openWithId(otherId);
   };
 
   const editDMMessage = async (id: string, content: string) => {
@@ -289,6 +296,6 @@ export function useDMs(
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
-    newDMUsername, setNewDMUsername, creatingDM, createDM,
+    newDMUsername, setNewDMUsername, creatingDM, createDM, startDMWith,
   };
 }

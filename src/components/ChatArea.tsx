@@ -63,6 +63,7 @@ type Props = {
   mentionCandidates: { id: string; username: string; avatar?: string }[];
   dmMentionCandidates: { id: string; username: string; avatar?: string }[];
   userAvatar?: string | null;
+  onViewProfile: (id: string) => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -77,7 +78,7 @@ export default function ChatArea(props: Props) {
     pendingFile, uploading, onAttachFile, onClearFile,
     pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
     typingChannel, typingDM, onBlurChannel, onBlurDM,
-    mentionCandidates, dmMentionCandidates, userAvatar,
+    mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -392,9 +393,11 @@ export default function ChatArea(props: Props) {
             ) : (
               dmMessages.map((m) => (
                 <div key={m.id} id={`msg-${m.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${m.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-                  <Avatar src={m.sender_id === userId ? (userAvatar || "😎") : (dmConversations.find((d) => d.id === selectedDM)?.participants.find((p) => p.id === m.sender_id)?.avatar || "👤")} name={m.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm mt-0.5" />
+                  <button onClick={() => onViewProfile(m.sender_id)} className="shrink-0 mt-0.5" title="Ver perfil">
+                    <Avatar src={m.sender_id === userId ? (userAvatar || "😎") : (dmConversations.find((d) => d.id === selectedDM)?.participants.find((p) => p.id === m.sender_id)?.avatar || "👤")} name={m.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
+                  </button>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
+                    <div className="flex items-baseline gap-2"><button onClick={() => onViewProfile(m.sender_id)} className="font-medium text-sm hover:underline" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</button><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
                     {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
                     {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{q ? highlight(m.content) : mentionize(m.content)}</p>}
                     {editingId !== m.id && attachmentBlock(m.file_url, m.file_name, m.file_type)}
@@ -463,9 +466,11 @@ export default function ChatArea(props: Props) {
                 </div>
                 {channelMessages.map((msg) => (
                   <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></div>
+                    <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="shrink-0 mt-1 rounded-full" title="Ver perfil">
+                      <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></span>
+                    </button>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
+                      <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
                       {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
                       {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
                       {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}

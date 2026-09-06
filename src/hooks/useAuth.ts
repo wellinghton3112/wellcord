@@ -8,6 +8,8 @@ export function useAuth(supabase: any) {
   const [user, setUser] = useState<any>(null);
   const [username, setUsername] = useState("Você");
   const [avatar, setAvatar] = useState("😎");
+  const [bio, setBio] = useState("");
+  const [statusText, setStatusText] = useState("");
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }: any) => {
@@ -22,6 +24,8 @@ export function useAuth(supabase: any) {
       else if (user.user_metadata?.username) setUsername(user.user_metadata.username);
       else setUsername(user.email?.split("@")[0] || "Você");
       if (profile?.avatar) setAvatar(profile.avatar);
+      if (profile?.bio) setBio(profile.bio);
+      if (profile?.status_text) setStatusText(profile.status_text);
     });
     const { data: listener } = supabase.auth.onAuthStateChange((event: string, session: any) => {
       if (event === "SIGNED_OUT" || !session) router.push("/login");
@@ -30,5 +34,5 @@ export function useAuth(supabase: any) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { user, username, setUsername, avatar, setAvatar };
+  return { user, username, setUsername, avatar, setAvatar, bio, setBio, statusText, setStatusText };
 }

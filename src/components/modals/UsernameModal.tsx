@@ -9,13 +9,17 @@ type Props = {
   avatar: string;
   onFile: (f: File | null) => void;
   onRemovePhoto: () => void;
+  bio: string;
+  setBio: (v: string) => void;
+  statusText: string;
+  setStatusText: (v: string) => void;
   saving: boolean;
   onClose: () => void;
   onSave: () => void;
 };
 
-// Modal de edição de perfil (nome + foto). Extraído de page.tsx + foto.
-export default function UsernameModal({ userEmail, username, setUsername, avatar, onFile, onRemovePhoto, saving, onClose, onSave }: Props) {
+// Modal de edição de perfil (nome + foto + bio + recado). Extraído de page.tsx + foto.
+export default function UsernameModal({ userEmail, username, setUsername, avatar, onFile, onRemovePhoto, bio, setBio, statusText, setStatusText, saving, onClose, onSave }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -46,6 +50,8 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
           </div>
         </div>
         <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white" placeholder="Seu nome" autoFocus />
+        <input value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={60} className="w-full mt-3 bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white text-sm" placeholder="Recado (ex: Pensamento de chuveiro?)" />
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={300} rows={3} className="w-full mt-3 bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white text-sm resize-none" placeholder="Sobre mim" />
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
           <button onClick={onSave} disabled={saving} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{saving ? "Salvando..." : "Salvar"}</button>

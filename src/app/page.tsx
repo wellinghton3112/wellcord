@@ -13,6 +13,7 @@ import NewDMModal from "@/components/modals/NewDMModal";
 import ChannelModal from "@/components/modals/ChannelModal";
 import InviteModal from "@/components/modals/InviteModal";
 import JoinModal from "@/components/modals/JoinModal";
+import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
@@ -28,7 +29,7 @@ import { useNotify } from "@/hooks/useNotify";
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const { user, username, setUsername, avatar, setAvatar } = useAuth(supabase);
+  const { user, username, setUsername, avatar, setAvatar, bio, setBio, statusText, setStatusText } = useAuth(supabase);
   const {
     servers,
     selectedServer, setSelectedServer,
@@ -70,7 +71,7 @@ export default function DiscordClone() {
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
-    newDMUsername, setNewDMUsername, creatingDM, createDM,
+    newDMUsername, setNewDMUsername, creatingDM, createDM, startDMWith,
   } = useDMs(supabase, user, username, setViewMode, setShowNewDMModal);
   const dmTyping = useTyping(supabase, user, username, selectedDM ? `dm-${selectedDM}` : null);
 
@@ -153,6 +154,32 @@ export default function DiscordClone() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarRemoved, setAvatarRemoved] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
+  const [viewProfile, setViewProfile] = useState<CardProfile | null>(null);
+
+  const openProfile = async (id: string) => {
+    const { data } = await supabase.from("profiles").select("id, username, avatar, color, bio, status_text, created_at").eq("id", id).single();
+    if (data) {
+      setViewProfile({
+        id: data.id,
+        username: data.username,
+        avatar: data.avatar || "😎",
+        color: data.color || "#5865F2",
+        bio: data.bio || "",
+        status_text: data.status_text || "",
+        created_at: data.created_at,
+      });
+    }
+  };
+
+  const profileStatus = (id: string) =>
+    onlineMembers.find((m) => m.id === id)?.status || "offline";
+
+  const dmFromCard = async () => {
+    if (!viewProfile) return;
+    const id = viewProfile.id;
+    setViewProfile(null);
+    await startDMWith(id);
+  };
 
   const saveProfile = async () => {
     if (!user) return;
@@ -167,7 +194,7 @@ export default function DiscordClone() {
         const { data } = supabase.storage.from("avatars").getPublicUrl(path);
         avatarUrl = data.publicUrl;
       }
-      await supabase.from("profiles").update({ username, avatar: avatarUrl }).eq("id", user.id);
+      await supabase.from("profiles").update({ username, avatar: avatarUrl, bio, status_text: statusText }).eq("id", user.id);
       setAvatar(avatarUrl || "😎");
       setAvatarFile(null);
       setAvatarRemoved(false);
@@ -246,6 +273,7 @@ export default function DiscordClone() {
         setShowUsernameModal={setShowUsernameModal}
         onSignOut={signOut}
         userAvatar={avatar}
+        onViewProfile={openProfile}
       />
 
       <ChatArea
@@ -297,9 +325,10 @@ export default function DiscordClone() {
         mentionCandidates={allProfiles}
         dmMentionCandidates={dmConversations.find((d) => d.id === selectedDM)?.participants || []}
         userAvatar={avatar}
+        onViewProfile={openProfile}
       />
 
-      <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />
+      <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />
       </div>
 
       {showUsernameModal && (
@@ -310,6 +339,10 @@ export default function DiscordClone() {
           avatar={avatarRemoved ? "😎" : avatar}
           onFile={setAvatarFile}
           onRemovePhoto={() => setAvatarRemoved(true)}
+          bio={bio}
+          setBio={setBio}
+          statusText={statusText}
+          setStatusText={setStatusText}
           saving={savingProfile}
           onClose={() => { setShowUsernameModal(false); setAvatarFile(null); setAvatarRemoved(false); }}
           onSave={saveProfile}
@@ -401,6 +434,16 @@ export default function DiscordClone() {
             <X className="w-3.5 h-3.5 text-zinc-400" />
           </span>
         </button>
+      )}
+      {viewProfile && (
+        <ProfileCard
+          profile={viewProfile}
+          status={profileStatus(viewProfile.id)}
+          isSelf={viewProfile.id === user?.id}
+          onClose={() => setViewProfile(null)}
+          onEdit={() => { setViewProfile(null); setShowUsernameModal(true); }}
+          onSendDM={dmFromCard}
+        />
       )}
     </div>
     </VoiceProvider>

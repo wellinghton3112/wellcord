@@ -37,6 +37,7 @@ type Props = {
   setShowStatusMenu: (v: boolean) => void;
   setShowUsernameModal: (v: boolean) => void;
   onSignOut: () => void;
+  onViewProfile: (id: string) => void;
 };
 
 // Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
@@ -45,7 +46,7 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile,
   } = props;
 
   // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
@@ -79,7 +80,9 @@ export default function ChannelSidebar(props: Props) {
               <p className="text-xs text-zinc-500 px-2">Nenhuma DM ainda. Clique + para iniciar.</p>
             ) : dmConversations.map((dm) => (
               <button key={dm.id} onClick={() => setSelectedDM(dm.id)} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-                <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
+                <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">
+                  <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
+                </span>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
                   <div className="text-xs text-zinc-500 truncate">Clique para conversar</div>
@@ -143,10 +146,10 @@ export default function ChannelSidebar(props: Props) {
         </>
       )}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0 relative">
-        <div className="relative">
+        <button onClick={() => userId && onViewProfile(userId)} className="relative shrink-0" title="Meu perfil">
           <Avatar src={userAvatar || undefined} name={username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />
-        </div>
+        </button>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
           <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
           <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
