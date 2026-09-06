@@ -1,15 +1,13 @@
 "use client";
-import { Plus, Ticket, Users } from "lucide-react";
+import { Plus, Ticket } from "lucide-react";
 import type { Server } from "@/lib/chat-types";
 
 type Props = {
   servers: Server[];
   selectedServer: string;
-  viewMode: "server" | "dm" | "friends";
+  viewMode: "server" | "dm";
   showMobileSidebar: boolean;
   onSelectDM: () => void;
-  onSelectFriends: () => void;
-  pendingFriends?: number;
   onSelectServer: (server: Server) => void;
   onEditServer: (server: Server) => void;
   onAddServer: () => void;
@@ -21,16 +19,10 @@ type Props = {
 // Barra fina de servidores (72px). Extraído de page.tsx sem mudança visual.
 export default function ServerRail({
   servers, selectedServer, viewMode, showMobileSidebar,
-  onSelectDM, onSelectFriends, pendingFriends, onSelectServer, onEditServer, onAddServer, onJoinServer, unreadByServer, unreadDMCount,
+  onSelectDM, onSelectServer, onEditServer, onAddServer, onJoinServer, unreadByServer, unreadDMCount,
 }: Props) {
   return (
     <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed inset-y-0 left-0 lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex lg:flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
-      <button onClick={onSelectFriends} className={`relative w-12 h-12 flex items-center justify-center transition-all ${viewMode === "friends" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Amigos">
-        <Users className="w-6 h-6" />
-        {(pendingFriends || 0) > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#DA373C] text-white text-[11px] font-bold flex items-center justify-center border-2 border-[#1E1F22]">{pendingFriends! > 9 ? "9+" : pendingFriends}</span>
-        )}
-      </button>
       <button onClick={onSelectDM} className={`relative w-12 h-12 flex items-center justify-center text-xl transition-all ${viewMode === "dm" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Mensagens Diretas">
         💬
         {(unreadDMCount || 0) > 0 && viewMode !== "dm" && (

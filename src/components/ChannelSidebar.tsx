@@ -1,15 +1,17 @@
 "use client";
-import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen } from "lucide-react";
+import { useState } from "react";
+import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
 import VoicePreview from "@/components/VoicePreview";
 import Avatar from "@/components/Avatar";
+import type { Friend, FriendRequest } from "@/hooks/useFriends";
 
 type Props = {
   showMobileSidebar: boolean;
   setShowMobileSidebar: (v: boolean) => void;
-  viewMode: "server" | "dm" | "friends";
+  viewMode: "server" | "dm";
   // DM
   dmConversations: DMConversation[];
   selectedDM: string | null;
@@ -42,6 +44,17 @@ type Props = {
   onLeaveServer: () => void;
   channelUnread?: Record<string, number>;
   setViewModeDM: () => void;
+  // Amigos (aba dentro das DMs)
+  friendsList: Friend[];
+  incomingRequests: FriendRequest[];
+  outgoingRequests: FriendRequest[];
+  sendingFriend: boolean;
+  onAddFriend: (username: string) => Promise<boolean>;
+  onAcceptFriend: (id: string) => void;
+  onRejectFriend: (id: string) => void;
+  onCancelFriend: (id: string) => void;
+  onRemoveFriend: (id: string, username: string) => void;
+  onFriendDM: (id: string) => void;
 };
 
 // Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
@@ -51,7 +64,21 @@ export default function ChannelSidebar(props: Props) {
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
     username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer, channelUnread, setViewModeDM,
+    friendsList, incomingRequests, outgoingRequests, sendingFriend, onAddFriend, onAcceptFriend, onRejectFriend, onCancelFriend, onRemoveFriend, onFriendDM,
   } = props;
+
+  const [sideTab, setSideTab] = useState<"dms" | "friends">("dms");
+  const [friendQuery, setFriendQuery] = useState("");
+  const [newFriendName, setNewFriendName] = useState("");
+  const onlineIds = new Set(onlineMembers.map((m) => m.id));
+  const fq = friendQuery.trim().toLowerCase();
+  const shownFriends = friendsList.filter((f) => !fq || f.username.toLowerCase().includes(fq));
+
+  const addFriend = async () => {
+    if (!newFriendName.trim()) return;
+    const ok = await onAddFriend(newFriendName);
+    if (ok) setNewFriendName("");
+  };
 
   // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
   const canManage = !currentServer?.owner_id || currentServer.owner_id === userId;
@@ -72,10 +99,16 @@ export default function ChannelSidebar(props: Props) {
     <div className={`${showMobileSidebar ? "translate-x-0 left-[72px]" : "-translate-x-full left-0"} lg:translate-x-0 lg:inset-y-auto lg:left-0 fixed inset-y-0 lg:relative z-50 lg:z-auto w-60 bg-[#2B2D31] flex lg:flex flex-col shrink-0 h-full transition-transform duration-200`}>
       {viewMode !== "server" ? (
         <>
-          <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
-            <span className="font-bold text-[15px]">Mensagens Diretas</span>
-            <button onClick={() => setShowNewDMModal(true)} className="w-7 h-7 rounded bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
+          <div className="h-12 px-3 flex items-center gap-1 border-b border-[#1F2124] shadow-sm shrink-0">
+            <button onClick={() => setSideTab("dms")} className={`flex-1 py-1.5 rounded text-[13px] font-semibold transition-colors ${sideTab === "dms" ? "bg-[#404249] text-white" : "text-zinc-400 hover:text-zinc-200"}`}>Conversas</button>
+            <button onClick={() => setSideTab("friends")} className={`flex-1 py-1.5 rounded text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${sideTab === "friends" ? "bg-[#404249] text-white" : "text-zinc-400 hover:text-zinc-200"}`}>
+              Amigos
+              {incomingRequests.length > 0 && <span className="min-w-4 h-4 px-1 rounded-full bg-[#DA373C] text-white text-[10px] font-bold inline-flex items-center justify-center">{incomingRequests.length > 9 ? "9+" : incomingRequests.length}</span>}
+            </button>
+            <button onClick={() => setShowNewDMModal(true)} className="w-7 h-7 rounded bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center shrink-0" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
           </div>
+          {sideTab === "dms" ? (
+          <>
           <div className="p-2">
             <div className="relative mb-2">
               <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -113,6 +146,70 @@ export default function ChannelSidebar(props: Props) {
               </div>
             </div>
           </div>
+        </>
+      ) : (
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            <div className="flex gap-1.5">
+              <input
+                value={newFriendName}
+                onChange={(e) => setNewFriendName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addFriend()}
+                placeholder="Username do amigo"
+                className="flex-1 min-w-0 bg-[#1E1F22] rounded px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#5865F2] placeholder:text-zinc-500 text-zinc-200"
+              />
+              <button onClick={addFriend} disabled={sendingFriend || !newFriendName.trim()} className="px-2 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-zinc-200 shrink-0" title="Adicionar amigo">
+                <UserPlus className="w-4 h-4 text-white" />
+              </button>
+            </div>
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input value={friendQuery} onChange={(e) => setFriendQuery(e.target.value)} placeholder="Buscar amigo" className="w-full bg-[#1E1F22] rounded pl-7 pr-2 py-1.5 text-xs focus:outline-none placeholder:text-zinc-500 text-zinc-200" />
+            </div>
+            {incomingRequests.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-zinc-400 px-1 mb-1">PEDIDOS — {incomingRequests.length}</p>
+                {incomingRequests.map((r) => (
+                  <div key={r.from_user} className="flex items-center gap-2 px-1.5 py-1.5 rounded bg-[#232428] mb-1">
+                    <button onClick={() => onViewProfile(r.from_user)} title="Ver perfil"><Avatar src={r.avatar} name={r.username} className="w-7 h-7 rounded-full bg-[#41434A] text-xs" /></button>
+                    <span className="flex-1 min-w-0 text-xs font-medium text-zinc-200 truncate">{r.username}</span>
+                    <button onClick={() => onAcceptFriend(r.from_user)} className="w-7 h-7 rounded-full bg-[#23A559] hover:bg-[#1A7F44] flex items-center justify-center shrink-0" title="Aceitar"><Check className="w-3.5 h-3.5 text-white" /></button>
+                    <button onClick={() => onRejectFriend(r.from_user)} className="w-7 h-7 rounded-full bg-[#35373C] hover:bg-[#DA373C] flex items-center justify-center shrink-0" title="Recusar"><X className="w-3.5 h-3.5 text-zinc-300" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {outgoingRequests.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-zinc-400 px-1 mb-1">ENVIADOS</p>
+                {outgoingRequests.map((r) => (
+                  <div key={r.to_user} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-[#35373C]">
+                    <Avatar src={r.avatar} name={r.username} className="w-6 h-6 rounded-full bg-[#41434A] text-[10px]" />
+                    <span className="flex-1 min-w-0 text-xs text-zinc-400 truncate">{r.username}</span>
+                    <button onClick={() => onCancelFriend(r.to_user)} className="text-[11px] text-zinc-500 hover:text-red-400 shrink-0">cancelar</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div>
+              <p className="text-[11px] font-bold text-zinc-400 px-1 mb-1">AMIGOS — {shownFriends.length}</p>
+              {shownFriends.length === 0 && <p className="text-[11px] text-zinc-600 px-1">{friendsList.length === 0 ? "Sem amigos ainda." : "Nada achado."}</p>}
+              {shownFriends.map((f) => (
+                <div key={f.user_id} className="flex items-center gap-2 px-1.5 py-1.5 rounded hover:bg-[#35373C] group">
+                  <button onClick={() => onViewProfile(f.user_id)} className="relative shrink-0" title="Ver perfil">
+                    <Avatar src={f.avatar} name={f.username} className="w-7 h-7 rounded-full bg-[#41434A] text-xs" />
+                    <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#2B2D31] ${onlineIds.has(f.user_id) ? "bg-[#23A559]" : "bg-zinc-600"}`} />
+                  </button>
+                  <button onClick={() => onFriendDM(f.user_id)} className="flex-1 min-w-0 text-left">
+                    <span className="block text-xs font-medium text-zinc-200 truncate">{f.username}</span>
+                    <span className="block text-[10px] text-zinc-500">{onlineIds.has(f.user_id) ? "Online" : "Offline"}</span>
+                  </button>
+                  <button onClick={() => onFriendDM(f.user_id)} className="p-1.5 hover:bg-[#5865F2] rounded opacity-0 group-hover:opacity-100 shrink-0" title="Conversar"><MessageCircle className="w-3.5 h-3.5 text-zinc-300" /></button>
+                  <button onClick={() => onRemoveFriend(f.user_id, f.username)} className="p-1.5 hover:bg-[#DA373C] rounded opacity-0 group-hover:opacity-100 shrink-0" title="Remover"><UserX className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>
+                </div>
+              ))}
+            </div>
+          </div>
+          )}
         </>
       ) : (
         <>
