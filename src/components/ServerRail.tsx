@@ -36,10 +36,12 @@ export default function ServerRail({
           onClick={() => onSelectServer(server)}
           onDoubleClick={() => onEditServer(server)}
           onContextMenu={(e) => { e.preventDefault(); onEditServer(server); }}
-          className={`w-12 h-12 flex items-center justify-center text-lg font-bold transition-all duration-200 relative group overflow-hidden ${viewMode === "server" && selectedServer === server.id ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`}
+          className={`w-12 h-12 flex items-center justify-center text-lg font-bold transition-all duration-200 relative group ${viewMode === "server" && selectedServer === server.id ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`}
           title={`${server.name} (duplo clique para editar)`}
         >
-          {server.image_url ? <img src={server.image_url} alt={server.name} className="w-full h-full object-cover" /> : server.icon}
+          <span className="absolute inset-0 overflow-hidden rounded-[inherit] flex items-center justify-center">
+            {server.image_url ? <img src={server.image_url} alt={server.name} className="w-full h-full object-cover" /> : server.icon}
+          </span>
           {viewMode === "server" && selectedServer === server.id
             ? <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
             : (unreadByServer?.[server.id] || 0) > 0 && <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1 h-4 bg-white rounded-r-full" />}
@@ -51,9 +53,6 @@ export default function ServerRail({
       <button onClick={onJoinServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#5865F2] text-zinc-300 hover:text-white flex items-center justify-center transition-all duration-200" title="Entrar com convite">
         <Ticket className="w-6 h-6" />
       </button>
-      {process.env.NODE_ENV !== "production" || true ? (
-        <span className="text-[8px] text-zinc-500 break-all px-1">{JSON.stringify(unreadByServer || {})}</span>
-      ) : null}
     </div>
   );
 }
