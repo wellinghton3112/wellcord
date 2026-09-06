@@ -51,6 +51,9 @@ export default function ServerRail({
       <button onClick={onJoinServer} className="w-12 h-12 rounded-[24px] hover:rounded-[16px] bg-[#313338] hover:bg-[#5865F2] text-zinc-300 hover:text-white flex items-center justify-center transition-all duration-200" title="Entrar com convite">
         <Ticket className="w-6 h-6" />
       </button>
+      {process.env.NODE_ENV !== "production" || true ? (
+        <span className="text-[8px] text-zinc-500 break-all px-1">{JSON.stringify(unreadByServer || {})}</span>
+      ) : null}
     </div>
   );
 }
