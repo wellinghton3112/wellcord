@@ -13,7 +13,7 @@ import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 
 type Props = {
-  viewMode: "server" | "dm";
+  viewMode: "server" | "dm" | "friends";
   setShowMobileSidebar: (v: boolean) => void;
   // DM
   dmConversations: DMConversation[];

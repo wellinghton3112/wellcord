@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 
 // Não-lidas de canais: listener global + última leitura persistida.
-export function useChannelUnread(supabase: any, user: any, selectedChannel: string, viewMode: "server" | "dm") {
+export function useChannelUnread(supabase: any, user: any, selectedChannel: string, viewMode: "server" | "dm" | "friends") {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const selectedRef = useRef(selectedChannel);
   const modeRef = useRef(viewMode);

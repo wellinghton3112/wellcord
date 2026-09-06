@@ -13,10 +13,12 @@ import NewDMModal from "@/components/modals/NewDMModal";
 import ChannelModal from "@/components/modals/ChannelModal";
 import JoinModal from "@/components/modals/JoinModal";
 import MembersModal from "@/components/modals/MembersModal";
+import FriendsPanel from "@/components/FriendsPanel";
 import PinsModal from "@/components/modals/PinsModal";
 import PollModal from "@/components/modals/PollModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
+import { useFriends } from "@/hooks/useFriends";
 import { useServerManager } from "@/hooks/useServerManager";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
@@ -49,6 +51,7 @@ export default function DiscordClone() {
   const sendChannel = () => { chTyping.notifyStop(); handleSend(); };
   const typeChannel = (v: string) => { setInput(v); if (v) chTyping.notifyTyping(); else chTyping.notifyStop(); };
   const { redeemInvite } = useInvites(supabase, user);
+  const friends = useFriends(supabase, user);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
   const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
@@ -86,7 +89,7 @@ export default function DiscordClone() {
   } = useServerActions(supabase, user?.id, servers, currentServer, selectedChannel, setSelectedServer, setSelectedChannel, setShowCreateServerModal, setShowCreateChannelModal);
   const { status, setStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username, avatar);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<"server" | "dm">("server");
+  const [viewMode, setViewMode] = useState<"server" | "dm" | "friends">("server");
   const [showNewDMModal, setShowNewDMModal] = useState(false);
   const {
     dmConversations, selectedDM, setSelectedDM,
@@ -268,6 +271,8 @@ export default function DiscordClone() {
         onJoinServer={() => setShowJoinModal(true)}
         unreadByServer={unreadByServer}
         unreadDMCount={Object.values(unread).reduce((a, b) => a + b, 0)}
+        onSelectFriends={() => setViewMode("friends")}
+        pendingFriends={friends.incoming.length}
       />
 
       <ChannelSidebar
@@ -277,6 +282,7 @@ export default function DiscordClone() {
         dmConversations={dmConversations}
         selectedDM={selectedDM}
         setSelectedDM={setSelectedDM}
+        setViewModeDM={() => setViewMode("dm")}
         unreadDMs={unread}
         onlineMembers={onlineMembers}
         setNewDMUsername={setNewDMUsername}
@@ -304,6 +310,22 @@ export default function DiscordClone() {
         channelUnread={channelUnread}
       />
 
+      {viewMode === "friends" ? (
+        <FriendsPanel
+          friends={friends.friends}
+          incoming={friends.incoming}
+          outgoing={friends.outgoing}
+          onlineMembers={onlineMembers}
+          sending={friends.sending}
+          onAdd={friends.sendRequest}
+          onAccept={friends.accept}
+          onReject={friends.reject}
+          onCancel={friends.cancelOutgoing}
+          onRemove={friends.removeFriend}
+          onDM={startDMWith}
+          onViewProfile={openProfile}
+        />
+      ) : (
       <ChatArea
         viewMode={viewMode}
         setShowMobileSidebar={setShowMobileSidebar}
@@ -368,6 +390,7 @@ export default function DiscordClone() {
         onDeletePoll={deletePoll}
         onOpenPollModal={() => setShowPollModal(true)}
       />
+      )}
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />
       </div>

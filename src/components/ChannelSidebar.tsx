@@ -9,7 +9,7 @@ import Avatar from "@/components/Avatar";
 type Props = {
   showMobileSidebar: boolean;
   setShowMobileSidebar: (v: boolean) => void;
-  viewMode: "server" | "dm";
+  viewMode: "server" | "dm" | "friends";
   // DM
   dmConversations: DMConversation[];
   selectedDM: string | null;
@@ -41,6 +41,7 @@ type Props = {
   onOpenMembers: () => void;
   onLeaveServer: () => void;
   channelUnread?: Record<string, number>;
+  setViewModeDM: () => void;
 };
 
 // Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
@@ -49,7 +50,7 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer, channelUnread,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer, channelUnread, setViewModeDM,
   } = props;
 
   // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
@@ -69,7 +70,7 @@ export default function ChannelSidebar(props: Props) {
 
   return (
     <div className={`${showMobileSidebar ? "translate-x-0 left-[72px]" : "-translate-x-full left-0"} lg:translate-x-0 lg:inset-y-auto lg:left-0 fixed inset-y-0 lg:relative z-50 lg:z-auto w-60 bg-[#2B2D31] flex lg:flex flex-col shrink-0 h-full transition-transform duration-200`}>
-      {viewMode === "dm" ? (
+      {viewMode !== "server" ? (
         <>
           <div className="h-12 px-4 flex items-center justify-between border-b border-[#1F2124] shadow-sm shrink-0">
             <span className="font-bold text-[15px]">Mensagens Diretas</span>
@@ -85,7 +86,7 @@ export default function ChannelSidebar(props: Props) {
             {dmConversations.length === 0 ? (
               <p className="text-xs text-zinc-500 px-2">Nenhuma DM ainda. Clique + para iniciar.</p>
             ) : dmConversations.map((dm) => (
-              <button key={dm.id} onClick={() => setSelectedDM(dm.id)} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewModeDM(); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">
                   <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
                 </span>

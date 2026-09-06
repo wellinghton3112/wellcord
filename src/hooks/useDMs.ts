@@ -12,8 +12,8 @@ export function useDMs(
   supabase: any,
   user: any,
   username: string,
-  viewMode: "server" | "dm",
-  setViewMode: (m: "server" | "dm") => void,
+  viewMode: "server" | "dm" | "friends",
+  setViewMode: (m: "server" | "dm" | "friends") => void,
   setShowNewDMModal: (v: boolean) => void,
 ) {
   const [dmConversations, setDmConversations] = useState<DMConversation[]>([]);
