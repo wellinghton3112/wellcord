@@ -48,7 +48,7 @@ export default function LoginPage() {
       <div className="w-full max-w-[480px] bg-[#313338] rounded-lg overflow-hidden shadow-2xl border border-[#232428]">
         <div className="bg-[#5865F2] h-2" />
         <div className="p-8">
-          <h1 className="text-2xl font-bold text-white text-center">Boas-vindas ao Wellcord!</h1>
+          <h1 className="text-2xl font-bold text-white text-center">Boas-vindas ao WellCORD!</h1>
           <p className="text-zinc-400 text-center text-sm mt-1">O Discord dos seus amigos — agora com login seguro</p>
 
           <div className="flex bg-[#2B2D31] rounded-full p-1 mt-6">
@@ -77,7 +77,7 @@ export default function LoginPage() {
               {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar conta"}
             </button>
           </form>
-          <p className="text-xs text-zinc-500 text-center mt-6">Ao registrar, você concorda com os Termos do Wellcord. Perfil salvo em Supabase Auth.</p>
+          <p className="text-xs text-zinc-500 text-center mt-6">Ao registrar, você concorda com os Termos do WellCORD. Perfil salvo em Supabase Auth.</p>
           <p className="text-[10px] font-mono text-zinc-600 text-center mt-2">{APP_VERSION}</p>
         </div>
       </div>

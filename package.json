@@ -1,6 +1,6 @@
 {
-  "name": "novo",
-  "version": "0.1.49",
+  "name": "wellcord",
+  "version": "0.1.50",
   "private": true,
   "scripts": {
     "dev": "next dev",
