@@ -28,6 +28,9 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
   const [cameraOn, setCameraOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
+  // Qualidade da transmissão de tela (downscale via applyConstraints, ao vivo)
+  const [screenQuality, setScreenQuality] = useState<"auto" | "720" | "1080" | "1440">("auto");
+  const screenQualityRef = useRef<"auto" | "720" | "1080" | "1440">("auto");
   // Supressão de ruído RNNoise (ML local). Ligada por padrão; cai p/ navegador se falhar.
   const [denoise, setDenoise] = useState(true);
   const [denoiseActive, setDenoiseActive] = useState(false);
@@ -544,6 +547,25 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     } catch (e: any) { setError(e.message); }
   };
 
+  const applyScreenQuality = async (track: MediaStreamTrack, q: "auto" | "720" | "1080" | "1440") => {
+    if (q === "auto") return;
+    const dims = { "720": [1280, 720], "1080": [1920, 1080], "1440": [2560, 1440] } as const;
+    const [w, h] = dims[q];
+    try {
+      await track.applyConstraints({ width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: 30 } });
+      console.log(`[voz] tela em ~${q}p`);
+    } catch (e) {
+      console.warn("[voz] navegador recusou a qualidade pedida, mantendo original", e);
+    }
+  };
+
+  const changeScreenQuality = async (q: "auto" | "720" | "1080" | "1440") => {
+    setScreenQuality(q);
+    screenQualityRef.current = q;
+    const track = localStreamRef.current?.getVideoTracks()[0];
+    if (screenOn && track) await applyScreenQuality(track, q);
+  };
+
   const toggleScreen = async () => {
     if (screenOn) {
       localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
@@ -559,6 +581,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
       const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: { displaySurface: "monitor" } as any, audio: true });
       const track = stream.getVideoTracks()[0];
       const audioTrack = stream.getAudioTracks()[0];
+      await applyScreenQuality(track, screenQualityRef.current);
       if (!localStreamRef.current) localStreamRef.current = new MediaStream();
       // remove câmera
       localStreamRef.current.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
@@ -599,9 +622,24 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
 
   return (
     <div className="flex-1 flex flex-col p-6 gap-6 overflow-y-auto">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-bold flex items-center gap-2"><Volume2 className="w-5 h-5" /> Conectado — {peers.length + 1} no canal</h2>
-        <button onClick={leave} className="bg-[#DA373C] hover:bg-[#A12828] text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><PhoneOff className="w-4 h-4" /> Sair</button>
+        <div className="flex items-center gap-2">
+          {screenOn && (
+            <div className="flex items-center gap-1 bg-[#232428] rounded-full p-1" title="Qualidade da transmissão de tela (aplica ao vivo)">
+              {(["auto", "720", "1080", "1440"] as const).map((q) => (
+                <button
+                  key={q}
+                  onClick={() => changeScreenQuality(q)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${screenQuality === q ? "bg-[#5865F2] text-white" : "text-zinc-400 hover:text-white"}`}
+                >
+                  {q === "auto" ? "Auto" : `${q}p`}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={leave} className="bg-[#DA373C] hover:bg-[#A12828] text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><PhoneOff className="w-4 h-4" /> Sair</button>
+        </div>
       </div>
 
       {expanded && (
