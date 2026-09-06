@@ -31,13 +31,14 @@ export function useChannelUnread(supabase: any, user: any, selectedChannel: stri
       .channel("channels-inbox")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         const r = payload.new;
+        console.log("[ch] inbox evento:", r?.channel_id, (r?.content || "").slice(0, 30));
         if (!r?.channel_id || r.user_id === user.id) return;
         // Só pula se estou OLHANDO o canal (modo server + canal atual)
         if (modeRef.current === "server" && selectedRef.current === r.channel_id) return;
         setUnread((prev) => ({ ...prev, [r.channel_id]: (prev[r.channel_id] || 0) + 1 }));
       })
-      .subscribe((status: string) => {
-        if (status !== "SUBSCRIBED") console.warn("[ch] inbox status:", status);
+      .subscribe((status: string, err?: any) => {
+        console.log("[ch] inbox status:", status, err || "");
       });
     return () => { supabase.removeChannel(inbox); };
   }, [user, supabase]);
