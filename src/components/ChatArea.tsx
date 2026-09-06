@@ -257,12 +257,22 @@ export default function ChatArea(props: Props) {
 
   const attachmentBlock = (url: string | null | undefined, name: string | null | undefined, type: string | null | undefined) => {
     if (!url) return null;
-    const isImage = (type || "").startsWith("image/");
+    const kind = (type || "").toLowerCase();
+    const isImage = kind.startsWith("image/");
+    const isAudio = kind.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|opus|flac|aac)$/i.test(name || "");
     if (isImage) {
       return (
         <a href={url} target="_blank" rel="noreferrer" className="mt-1 block max-w-sm">
           <img src={url} alt={name || "anexo"} className="max-h-64 rounded-lg object-cover border border-[#4A4D53] hover:brightness-110 transition" />
         </a>
+      );
+    }
+    if (isAudio) {
+      return (
+        <div className="mt-1 max-w-sm rounded-lg border border-[#4A4D53] bg-[#2B2D31] px-3 py-2">
+          <div className="mb-1 truncate text-xs text-zinc-300">{name || "áudio"}</div>
+          <audio controls preload="metadata" src={url} className="w-full min-w-60" />
+        </div>
       );
     }
     return (
