@@ -224,7 +224,7 @@ export function useDMs(
     if (other) {
       sendNotify(supabase, other.id, {
         kind: "dm", from: username, snippet: content.slice(0, 80) || "📎 arquivo",
-        messageId: "", conversationId: selectedDM,
+        conversationId: selectedDM,
       }).catch(() => {});
     }
   };

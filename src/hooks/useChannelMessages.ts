@@ -165,7 +165,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       const snippet = content.slice(0, 80);
       mentionIds.forEach((id) => {
         sendNotify(supabase, id, {
-          kind: "channel", from: username, snippet, messageId: "",
+          kind: "channel", from: username, snippet,
           serverId: serverId, channelId: selectedChannel,
         }).catch(() => {});
       });

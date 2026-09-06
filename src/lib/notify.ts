@@ -4,31 +4,24 @@ export type NotifyPayload = {
   kind: "channel" | "dm";
   from: string;
   snippet: string;
-  messageId: string;
   serverId?: string;
   channelId?: string;
   conversationId?: string;
 };
 
-// Envia notificação efêmera para um usuário (canal temporário só p/ o envio)
-export async function sendNotify(supabase: SupabaseClient, userId: string, payload: NotifyPayload) {
-  const ch = supabase.channel(`notify-send-${userId}-${Date.now()}`, {
-    config: { broadcast: { self: false } },
+// Notificação persistente (tabela + realtime) — entrega garantida mesmo se o
+// destinatário estiver com a conversa fechada; o toast some ao dispensar.
+export async function sendNotify(supabase: any, userId: string, payload: NotifyPayload) {
+  const { error } = await supabase.from("notifications").insert({
+    user_id: userId,
+    kind: payload.kind,
+    sender: payload.from,
+    snippet: payload.snippet,
+    server_id: payload.serverId || null,
+    channel_id: payload.channelId || null,
+    conversation_id: payload.conversationId || null,
   });
-  try {
-    await new Promise<void>((resolve) => {
-      ch.subscribe((status: string) => {
-        if (status === "SUBSCRIBED") {
-          ch.send({ type: "broadcast", event: `notify:${userId}`, payload }).then(() => resolve()).catch(() => resolve());
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-          resolve();
-        }
-      });
-      setTimeout(resolve, 3000);
-    });
-  } finally {
-    try { supabase.removeChannel(ch); } catch {}
-  }
+  if (error) console.warn("[notify] falha ao gravar:", error.message);
 }
 
 // Extrai @nomes do texto (letras, números, _, ., -)

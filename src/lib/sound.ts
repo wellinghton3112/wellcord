@@ -1,6 +1,19 @@
 // "Pop" de notificação via WebAudio (sem asset). Silencia se o browser bloquear.
 let ctx: AudioContext | null = null;
 
+// Browsers bloqueiam áudio até o primeiro gesto: chama uma vez no mount
+export function unlockAudio() {
+  try {
+    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AC) return;
+    if (!ctx) ctx = new AC();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const unlock = () => { ctx?.resume().catch(() => {}); };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+  } catch {}
+}
+
 export function playPop() {
   try {
     const AC = window.AudioContext || (window as any).webkitAudioContext;

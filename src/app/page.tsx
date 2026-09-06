@@ -79,30 +79,19 @@ export default function DiscordClone() {
 
   // Notificações (menções + DMs): toast clicável que navega
   const { toast, dismiss } = useNotify(supabase, user);
-  const pendingScrollMsg = useRef<string | null>(null);
 
   const openToast = () => {
     if (!toast) return;
     if (toast.kind === "dm" && toast.conversationId) {
       setViewMode("dm");
       setSelectedDM(toast.conversationId);
-      if (toast.messageId) pendingScrollMsg.current = toast.messageId;
     } else if (toast.kind === "channel" && toast.serverId && toast.channelId) {
       setViewMode("server");
       setSelectedServer(toast.serverId);
       setSelectedChannel(toast.channelId);
-      if (toast.messageId) pendingScrollMsg.current = toast.messageId;
     }
     dismiss();
   };
-
-  useEffect(() => {
-    if (pendingScrollMsg.current) {
-      const id = pendingScrollMsg.current;
-      pendingScrollMsg.current = null;
-      setTimeout(() => document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
-    }
-  }, [channelMessages, dmMessages]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
