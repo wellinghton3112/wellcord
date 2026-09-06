@@ -22,6 +22,7 @@ import { useServers } from "@/hooks/useServers";
 import { useChannelMessages } from "@/hooks/useChannelMessages";
 import { useDMs } from "@/hooks/useDMs";
 import { useServerActions } from "@/hooks/useServerActions";
+import { useTyping } from "@/hooks/useTyping";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
@@ -35,6 +36,10 @@ export default function DiscordClone() {
     loading, connected, reload,
   } = useServers(supabase, user);
   const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id);
+  const chTyping = useTyping(supabase, user, username, selectedChannel ? `ch-${selectedChannel}` : null);
+
+  const sendChannel = () => { chTyping.notifyStop(); handleSend(); };
+  const typeChannel = (v: string) => { setInput(v); if (v) chTyping.notifyTyping(); else chTyping.notifyStop(); };
   const { inviteCode, creatingInvite, openInvite, redeemInvite } = useInvites(supabase, user);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -66,6 +71,10 @@ export default function DiscordClone() {
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   } = useDMs(supabase, user, setViewMode, setShowNewDMModal);
+  const dmTyping = useTyping(supabase, user, username, selectedDM ? `dm-${selectedDM}` : null);
+
+  const sendDM = () => { dmTyping.notifyStop(); handleDMSend(); };
+  const typeDM = (v: string) => { setDmInput(v); if (v) dmTyping.notifyTyping(); else dmTyping.notifyStop(); };
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -204,8 +213,8 @@ export default function DiscordClone() {
         selectedDM={selectedDM}
         dmMessages={dmMessages}
         dmInput={dmInput}
-        setDmInput={setDmInput}
-        handleDMSend={handleDMSend}
+        setDmInput={typeDM}
+        handleDMSend={sendDM}
         dmEndRef={dmEndRef}
         onlineMembers={onlineMembers}
         userId={user?.id}
@@ -214,8 +223,8 @@ export default function DiscordClone() {
         channelMessages={channelMessages}
         messagesEndRef={messagesEndRef}
         input={input}
-        setInput={setInput}
-        handleSend={handleSend}
+        setInput={typeChannel}
+        handleSend={sendChannel}
         username={username}
         status={status}
         onEditMessage={editMessage}
@@ -239,6 +248,10 @@ export default function DiscordClone() {
         uploadingDm={uploadingDm}
         onAttachDmFile={attachDmFile}
         onClearDmFile={() => setPendingDmFile(null)}
+        typingChannel={chTyping.typingUsers}
+        typingDM={dmTyping.typingUsers}
+        onBlurChannel={chTyping.notifyStop}
+        onBlurDM={dmTyping.notifyStop}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />

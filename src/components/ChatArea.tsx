@@ -7,6 +7,7 @@ import {
   ChevronUp, ChevronDown, FileText, Download, Loader2,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
+import type { TypingUser } from "@/hooks/useTyping";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 
@@ -54,6 +55,10 @@ type Props = {
   uploadingDm: boolean;
   onAttachDmFile: (f: File) => void;
   onClearDmFile: () => void;
+  typingChannel: TypingUser[];
+  typingDM: TypingUser[];
+  onBlurChannel: () => void;
+  onBlurDM: () => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -67,6 +72,7 @@ export default function ChatArea(props: Props) {
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
     pendingFile, uploading, onAttachFile, onClearFile,
     pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
+    typingChannel, typingDM, onBlurChannel, onBlurDM,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -281,6 +287,27 @@ export default function ChatArea(props: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dmFileInputRef = useRef<HTMLInputElement>(null);
 
+  const typingBar = (users: TypingUser[]) => {
+    if (users.length === 0) return <div className="h-5" />;
+    const names = users.slice(0, 3).map((u) => u.username);
+    const label =
+      users.length === 1
+        ? `${names[0]} está digitando`
+        : users.length <= 3
+          ? `${names.join(", ")} estão digitando`
+          : `${names.join(", ")} e mais ${users.length - 3} estão digitando`;
+    return (
+      <div className="h-5 flex items-center gap-1.5 text-xs text-zinc-400 px-1">
+        <span className="flex gap-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+        </span>
+        <span className="truncate">{label}...</span>
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
       {viewMode === "dm" ? (
@@ -342,13 +369,18 @@ export default function ChatArea(props: Props) {
             <div ref={dmEndRef} />
           </div>
           {selectedDM && (
-            <div className="p-4 shrink-0">
+            <div className="px-4 pt-1 shrink-0">
+              {typingBar(typingDM)}
+            </div>
+          )}
+          {selectedDM && (
+            <div className="p-4 pt-1 shrink-0">
               {replyPreview(dmReplyTo, () => setDmReplyTo(null))}
               {pendingPreview(pendingDmFile, uploadingDm, onClearDmFile)}
               <input ref={dmFileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachDmFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => dmFileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
-                <input value={dmInput} onChange={(e) => setDmInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                <input value={dmInput} onChange={(e) => setDmInput(e.target.value)} onBlur={onBlurDM} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <button onClick={handleDMSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
               </div>
             </div>
@@ -409,13 +441,18 @@ export default function ChatArea(props: Props) {
             )}
           </div>
           {currentChannel?.type === "text" && (
-            <div className="p-4 shrink-0">
+            <div className="px-4 pt-1 shrink-0">
+              {typingBar(typingChannel)}
+            </div>
+          )}
+          {currentChannel?.type === "text" && (
+            <div className="p-4 pt-1 shrink-0">
               {replyPreview(replyTo, () => setReplyTo(null))}
               {pendingPreview(pendingFile, uploading, onClearFile)}
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
-                <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                <input value={input} onChange={(e) => setInput(e.target.value)} onBlur={onBlurChannel} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
                   <button onClick={handleSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>
