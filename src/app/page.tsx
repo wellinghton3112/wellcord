@@ -252,6 +252,7 @@ export default function DiscordClone() {
         onAddServer={openCreateServer}
         onJoinServer={() => setShowJoinModal(true)}
         unreadByServer={unreadByServer}
+        unreadDMCount={Object.values(unread).reduce((a, b) => a + b, 0)}
       />
 
       <ChannelSidebar

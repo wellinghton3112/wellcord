@@ -13,16 +13,22 @@ type Props = {
   onAddServer: () => void;
   onJoinServer: () => void;
   unreadByServer?: Record<string, number>;
+  unreadDMCount?: number;
 };
 
 // Barra fina de servidores (72px). Extraído de page.tsx sem mudança visual.
 export default function ServerRail({
   servers, selectedServer, viewMode, showMobileSidebar,
-  onSelectDM, onSelectServer, onEditServer, onAddServer, onJoinServer, unreadByServer,
+  onSelectDM, onSelectServer, onEditServer, onAddServer, onJoinServer, unreadByServer, unreadDMCount,
 }: Props) {
   return (
     <div className={`${showMobileSidebar ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 fixed inset-y-0 left-0 lg:relative z-50 lg:z-auto w-[72px] bg-[#1E1F22] flex lg:flex flex-col items-center py-3 gap-2 shrink-0 overflow-y-auto h-full transition-transform duration-200`}>
-      <button onClick={onSelectDM} className={`w-12 h-12 flex items-center justify-center text-xl transition-all ${viewMode === "dm" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Mensagens Diretas">💬</button>
+      <button onClick={onSelectDM} className={`relative w-12 h-12 flex items-center justify-center text-xl transition-all ${viewMode === "dm" ? "bg-[#5865F2] text-white rounded-[16px]" : "bg-[#313338] text-zinc-300 rounded-[24px] hover:rounded-[16px] hover:bg-[#5865F2] hover:text-white"}`} title="Mensagens Diretas">
+        💬
+        {(unreadDMCount || 0) > 0 && viewMode !== "dm" && (
+          <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-[#DA373C] text-white text-[11px] font-bold flex items-center justify-center border-2 border-[#1E1F22]">{unreadDMCount! > 9 ? "9+" : unreadDMCount}</span>
+        )}
+      </button>
       <div className="w-8 h-0.5 bg-[#35363C] rounded-full my-1" />
       {servers.map((server) => (
         <button
