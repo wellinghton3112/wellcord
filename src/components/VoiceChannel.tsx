@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X, Waves } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
-import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE } from "@/lib/video";
+import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, type ScreenQuality } from "@/lib/video";
 
 type Props = {
   channelId: string;
@@ -30,8 +30,8 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   const [cameraOn, setCameraOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
   // Qualidade da transmissão de tela (downscale via applyConstraints, ao vivo)
-  const [screenQuality, setScreenQuality] = useState<"auto" | "720" | "1080" | "1440">("auto");
-  const screenQualityRef = useRef<"auto" | "720" | "1080" | "1440">("auto");
+  const [screenQuality, setScreenQuality] = useState<ScreenQuality>("auto");
+  const screenQualityRef = useRef<ScreenQuality>("auto");
   // Supressão de ruído RNNoise (ML local). Ligada por padrão; cai p/ navegador se falhar.
   const [denoise, setDenoise] = useState(true);
   const [denoiseActive, setDenoiseActive] = useState(false);
@@ -556,19 +556,19 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     } catch (e: any) { setError(e.message); }
   };
 
-  const applyScreenQuality = async (track: MediaStreamTrack, q: "auto" | "720" | "1080" | "1440") => {
-    if (q === "auto") return;
-    const dims = { "720": [1280, 720], "1080": [1920, 1080], "1440": [2560, 1440] } as const;
-    const [w, h] = dims[q];
+  const applyScreenQuality = async (track: MediaStreamTrack, q: ScreenQuality) => {
+    const dims = qualityDims(q);
+    if (!dims) return;
+    const [w, h, fps] = dims;
     try {
-      await track.applyConstraints({ width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: 30 } });
-      console.log(`[voz] tela em ~${q}p`);
+      await track.applyConstraints({ width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps } });
+      console.log(`[voz] tela em ~${q}`);
     } catch (e) {
       console.warn("[voz] navegador recusou a qualidade pedida, mantendo original", e);
     }
   };
 
-  const changeScreenQuality = async (q: "auto" | "720" | "1080" | "1440") => {
+  const changeScreenQuality = async (q: ScreenQuality) => {
     setScreenQuality(q);
     screenQualityRef.current = q;
     const track = localStreamRef.current?.getVideoTracks()[0];
@@ -653,14 +653,14 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         <h2 className="font-bold flex items-center gap-2"><Volume2 className="w-5 h-5" /> Conectado — {peers.length + 1} no canal</h2>
         <div className="flex items-center gap-2">
           {screenOn && (
-            <div className="flex items-center gap-1 bg-[#232428] rounded-full p-1" title="Qualidade da transmissão de tela (aplica ao vivo)">
-              {(["auto", "720", "1080", "1440"] as const).map((q) => (
+            <div className="flex items-center gap-1 bg-[#232428] rounded-full p-1 flex-wrap justify-end" title="Qualidade da transmissão de tela (aplica ao vivo)">
+              {SCREEN_QUALITIES.map((q) => (
                 <button
                   key={q}
                   onClick={() => changeScreenQuality(q)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${screenQuality === q ? "bg-[#5865F2] text-white" : "text-zinc-400 hover:text-white"}`}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenQuality === q ? "bg-[#5865F2] text-white" : "text-zinc-400 hover:text-white"}`}
                 >
-                  {q === "auto" ? "Auto" : `${q}p`}
+                  {qualityLabel(q)}
                 </button>
               ))}
             </div>

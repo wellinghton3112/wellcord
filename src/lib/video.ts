@@ -1,12 +1,35 @@
 // Qualidade de vídeo WebRTC: bitrate alto + VP9 + nitidez.
 // Sem isso o navegador economiza banda e o vídeo fica borrado/quadriculado.
 
+export type ScreenQuality =
+  | "auto"
+  | "720p30" | "720p60"
+  | "1080p30" | "1080p60"
+  | "1440p30" | "1440p60" | "1440p120";
+
+export const SCREEN_QUALITIES: ScreenQuality[] = [
+  "auto", "720p30", "720p60", "1080p30", "1080p60", "1440p30", "1440p60", "1440p120",
+];
+
+export function qualityLabel(q: ScreenQuality): string {
+  return q === "auto" ? "Auto" : q.replace("p", "p ");
+}
+
+// [largura, altura, fps, bitrate]
+const SPECS: Record<Exclude<ScreenQuality, "auto">, [number, number, number, number]> = {
+  "720p30": [1280, 720, 30, 2_500_000],
+  "720p60": [1280, 720, 60, 4_000_000],
+  "1080p30": [1920, 1080, 30, 5_000_000],
+  "1080p60": [1920, 1080, 60, 8_000_000],
+  "1440p30": [2560, 1440, 30, 8_000_000],
+  "1440p60": [2560, 1440, 60, 12_000_000],
+  "1440p120": [2560, 1440, 120, 16_000_000],
+};
+
 export const VIDEO_BITRATE: Record<string, number> = {
   camera: 1_500_000, // 1.5 Mbps
-  "720": 2_500_000, // 2.5 Mbps
-  "1080": 5_000_000, // 5 Mbps
-  "1440": 8_000_000, // 8 Mbps
   auto: 5_000_000,
+  ...Object.fromEntries(Object.entries(SPECS).map(([k, [, , , b]]) => [k, b])),
 };
 
 // Prefere VP9 (mais nítido por bit que VP8) mantendo os demais como fallback
@@ -49,6 +72,12 @@ export async function tuneVideoSender(
   }
 }
 
-export function videoBitrateFor(quality: "auto" | "720" | "1080" | "1440"): number {
+export function videoBitrateFor(quality: ScreenQuality): number {
   return VIDEO_BITRATE[quality] ?? VIDEO_BITRATE.auto;
+}
+
+export function qualityDims(quality: ScreenQuality): [number, number, number] | null {
+  if (quality === "auto") return null;
+  const [w, h, fps] = SPECS[quality];
+  return [w, h, fps];
 }
