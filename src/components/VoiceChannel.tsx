@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X, Waves } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
+import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE } from "@/lib/video";
 
 type Props = {
   channelId: string;
@@ -151,7 +152,12 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
 
     // add local tracks
     if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current!));
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current!);
+        if (track.kind === "video") {
+          tuneVideoSender(pc, track, { screen: screenOn, maxBitrate: videoBitrateFor(screenQualityRef.current) }).catch(() => {});
+        }
+      });
     }
 
     pc.onicecandidate = (e) => {
@@ -540,7 +546,10 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         localVideoRef.current.srcObject = new MediaStream([track]);
         await localVideoRef.current.play().catch(() => {});
       }
-      peersRef.current.forEach((pc) => pc.addTrack(track, localStreamRef.current!));
+      peersRef.current.forEach((pc) => {
+        pc.addTrack(track, localStreamRef.current!);
+        tuneVideoSender(pc, track, { screen: false, maxBitrate: VIDEO_BITRATE.camera }).catch(() => {});
+      });
       setCameraOn(true);
       if (screenOn) setScreenOn(false);
       await renegotiate();
@@ -563,7 +572,22 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     setScreenQuality(q);
     screenQualityRef.current = q;
     const track = localStreamRef.current?.getVideoTracks()[0];
-    if (screenOn && track) await applyScreenQuality(track, q);
+    if (screenOn && track) {
+      await applyScreenQuality(track, q);
+      // Reaplica o teto de bitrate nos senders ativos
+      const bitrate = videoBitrateFor(q);
+      for (const pc of peersRef.current.values()) {
+        const sender = pc.getSenders().find((s) => s.track === track);
+        if (sender) {
+          try {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+            params.encodings[0].maxBitrate = bitrate;
+            await sender.setParameters(params);
+          } catch {}
+        }
+      }
+    }
   };
 
   const toggleScreen = async () => {
@@ -591,7 +615,10 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
         localVideoRef.current.srcObject = new MediaStream([track]);
         await localVideoRef.current.play().catch(() => {});
       }
-      peersRef.current.forEach((pc) => pc.addTrack(track, localStreamRef.current!));
+      peersRef.current.forEach((pc) => {
+        pc.addTrack(track, localStreamRef.current!);
+        tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current) }).catch(() => {});
+      });
       if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
       track.onended = () => toggleScreen();
       setScreenOn(true);
