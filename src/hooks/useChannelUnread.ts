@@ -2,10 +2,12 @@
 import { useEffect, useRef, useState } from "react";
 
 // Não-lidas de canais: listener global + última leitura persistida.
-export function useChannelUnread(supabase: any, user: any, selectedChannel: string) {
+export function useChannelUnread(supabase: any, user: any, selectedChannel: string, viewMode: "server" | "dm") {
   const [unread, setUnread] = useState<Record<string, number>>({});
   const selectedRef = useRef(selectedChannel);
+  const modeRef = useRef(viewMode);
   selectedRef.current = selectedChannel;
+  modeRef.current = viewMode;
 
   // Marca leitura ao abrir o canal (limpa + persiste)
   useEffect(() => {
@@ -30,7 +32,8 @@ export function useChannelUnread(supabase: any, user: any, selectedChannel: stri
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload: any) => {
         const r = payload.new;
         if (!r?.channel_id || r.user_id === user.id) return;
-        if (selectedRef.current === r.channel_id) return; // estou vendo: sem badge
+        // Só pula se estou OLHANDO o canal (modo server + canal atual)
+        if (modeRef.current === "server" && selectedRef.current === r.channel_id) return;
         setUnread((prev) => ({ ...prev, [r.channel_id]: (prev[r.channel_id] || 0) + 1 }));
       })
       .subscribe((status: string) => {

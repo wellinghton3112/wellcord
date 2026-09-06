@@ -10,6 +10,7 @@ export function useDMs(
   supabase: any,
   user: any,
   username: string,
+  viewMode: "server" | "dm",
   setViewMode: (m: "server" | "dm") => void,
   setShowNewDMModal: (v: boolean) => void,
 ) {
@@ -27,8 +28,10 @@ export function useDMs(
   // Refs para usar estado atual dentro de subscriptions estáveis
   const convIdsRef = useRef<Set<string>>(new Set());
   const selectedDMRef = useRef<string | null>(null);
+  const modeRef = useRef(viewMode);
   convIdsRef.current = new Set(dmConversations.map((c) => c.id));
   selectedDMRef.current = selectedDM;
+  modeRef.current = viewMode;
 
   // DMs: carregar conversas
   const loadDMs = async () => {
@@ -64,7 +67,8 @@ export function useDMs(
         if (!convIdsRef.current.has(r.conversation_id)) {
           loadDMs(); // conversa nova vinda de outro: atualiza a lista
         }
-        if (selectedDMRef.current !== r.conversation_id) {
+        // Só pula se estou OLHANDO a conversa (modo dm + conversa atual)
+        if (!(modeRef.current === "dm" && selectedDMRef.current === r.conversation_id)) {
           setUnread((prev) => ({ ...prev, [r.conversation_id]: (prev[r.conversation_id] || 0) + 1 }));
         }
       })

@@ -75,7 +75,7 @@ export default function DiscordClone() {
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
     newDMUsername, setNewDMUsername, creatingDM, createDM, startDMWith,
-  } = useDMs(supabase, user, username, setViewMode, setShowNewDMModal);
+  } = useDMs(supabase, user, username, viewMode, setViewMode, setShowNewDMModal);
   const dmTyping = useTyping(supabase, user, username, selectedDM ? `dm-${selectedDM}` : null);
 
   const sendDM = () => { dmTyping.notifyStop(); handleDMSend(); };
@@ -83,7 +83,7 @@ export default function DiscordClone() {
 
   // Notificações (menções + DMs): toast clicável que navega
   const { toast, dismiss } = useNotify(supabase, user);
-  const { channelUnread } = useChannelUnread(supabase, user, selectedChannel);
+  const { channelUnread } = useChannelUnread(supabase, user, selectedChannel, viewMode);
   const unreadByServer: Record<string, number> = {};
   for (const s of servers) {
     const total = s.channels.reduce((acc, c) => acc + (channelUnread[c.id] || 0), 0);
