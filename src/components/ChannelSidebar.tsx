@@ -4,6 +4,7 @@ import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-t
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
 import VoicePreview from "@/components/VoicePreview";
+import Avatar from "@/components/Avatar";
 
 type Props = {
   showMobileSidebar: boolean;
@@ -29,6 +30,7 @@ type Props = {
   deleteChannel: (id: string, name: string) => void;
   // Painel usuário
   username: string;
+  userAvatar?: string | null;
   status: keyof typeof statusConfig;
   setStatus: (s: "online" | "idle" | "dnd" | "invisible") => void;
   showStatusMenu: boolean;
@@ -43,7 +45,7 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar,
   } = props;
 
   // Dono do servidor (ou legado sem dono) pode gerenciar; demais só usam
@@ -77,7 +79,7 @@ export default function ChannelSidebar(props: Props) {
               <p className="text-xs text-zinc-500 px-2">Nenhuma DM ainda. Clique + para iniciar.</p>
             ) : dmConversations.map((dm) => (
               <button key={dm.id} onClick={() => setSelectedDM(dm.id)} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-                <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{dm.otherUser?.avatar || "👤"}</div>
+                <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
                   <div className="text-xs text-zinc-500 truncate">Clique para conversar</div>
@@ -91,13 +93,13 @@ export default function ChannelSidebar(props: Props) {
             <div className="mt-4 p-2 bg-[#232428] rounded">
               <p className="text-xs font-bold text-zinc-300">Amigos Online — {onlineMembers.length}</p>
               <div className="mt-2 space-y-1">
-                {onlineMembers.slice(0, 5).map((m) => (
-                  <button key={m.id} onClick={() => { setNewDMUsername(m.username); setShowNewDMModal(true); }} className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[#35373C] text-left">
-                    <div className="w-6 h-6 rounded-full bg-[#41434A] flex items-center justify-center text-xs">{m.avatar}</div>
-                    <span className="text-xs text-zinc-300 truncate">{m.username}</span>
-                    <Plus className="w-3 h-3 ml-auto text-zinc-500" />
-                  </button>
-                ))}
+                  {onlineMembers.slice(0, 5).map((m) => (
+                    <button key={m.id} onClick={() => { setNewDMUsername(m.username); setShowNewDMModal(true); }} className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[#35373C] text-left">
+                      <Avatar src={m.avatar} name={m.username} className="w-6 h-6 rounded-full bg-[#41434A] text-xs" />
+                      <span className="text-xs text-zinc-300 truncate">{m.username}</span>
+                      <Plus className="w-3 h-3 ml-auto text-zinc-500" />
+                    </button>
+                  ))}
               </div>
             </div>
           </div>
@@ -142,7 +144,7 @@ export default function ChannelSidebar(props: Props) {
       )}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0 relative">
         <div className="relative">
-          <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">😎</div>
+          <Avatar src={userAvatar || undefined} name={username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />
         </div>
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>

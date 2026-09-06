@@ -5,7 +5,7 @@ import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { extractMentions, sendNotify } from "@/lib/notify";
 
 // Mensagens do canal: carga, realtime, envio, reações, respostas e anexos.
-export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string) {
+export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string, avatar: string = "😎") {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [reactions, setReactions] = useState<ReactionMap>({});
@@ -142,7 +142,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       user_id: user.id,
       username,
       content,
-      avatar: "😎",
+      avatar,
       color: "#5865F2",
       reply_to: reply?.id || null,
       reply_user: reply?.user || null,

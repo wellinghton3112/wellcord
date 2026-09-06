@@ -4,7 +4,7 @@ import type { PresenceUser } from "@/lib/chat-types";
 
 // Presença realtime + lista de perfis para offline.
 // Extraído de page.tsx sem mudança de comportamento.
-export function usePresence(supabase: any, user: any, username: string) {
+export function usePresence(supabase: any, user: any, username: string, avatar: string = "😎") {
   const [status, setStatus] = useState<"online" | "idle" | "dnd" | "invisible">("online");
   const [onlineMembers, setOnlineMembers] = useState<PresenceUser[]>([]);
   const [allProfiles, setAllProfiles] = useState<PresenceUser[]>([]);
@@ -26,11 +26,11 @@ export function usePresence(supabase: any, user: any, username: string) {
     });
     ch.subscribe(async (s: string) => {
       if (s === "SUBSCRIBED" && status !== "invisible") {
-        await ch.track({ id: user.id, username, avatar: "😎", status, email: user.email });
+        await ch.track({ id: user.id, username, avatar, status, email: user.email });
       }
     });
     return () => { supabase.removeChannel(ch); };
-  }, [user, username, status, supabase]);
+  }, [user, username, status, avatar, supabase]);
 
   // Todos os perfis para lista offline (uma vez por login — sem loop por presença)
   useEffect(() => {

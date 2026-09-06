@@ -28,7 +28,7 @@ import { useNotify } from "@/hooks/useNotify";
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const { user, username, setUsername } = useAuth(supabase);
+  const { user, username, setUsername, avatar, setAvatar } = useAuth(supabase);
   const {
     servers,
     selectedServer, setSelectedServer,
@@ -36,7 +36,7 @@ export default function DiscordClone() {
     currentServer, currentChannel,
     loading, connected, reload,
   } = useServers(supabase, user);
-  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id);
+  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id, avatar);
   const chTyping = useTyping(supabase, user, username, selectedChannel ? `ch-${selectedChannel}` : null);
 
   const sendChannel = () => { chTyping.notifyStop(); handleSend(); };
@@ -60,7 +60,7 @@ export default function DiscordClone() {
     openCreateServer, openEditServer, handleServerSave,
     deleteServer, deleteChannel, createChannel, handleCreateChannel,
   } = useServerActions(supabase, user?.id, servers, currentServer, selectedChannel, setSelectedServer, setSelectedChannel, setShowCreateServerModal, setShowCreateChannelModal);
-  const { status, setStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username);
+  const { status, setStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username, avatar);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [viewMode, setViewMode] = useState<"server" | "dm">("server");
   const [showNewDMModal, setShowNewDMModal] = useState(false);
@@ -150,9 +150,33 @@ export default function DiscordClone() {
 
   useEffect(() => { setShowMobileSidebar(false); }, [selectedChannel, selectedDM]);
 
-  const saveUsername = async () => {
-    if (user) await supabase.from("profiles").update({ username }).eq("id", user.id);
-    setShowUsernameModal(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarRemoved, setAvatarRemoved] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  const saveProfile = async () => {
+    if (!user) return;
+    setSavingProfile(true);
+    try {
+      let avatarUrl: string | null = avatarRemoved ? "😎" : avatar;
+      if (avatarFile) {
+        const safe = avatarFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${user.id}/${Date.now()}-${safe}`;
+        const { error: upErr } = await supabase.storage.from("avatars").upload(path, avatarFile);
+        if (upErr) throw upErr;
+        const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+        avatarUrl = data.publicUrl;
+      }
+      await supabase.from("profiles").update({ username, avatar: avatarUrl }).eq("id", user.id);
+      setAvatar(avatarUrl || "😎");
+      setAvatarFile(null);
+      setAvatarRemoved(false);
+      setShowUsernameModal(false);
+    } catch (e: any) {
+      alert("Erro ao salvar perfil: " + (e?.message || e));
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const signOut = async () => { await supabase.auth.signOut(); router.push("/login"); };
@@ -221,6 +245,7 @@ export default function DiscordClone() {
         setShowStatusMenu={setShowStatusMenu}
         setShowUsernameModal={setShowUsernameModal}
         onSignOut={signOut}
+        userAvatar={avatar}
       />
 
       <ChatArea
@@ -271,6 +296,7 @@ export default function DiscordClone() {
         onBlurDM={dmTyping.notifyStop}
         mentionCandidates={allProfiles}
         dmMentionCandidates={dmConversations.find((d) => d.id === selectedDM)?.participants || []}
+        userAvatar={avatar}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />
@@ -281,8 +307,12 @@ export default function DiscordClone() {
           userEmail={user?.email}
           username={username}
           setUsername={setUsername}
-          onClose={() => setShowUsernameModal(false)}
-          onSave={saveUsername}
+          avatar={avatarRemoved ? "😎" : avatar}
+          onFile={setAvatarFile}
+          onRemovePhoto={() => setAvatarRemoved(true)}
+          saving={savingProfile}
+          onClose={() => { setShowUsernameModal(false); setAvatarFile(null); setAvatarRemoved(false); }}
+          onSave={saveProfile}
         />
       )}
 

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
+import Avatar from "@/components/Avatar";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 
@@ -61,6 +62,7 @@ type Props = {
   onBlurDM: () => void;
   mentionCandidates: { id: string; username: string; avatar?: string }[];
   dmMentionCandidates: { id: string; username: string; avatar?: string }[];
+  userAvatar?: string | null;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -75,7 +77,7 @@ export default function ChatArea(props: Props) {
     pendingFile, uploading, onAttachFile, onClearFile,
     pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
     typingChannel, typingDM, onBlurChannel, onBlurDM,
-    mentionCandidates, dmMentionCandidates,
+    mentionCandidates, dmMentionCandidates, userAvatar,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -364,7 +366,7 @@ export default function ChatArea(props: Props) {
             <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-[#2B2D31] hover:bg-[#404249] rounded-lg"><Menu className="w-5 h-5" /></button>
             {selectedDM ? (
               <>
-                <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm">{dmOther?.avatar || "👤"}</div>
+                <Avatar src={dmOther?.avatar} name={dmOther?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
                 <span className="font-bold">{dmOther?.username || "DM"}</span>
                 <span className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dmOther?.id) ? "bg-[#23A559]" : "bg-zinc-500"}`} />
               </>
@@ -390,7 +392,7 @@ export default function ChatArea(props: Props) {
             ) : (
               dmMessages.map((m) => (
                 <div key={m.id} id={`msg-${m.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${m.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-                  <div className="w-8 h-8 rounded-full bg-[#5865F2] flex items-center justify-center text-sm shrink-0">{m.sender_id === userId ? "😎" : "👤"}</div>
+                  <Avatar src={m.sender_id === userId ? (userAvatar || "😎") : (dmConversations.find((d) => d.id === selectedDM)?.participants.find((p) => p.id === m.sender_id)?.avatar || "👤")} name={m.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
                     {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
@@ -461,7 +463,7 @@ export default function ChatArea(props: Props) {
                 </div>
                 {channelMessages.map((msg) => (
                   <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}>{msg.avatar}</div>
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 mt-1" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
                       {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
