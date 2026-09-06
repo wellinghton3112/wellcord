@@ -4,6 +4,8 @@ import type { DMConversation, DMMessage, PendingFile, ReactionMap, ReplyTarget }
 import { extractMentions, sendNotify } from "@/lib/notify";
 import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 
+const PAGE = 100;
+
 // DMs: conversas, mensagens com batch de profiles, envio e criação.
 // Extraído de page.tsx sem mudança de comportamento.
 export function useDMs(
@@ -21,6 +23,10 @@ export function useDMs(
   const [dmReplyTo, setDmReplyTo] = useState<ReplyTarget | null>(null);
   const [pendingDmFile, setPendingDmFile] = useState<PendingFile | null>(null);
   const [uploadingDm, setUploadingDm] = useState(false);
+  const [dmHasMore, setDmHasMore] = useState(true);
+  const [dmLoadingOlder, setDmLoadingOlder] = useState(false);
+  const dmMessagesRef = useRef<DMMessage[]>([]);
+  dmMessagesRef.current = dmMessages;
   const [dmReactions, setDmReactions] = useState<ReactionMap>({});
   const [newDMUsername, setNewDMUsername] = useState("");
   const [creatingDM, setCreatingDM] = useState(false);
@@ -95,35 +101,38 @@ export function useDMs(
     let cancelled = false;
     setPendingDmFile(null);
     setDmReplyTo(null);
+    setDmHasMore(true);
+    const toMsg = (r: any, nameMap: Map<string, string>) => ({
+      id: r.id,
+      conversation_id: r.conversation_id,
+      sender_id: r.sender_id,
+      username: nameMap.get(r.sender_id) || r.sender_id.slice(0, 6),
+      content: r.content,
+      created_at: r.created_at,
+      reply_to: r.reply_to || null,
+      reply_user: r.reply_user || null,
+      reply_content: r.reply_content || null,
+      mentions: r.mentions || [],
+      file_url: r.file_url || null,
+      file_name: r.file_name || null,
+      file_type: r.file_type || null,
+    });
     const load = async () => {
-      const { data } = await supabase.from("dm_messages").select("*").eq("conversation_id", selectedDM).order("created_at", { ascending: true }).limit(100);
+      // Últimas 100 (antes: as 100 mais antigas)
+      const { data } = await supabase.from("dm_messages").select("*").eq("conversation_id", selectedDM).order("created_at", { ascending: false }).limit(PAGE);
       if (!data || cancelled) return;
+      const asc = [...data].reverse();
       // Batch: 1 query de profiles para todos os senders (evita N+1)
-      const senderIds = [...new Set(data.map((r: any) => r.sender_id))];
+      const senderIds = [...new Set(asc.map((r: any) => r.sender_id))];
       const nameMap = new Map<string, string>();
       if (senderIds.length > 0) {
         const { data: profs } = await supabase.from("profiles").select("id, username").in("id", senderIds);
         (profs || []).forEach((p: any) => nameMap.set(p.id, p.username));
       }
       if (cancelled) return;
-      setDmMessages(
-        data.map((r: any) => ({
-          id: r.id,
-          conversation_id: r.conversation_id,
-          sender_id: r.sender_id,
-          username: nameMap.get(r.sender_id) || r.sender_id.slice(0, 6),
-          content: r.content,
-          created_at: r.created_at,
-          reply_to: r.reply_to || null,
-          reply_user: r.reply_user || null,
-          reply_content: r.reply_content || null,
-          mentions: r.mentions || [],
-          file_url: r.file_url || null,
-          file_name: r.file_name || null,
-          file_type: r.file_type || null,
-        }))
-      );
-      const ids = data.map((r: any) => r.id);
+      setDmMessages(asc.map((r: any) => toMsg(r, nameMap)));
+      setDmHasMore(data.length === PAGE);
+      const ids = asc.map((r: any) => r.id);
       if (ids.length > 0) {
         const { data: reacts } = await supabase.from("dm_reactions").select("message_id, user_id, emoji").in("message_id", ids);
         if (!cancelled) setDmReactions(groupReactions((reacts || []) as any[], user?.id));
@@ -193,6 +202,60 @@ export function useDMs(
       alert("Falha no upload: " + (e?.message || e));
     } finally {
       setUploadingDm(false);
+    }
+  };
+
+  // Histórico da DM: 100 anteriores. Retorna quantas vieram.
+  const loadOlderDM = async (): Promise<number> => {
+    const cur = dmMessagesRef.current;
+    if (dmLoadingOlder || !dmHasMore || cur.length === 0 || !selectedDM) return 0;
+    setDmLoadingOlder(true);
+    try {
+      const oldest = cur[0].created_at;
+      const { data } = await supabase
+        .from("dm_messages")
+        .select("*")
+        .eq("conversation_id", selectedDM)
+        .lt("created_at", oldest)
+        .order("created_at", { ascending: false })
+        .limit(PAGE);
+      const rows = (data || []).filter((r: any) => !cur.some((m) => m.id === r.id));
+      if (rows.length === 0) {
+        if ((data || []).length < PAGE) setDmHasMore(false);
+        return 0;
+      }
+      const senderIds = [...new Set(rows.map((r: any) => r.sender_id))];
+      const nameMap = new Map<string, string>();
+      if (senderIds.length > 0) {
+        const { data: profs } = await supabase.from("profiles").select("id, username").in("id", senderIds);
+        (profs || []).forEach((p: any) => nameMap.set(p.id, p.username));
+      }
+      const asc = [...rows].reverse().map((r: any) => ({
+        id: r.id,
+        conversation_id: r.conversation_id,
+        sender_id: r.sender_id,
+        username: nameMap.get(r.sender_id) || cur.find((m) => m.sender_id === r.sender_id)?.username || r.sender_id.slice(0, 6),
+        content: r.content,
+        created_at: r.created_at,
+        reply_to: r.reply_to || null,
+        reply_user: r.reply_user || null,
+        reply_content: r.reply_content || null,
+        mentions: r.mentions || [],
+        file_url: r.file_url || null,
+        file_name: r.file_name || null,
+        file_type: r.file_type || null,
+      }));
+      setDmMessages((prev) => {
+        const known = new Set(prev.map((m) => m.id));
+        return [...asc.filter((m) => !known.has(m.id)), ...prev];
+      });
+      const ids = asc.map((m) => m.id);
+      const { data: reacts } = await supabase.from("dm_reactions").select("message_id, user_id, emoji").in("message_id", ids);
+      setDmReactions((prev) => ({ ...prev, ...groupReactions((reacts || []) as any[], user?.id) }));
+      if ((data || []).length < PAGE) setDmHasMore(false);
+      return asc.length;
+    } finally {
+      setDmLoadingOlder(false);
     }
   };
 
@@ -300,6 +363,7 @@ export function useDMs(
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
+    dmHasMore, dmLoadingOlder, loadOlderDM,
     newDMUsername, setNewDMUsername, creatingDM, createDM, startDMWith,
   };
 }

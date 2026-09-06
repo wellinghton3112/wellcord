@@ -39,7 +39,7 @@ export default function DiscordClone() {
     currentServer, currentChannel,
     loading, connected, reload,
   } = useServers(supabase, user);
-  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id, avatar);
+  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile, hasMore, loadingOlder, loadOlder } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id, avatar);
   const chTyping = useTyping(supabase, user, username, selectedChannel ? `ch-${selectedChannel}` : null);
 
   const sendChannel = () => { chTyping.notifyStop(); handleSend(); };
@@ -74,6 +74,7 @@ export default function DiscordClone() {
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
+    dmHasMore, dmLoadingOlder, loadOlderDM,
     newDMUsername, setNewDMUsername, creatingDM, createDM, startDMWith,
   } = useDMs(supabase, user, username, viewMode, setViewMode, setShowNewDMModal);
   const dmTyping = useTyping(supabase, user, username, selectedDM ? `dm-${selectedDM}` : null);
@@ -104,8 +105,6 @@ export default function DiscordClone() {
   };
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [showMobileMembers, setShowMobileMembers] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const dmEndRef = useRef<HTMLDivElement>(null);
 
   // Se veio do email com ?code=..., troca por sessão
   useEffect(() => {
@@ -119,9 +118,7 @@ export default function DiscordClone() {
     }
   }, []);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [channelMessages]);
+  // Scroll automático mora no ChatArea (só desce se já estou no fim)
 
   // Convite via link (?server=ID): seleciona após a lista carregar
   useEffect(() => {
@@ -154,8 +151,6 @@ export default function DiscordClone() {
       reload();
     }
   };
-
-  useEffect(() => { dmEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [dmMessages]);
 
   useEffect(() => { setShowMobileSidebar(false); }, [selectedChannel, selectedDM]);
 
@@ -298,13 +293,11 @@ export default function DiscordClone() {
         dmInput={dmInput}
         setDmInput={typeDM}
         handleDMSend={sendDM}
-        dmEndRef={dmEndRef}
         onlineMembers={onlineMembers}
         userId={user?.id}
         currentChannel={currentChannel}
         selectedChannel={selectedChannel}
         channelMessages={channelMessages}
-        messagesEndRef={messagesEndRef}
         input={input}
         setInput={typeChannel}
         handleSend={sendChannel}
@@ -339,6 +332,12 @@ export default function DiscordClone() {
         dmMentionCandidates={dmConversations.find((d) => d.id === selectedDM)?.participants || []}
         userAvatar={avatar}
         onViewProfile={openProfile}
+        hasMore={hasMore}
+        loadingOlder={loadingOlder}
+        onLoadOlder={loadOlder}
+        dmHasMore={dmHasMore}
+        dmLoadingOlder={dmLoadingOlder}
+        onLoadOlderDM={loadOlderDM}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />

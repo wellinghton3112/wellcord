@@ -22,14 +22,12 @@ type Props = {
   dmInput: string;
   setDmInput: (v: string) => void;
   handleDMSend: () => void;
-  dmEndRef: RefObject<HTMLDivElement | null>;
   onlineMembers: PresenceUser[];
   userId?: string;
   // Servidor
   currentChannel?: Channel;
   selectedChannel: string;
   channelMessages: Message[];
-  messagesEndRef: RefObject<HTMLDivElement | null>;
   input: string;
   setInput: (v: string) => void;
   handleSend: () => void;
@@ -64,14 +62,20 @@ type Props = {
   dmMentionCandidates: { id: string; username: string; avatar?: string }[];
   userAvatar?: string | null;
   onViewProfile: (id: string) => void;
+  hasMore: boolean;
+  loadingOlder: boolean;
+  onLoadOlder: () => Promise<number>;
+  dmHasMore: boolean;
+  dmLoadingOlder: boolean;
+  onLoadOlderDM: () => Promise<number>;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
 export default function ChatArea(props: Props) {
   const {
     viewMode, setShowMobileSidebar,
-    dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, dmEndRef, onlineMembers, userId,
-    currentChannel, selectedChannel, channelMessages, messagesEndRef, input, setInput, handleSend, username, status,
+    dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers, userId,
+    currentChannel, selectedChannel, channelMessages, input, setInput, handleSend, username, status,
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
@@ -79,6 +83,7 @@ export default function ChatArea(props: Props) {
     pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
     typingChannel, typingDM, onBlurChannel, onBlurDM,
     mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
+    hasMore, loadingOlder, onLoadOlder, dmHasMore, dmLoadingOlder, onLoadOlderDM,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -295,6 +300,75 @@ export default function ChatArea(props: Props) {
   const channelInputRef = useRef<HTMLInputElement>(null);
   const dmInputRef = useRef<HTMLInputElement>(null);
 
+  // Scroll inteligente: topo carrega histórico (preserva posição),
+  // novas mensagens descem sozinhas só se já estou no fim
+  const listRef = useRef<HTMLDivElement>(null);
+  const dmListRef = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const dmNearBottom = useRef(true);
+  const holding = useRef(false);
+  const prevLastId = useRef<string | null>(null);
+  const prevDmLastId = useRef<string | null>(null);
+
+  const trackScroll = (
+    el: HTMLDivElement | null,
+    nearRef: React.MutableRefObject<boolean>,
+    holdRef: React.MutableRefObject<boolean>,
+    hasMoreFlag: boolean,
+    loadingFlag: boolean,
+    load: () => Promise<number>,
+  ) => {
+    if (!el || holdRef.current || loadingFlag) return;
+    nearRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (el.scrollTop < 200 && hasMoreFlag) {
+      holdRef.current = true;
+      const h0 = el.scrollHeight;
+      load().then(() => {
+        requestAnimationFrame(() => {
+          const e2 = el;
+          if (e2) e2.scrollTop = e2.scrollHeight - h0;
+          holdRef.current = false;
+        });
+      }).catch(() => { holdRef.current = false; });
+    }
+  };
+
+  useEffect(() => {
+    const last = channelMessages[channelMessages.length - 1]?.id || null;
+    const changed = last !== prevLastId.current;
+    prevLastId.current = last;
+    if (!changed || holding.current) return;
+    if (nearBottom.current) {
+      const el = listRef.current;
+      if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    }
+  }, [channelMessages]);
+
+  useEffect(() => {
+    const last = dmMessages[dmMessages.length - 1]?.id || null;
+    const changed = last !== prevDmLastId.current;
+    prevDmLastId.current = last;
+    if (!changed || holding.current) return;
+    if (dmNearBottom.current) {
+      const el = dmListRef.current;
+      if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    }
+  }, [dmMessages]);
+
+  // Troca de conversa: volta pro fim
+  useEffect(() => {
+    nearBottom.current = true;
+    prevLastId.current = null;
+    const el = listRef.current;
+    if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }, [selectedChannel]);
+  useEffect(() => {
+    dmNearBottom.current = true;
+    prevDmLastId.current = null;
+    const el = dmListRef.current;
+    if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+  }, [selectedDM]);
+
   // Autocomplete de @menções no fim do texto
   const mentionBox = (
     value: string,
@@ -379,7 +453,12 @@ export default function ChatArea(props: Props) {
               {searchBox("Buscar na DM")}
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-1">
+          <div
+            ref={dmListRef}
+            onScroll={(e) => trackScroll(e.currentTarget, dmNearBottom, holding, dmHasMore, dmLoadingOlder, onLoadOlderDM)}
+            className="flex-1 overflow-y-auto p-4 space-y-1"
+          >
+            {dmLoadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
             {!selectedDM ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
                 <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-2xl">💬</div>
@@ -419,7 +498,6 @@ export default function ChatArea(props: Props) {
                 </div>
               ))
             )}
-            <div ref={dmEndRef} />
           </div>
           {selectedDM && (
             <div className="px-4 pt-1 shrink-0">
@@ -453,7 +531,12 @@ export default function ChatArea(props: Props) {
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
               </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col">
+          <div
+            ref={listRef}
+            onScroll={(e) => trackScroll(e.currentTarget, nearBottom, holding, hasMore, loadingOlder, onLoadOlder)}
+            className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col"
+          >
+            {loadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
             {currentChannel?.type === "voice" ? (
               <VoiceChannel channelId={selectedChannel} username={username} status={status} />
             ) : (
@@ -492,7 +575,6 @@ export default function ChatArea(props: Props) {
                     )}
                   </div>
                 ))}
-                <div ref={messagesEndRef} />
               </>
             )}
           </div>

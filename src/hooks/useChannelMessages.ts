@@ -1,10 +1,33 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Message, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { extractMentions, sendNotify } from "@/lib/notify";
 
-// Mensagens do canal: carga, realtime, envio, reações, respostas e anexos.
+const PAGE = 100;
+
+function toMessage(r: any): Message {
+  return {
+    id: r.id,
+    user: r.username,
+    user_id: r.user_id,
+    avatar: r.avatar || "😎",
+    color: r.color || "#5865F2",
+    content: r.content,
+    timestamp: formatTime(r.created_at),
+    channelId: r.channel_id,
+    created_at: r.created_at,
+    reply_to: r.reply_to || null,
+    reply_user: r.reply_user || null,
+    reply_content: r.reply_content || null,
+    mentions: r.mentions || [],
+    file_url: r.file_url || null,
+    file_name: r.file_name || null,
+    file_type: r.file_type || null,
+  };
+}
+
+// Mensagens do canal: carga, histórico infinito, realtime, envio, reações, respostas e anexos.
 export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string, avatar: string = "😎") {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -12,6 +35,10 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const messagesRef = useRef<Message[]>([]);
+  messagesRef.current = messages;
 
   // Carregar mensagens do canal selecionado + Realtime
   useEffect(() => {
@@ -19,33 +46,19 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     let channelSub: any;
     setPendingFile(null);
     setReplyTo(null);
+    setHasMore(true);
 
     async function loadMessages() {
-      const { data } = await supabase.from("messages").select("*").eq("channel_id", selectedChannel).order("created_at", { ascending: true }).limit(100);
+      // Últimas 100 (desc + inverte): antes pegava as 100 MAIS ANTIGAS
+      const { data } = await supabase.from("messages").select("*").eq("channel_id", selectedChannel).order("created_at", { ascending: false }).limit(PAGE);
       if (data) {
+        const asc = [...data].reverse();
         setMessages((prev) => {
           const others = prev.filter((m) => m.channelId !== selectedChannel);
-          const mapped = data.map((r: any) => ({
-            id: r.id,
-            user: r.username,
-            user_id: r.user_id,
-            avatar: r.avatar || "😎",
-            color: r.color || "#5865F2",
-            content: r.content,
-            timestamp: formatTime(r.created_at),
-            channelId: r.channel_id,
-            created_at: r.created_at,
-            reply_to: r.reply_to || null,
-            reply_user: r.reply_user || null,
-            reply_content: r.reply_content || null,
-            mentions: r.mentions || [],
-            file_url: r.file_url || null,
-            file_name: r.file_name || null,
-            file_type: r.file_type || null,
-          }));
-          return [...others, ...mapped];
+          return [...others, ...asc.map(toMessage)];
         });
-        const ids = data.map((r: any) => r.id);
+        setHasMore(data.length === PAGE);
+        const ids = asc.map((r: any) => r.id);
         if (ids.length > 0) {
           const { data: reacts } = await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", ids);
           setReactions(groupReactions((reacts || []) as any[], user?.id));
@@ -79,6 +92,42 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
 
     return () => { if (channelSub) supabase.removeChannel(channelSub); };
   }, [selectedChannel, supabase]);
+
+  // Histórico: busca 100 anteriores à mais antiga carregada. Retorna quantas vieram.
+  const loadOlder = async (): Promise<number> => {
+    const mine = messagesRef.current.filter((m) => m.channelId === selectedChannel);
+    if (loadingOlder || !hasMore || mine.length === 0) return 0;
+    setLoadingOlder(true);
+    try {
+      const oldest = mine[0].created_at || "";
+      const { data } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("channel_id", selectedChannel)
+        .lt("created_at", oldest)
+        .order("created_at", { ascending: false })
+        .limit(PAGE);
+      const rows = (data || []).filter((r: any) => !mine.some((m) => m.id === r.id));
+      if (rows.length === 0) {
+        if ((data || []).length < PAGE) setHasMore(false);
+        return 0;
+      }
+      const asc = [...rows].reverse().map(toMessage);
+      setMessages((prev) => {
+        const others = prev.filter((m) => m.channelId !== selectedChannel);
+        const cur = prev.filter((m) => m.channelId === selectedChannel);
+        const known = new Set(cur.map((m) => m.id));
+        return [...others, ...asc.filter((m) => !known.has(m.id)), ...cur];
+      });
+      const ids = asc.map((m) => m.id);
+      const { data: reacts } = await supabase.from("message_reactions").select("message_id, user_id, emoji").in("message_id", ids);
+      setReactions((prev) => ({ ...prev, ...groupReactions((reacts || []) as any[], user?.id) }));
+      if ((data || []).length < PAGE) setHasMore(false);
+      return asc.length;
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const refreshReactions = async () => {
     const { data } = await supabase.from("messages").select("id").eq("channel_id", selectedChannel).limit(100);
@@ -196,5 +245,5 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     }
   };
 
-  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile };
+  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile, hasMore, loadingOlder, loadOlder };
 }
