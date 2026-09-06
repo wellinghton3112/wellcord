@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { DMConversation, DMMessage, ReactionMap, ReplyTarget } from "@/lib/chat-types";
-import { groupReactions } from "@/lib/chat-types";
+import type { DMConversation, DMMessage, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
+import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 
 // DMs: conversas, mensagens com batch de profiles, envio e criação.
 // Extraído de page.tsx sem mudança de comportamento.
@@ -16,6 +16,8 @@ export function useDMs(
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
   const [dmInput, setDmInput] = useState("");
   const [dmReplyTo, setDmReplyTo] = useState<ReplyTarget | null>(null);
+  const [pendingDmFile, setPendingDmFile] = useState<PendingFile | null>(null);
+  const [uploadingDm, setUploadingDm] = useState(false);
   const [dmReactions, setDmReactions] = useState<ReactionMap>({});
   const [newDMUsername, setNewDMUsername] = useState("");
   const [creatingDM, setCreatingDM] = useState(false);
@@ -85,6 +87,8 @@ export function useDMs(
   useEffect(() => {
     if (!selectedDM) return;
     let cancelled = false;
+    setPendingDmFile(null);
+    setDmReplyTo(null);
     const load = async () => {
       const { data } = await supabase.from("dm_messages").select("*").eq("conversation_id", selectedDM).order("created_at", { ascending: true }).limit(100);
       if (!data || cancelled) return;
@@ -107,6 +111,9 @@ export function useDMs(
           reply_to: r.reply_to || null,
           reply_user: r.reply_user || null,
           reply_content: r.reply_content || null,
+          file_url: r.file_url || null,
+          file_name: r.file_name || null,
+          file_type: r.file_type || null,
         }))
       );
       const ids = data.map((r: any) => r.id);
@@ -125,11 +132,11 @@ export function useDMs(
         if (prev.some((m) => m.id === r.id)) return prev;
         // Reusa nome já conhecido; senão insere temporário e resolve async (1 query só quando necessário)
         const known = prev.find((m) => m.sender_id === r.sender_id)?.username;
-        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null }];
+        if (known) return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: known, content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
         supabase.from("profiles").select("username").eq("id", r.sender_id).single().then(({ data: prof }: any) => {
           setDmMessages((cur) => cur.map((m) => (m.id === r.id ? { ...m, username: prof?.username || r.sender_id.slice(0, 6) } : m)));
         });
-        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null }];
+        return [...prev, { id: r.id, conversation_id: r.conversation_id, sender_id: r.sender_id, username: r.sender_id.slice(0, 6), content: r.content, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
       });
     }).on("postgres_changes", { event: "UPDATE", schema: "public", table: "dm_messages" }, (payload: any) => {
       const r = payload.new;
@@ -164,12 +171,32 @@ export function useDMs(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDM, supabase]);
 
+  const attachDmFile = async (file: File) => {
+    if (!user || !selectedDM) return;
+    if (file.size > MAX_FILE_MB * 1024 * 1024) { alert(`Arquivo maior que ${MAX_FILE_MB}MB.`); return; }
+    setUploadingDm(true);
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `dm/${selectedDM}/${user.id}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from("chat-files").upload(path, file);
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("chat-files").getPublicUrl(path);
+      setPendingDmFile({ url: data.publicUrl, name: file.name, type: file.type });
+    } catch (e: any) {
+      alert("Falha no upload: " + (e?.message || e));
+    } finally {
+      setUploadingDm(false);
+    }
+  };
+
   const handleDMSend = async () => {
-    if (!dmInput.trim() || !selectedDM || !user) return;
+    if ((!dmInput.trim() && !pendingDmFile) || !selectedDM || !user || uploadingDm) return;
     const content = dmInput;
     const reply = dmReplyTo;
+    const file = pendingDmFile;
     setDmInput("");
     setDmReplyTo(null);
+    setPendingDmFile(null);
     const { error } = await supabase.from("dm_messages").insert({
       conversation_id: selectedDM,
       sender_id: user.id,
@@ -177,8 +204,11 @@ export function useDMs(
       reply_to: reply?.id || null,
       reply_user: reply?.user || null,
       reply_content: reply?.content || null,
+      file_url: file?.url || null,
+      file_name: file?.name || null,
+      file_type: file?.type || null,
     });
-    if (error) { alert(error.message); setDmInput(content); setDmReplyTo(reply); }
+    if (error) { alert(error.message); setDmInput(content); setDmReplyTo(reply); setPendingDmFile(file); }
   };
 
   const createDM = async () => {
@@ -240,6 +270,7 @@ export function useDMs(
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
+    pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   };
 }

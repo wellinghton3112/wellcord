@@ -34,7 +34,7 @@ export default function DiscordClone() {
     currentServer, currentChannel,
     loading, connected, reload,
   } = useServers(supabase, user);
-  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo } = useChannelMessages(supabase, user, username, selectedChannel);
+  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id);
   const { inviteCode, creatingInvite, openInvite, redeemInvite } = useInvites(supabase, user);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -63,6 +63,7 @@ export default function DiscordClone() {
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
+    pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
     newDMUsername, setNewDMUsername, creatingDM, createDM,
   } = useDMs(supabase, user, setViewMode, setShowNewDMModal);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -230,6 +231,14 @@ export default function DiscordClone() {
         setReplyTo={setReplyTo}
         dmReplyTo={dmReplyTo}
         setDmReplyTo={setDmReplyTo}
+        pendingFile={pendingFile}
+        uploading={uploading}
+        onAttachFile={attachFile}
+        onClearFile={() => setPendingFile(null)}
+        pendingDmFile={pendingDmFile}
+        uploadingDm={uploadingDm}
+        onAttachDmFile={attachDmFile}
+        onClearDmFile={() => setPendingDmFile(null)}
       />
 
       <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} />

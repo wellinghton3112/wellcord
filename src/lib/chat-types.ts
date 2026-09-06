@@ -13,6 +13,9 @@ export type Message = {
   reply_to?: string | null;
   reply_user?: string | null;
   reply_content?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
 };
 
 export type Channel = {
@@ -49,9 +52,16 @@ export type DMMessage = {
   reply_to?: string | null;
   reply_user?: string | null;
   reply_content?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
+  file_type?: string | null;
 };
 
 export type ReplyTarget = { id: string; user: string; content: string };
+
+export type PendingFile = { url: string; name: string; type: string };
+
+export const MAX_FILE_MB = 10;
 
 export type PresenceStatus = "online" | "idle" | "dnd" | "invisible";
 

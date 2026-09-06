@@ -1,20 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Message, ReactionMap, ReplyTarget } from "@/lib/chat-types";
-import { formatTime, groupReactions } from "@/lib/chat-types";
+import type { Message, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
+import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 
-// Mensagens do canal: carga, realtime, envio, reações e respostas.
-// Extraído de page.tsx sem mudança de comportamento.
-export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string) {
+// Mensagens do canal: carga, realtime, envio, reações, respostas e anexos.
+export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [reactions, setReactions] = useState<ReactionMap>({});
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Carregar mensagens do canal selecionado + Realtime
   useEffect(() => {
     if (!selectedChannel || selectedChannel.startsWith("fallback")) return;
     let channelSub: any;
+    setPendingFile(null);
+    setReplyTo(null);
 
     async function loadMessages() {
       const { data } = await supabase.from("messages").select("*").eq("channel_id", selectedChannel).order("created_at", { ascending: true }).limit(100);
@@ -34,6 +37,9 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
             reply_to: r.reply_to || null,
             reply_user: r.reply_user || null,
             reply_content: r.reply_content || null,
+            file_url: r.file_url || null,
+            file_name: r.file_name || null,
+            file_type: r.file_type || null,
           }));
           return [...others, ...mapped];
         });
@@ -54,7 +60,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
         const r = payload.new;
         setMessages((prev) => {
           if (prev.some((m) => m.id === r.id)) return prev;
-          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null }];
+          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
         });
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload: any) => {
@@ -96,12 +102,32 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
 
   const channelMessages = messages.filter((m) => m.channelId === selectedChannel);
 
+  const attachFile = async (file: File) => {
+    if (!user || !serverId) return;
+    if (file.size > MAX_FILE_MB * 1024 * 1024) { alert(`Arquivo maior que ${MAX_FILE_MB}MB.`); return; }
+    setUploading(true);
+    try {
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `ch/${serverId}/${selectedChannel}/${user.id}/${Date.now()}-${safe}`;
+      const { error: upErr } = await supabase.storage.from("chat-files").upload(path, file);
+      if (upErr) throw upErr;
+      const { data } = supabase.storage.from("chat-files").getPublicUrl(path);
+      setPendingFile({ url: data.publicUrl, name: file.name, type: file.type });
+    } catch (e: any) {
+      alert("Falha no upload: " + (e?.message || e));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || !selectedChannel || !user) return;
+    if ((!input.trim() && !pendingFile) || !selectedChannel || !user || uploading) return;
     const content = input;
     const reply = replyTo;
+    const file = pendingFile;
     setInput("");
     setReplyTo(null);
+    setPendingFile(null);
     const { error } = await supabase.from("messages").insert({
       channel_id: selectedChannel,
       user_id: user.id,
@@ -112,12 +138,16 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       reply_to: reply?.id || null,
       reply_user: reply?.user || null,
       reply_content: reply?.content || null,
+      file_url: file?.url || null,
+      file_name: file?.name || null,
+      file_type: file?.type || null,
     });
     if (error) {
       console.error(error);
       alert("Erro ao enviar: " + error.message);
       setInput(content);
       setReplyTo(reply);
+      setPendingFile(file);
     }
   };
 
@@ -145,5 +175,5 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     }
   };
 
-  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo };
+  return { messages, channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile };
 }

@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
   Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X, Reply,
-  ChevronUp, ChevronDown,
+  ChevronUp, ChevronDown, FileText, Download, Loader2,
 } from "lucide-react";
-import type { Channel, DMConversation, DMMessage, Message, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
+import type { Channel, DMConversation, DMMessage, Message, PendingFile, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 
@@ -46,6 +46,14 @@ type Props = {
   setReplyTo: (r: ReplyTarget | null) => void;
   dmReplyTo: ReplyTarget | null;
   setDmReplyTo: (r: ReplyTarget | null) => void;
+  pendingFile: PendingFile | null;
+  uploading: boolean;
+  onAttachFile: (f: File) => void;
+  onClearFile: () => void;
+  pendingDmFile: PendingFile | null;
+  uploadingDm: boolean;
+  onAttachDmFile: (f: File) => void;
+  onClearDmFile: () => void;
 };
 
 // Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
@@ -57,6 +65,8 @@ export default function ChatArea(props: Props) {
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
+    pendingFile, uploading, onAttachFile, onClearFile,
+    pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -209,8 +219,7 @@ export default function ChatArea(props: Props) {
   const replyPreview = (
     target: ReplyTarget | null,
     clear: () => void,
-  ) => {
-    if (!target) return null;
+  ) => {    if (!target) return null;
     return (
       <div className="mb-2 flex items-stretch gap-2 bg-[#2B2D31] rounded px-2 py-1.5">
         <span className="w-1 rounded-full bg-[#5865F2] shrink-0" />
@@ -222,6 +231,55 @@ export default function ChatArea(props: Props) {
       </div>
     );
   };
+
+  const attachmentBlock = (url: string | null | undefined, name: string | null | undefined, type: string | null | undefined) => {
+    if (!url) return null;
+    const isImage = (type || "").startsWith("image/");
+    if (isImage) {
+      return (
+        <a href={url} target="_blank" rel="noreferrer" className="mt-1 block max-w-sm">
+          <img src={url} alt={name || "anexo"} className="max-h-64 rounded-lg object-cover border border-[#4A4D53] hover:brightness-110 transition" />
+        </a>
+      );
+    }
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-2 bg-[#2B2D31] hover:bg-[#35373C] border border-[#4A4D53] rounded-lg px-3 py-2 max-w-sm transition-colors">
+        <FileText className="w-5 h-5 text-zinc-400 shrink-0" />
+        <span className="flex-1 min-w-0 text-sm text-zinc-200 truncate">{name || "arquivo"}</span>
+        <Download className="w-4 h-4 text-zinc-400 shrink-0" />
+      </a>
+    );
+  };
+
+  const pendingPreview = (
+    pending: PendingFile | null,
+    isUploading: boolean,
+    clear: () => void,
+  ) => {
+    if (isUploading) {
+      return (
+        <div className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
+          <Loader2 className="w-4 h-4 animate-spin" /> Enviando arquivo...
+        </div>
+      );
+    }
+    if (!pending) return null;
+    const isImage = (pending.type || "").startsWith("image/");
+    return (
+      <div className="mb-2 flex items-center gap-2 bg-[#2B2D31] rounded-lg p-2 w-fit max-w-full">
+        {isImage ? (
+          <img src={pending.url} alt={pending.name} className="h-14 w-14 rounded object-cover" />
+        ) : (
+          <FileText className="w-6 h-6 text-zinc-400 shrink-0" />
+        )}
+        <span className="text-xs text-zinc-300 truncate max-w-48">{pending.name}</span>
+        <button onClick={clear} className="p-1 hover:bg-[#35373C] rounded shrink-0" title="Remover anexo"><X className="w-4 h-4 text-zinc-400" /></button>
+      </div>
+    );
+  };
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dmFileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
@@ -262,6 +320,7 @@ export default function ChatArea(props: Props) {
                     <div className="flex items-baseline gap-2"><span className="font-medium text-sm" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</span><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
                     {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
                     {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{highlight(m.content)}</p>}
+                    {editingId !== m.id && attachmentBlock(m.file_url, m.file_name, m.file_type)}
                     {editingId !== m.id && reactionBar(dmReactions[m.id], (e) => onToggleDMReaction(m.id, e))}
                     {pickFor === m.id && emojiPicker(m.id, onToggleDMReaction)}
                   </div>
@@ -285,7 +344,10 @@ export default function ChatArea(props: Props) {
           {selectedDM && (
             <div className="p-4 shrink-0">
               {replyPreview(dmReplyTo, () => setDmReplyTo(null))}
+              {pendingPreview(pendingDmFile, uploadingDm, onClearDmFile)}
+              <input ref={dmFileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachDmFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
+                <button onClick={() => dmFileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
                 <input value={dmInput} onChange={(e) => setDmInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <button onClick={handleDMSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
               </div>
@@ -323,6 +385,7 @@ export default function ChatArea(props: Props) {
                       <div className="flex items-baseline gap-2 flex-wrap"><span className="font-medium cursor-pointer" style={{ color: msg.color }}>{msg.user}</span><span className="text-xs text-zinc-400">{msg.timestamp}</span></div>
                       {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
                       {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{highlight(msg.content)}</p>}
+                      {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
                       {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
                       {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
                     </div>
@@ -348,8 +411,10 @@ export default function ChatArea(props: Props) {
           {currentChannel?.type === "text" && (
             <div className="p-4 shrink-0">
               {replyPreview(replyTo, () => setReplyTo(null))}
+              {pendingPreview(pendingFile, uploading, onClearFile)}
+              <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
-                <button className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0"><Plus className="w-4 h-4 text-[#383A40]" /></button>
+                <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
                 <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
