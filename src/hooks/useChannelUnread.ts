@@ -14,6 +14,7 @@ export function useChannelUnread(supabase: any, user: any, selectedChannel: stri
     if (!user || !selectedChannel || selectedChannel.startsWith("fallback")) return;
     setUnread((prev) => {
       if (!prev[selectedChannel]) return prev;
+      console.log("[ch] limpando badge de", selectedChannel);
       const next = { ...prev };
       delete next[selectedChannel];
       return next;
@@ -35,7 +36,11 @@ export function useChannelUnread(supabase: any, user: any, selectedChannel: stri
         if (!r?.channel_id || r.user_id === user.id) return;
         // Só pula se estou OLHANDO o canal (modo server + canal atual)
         if (modeRef.current === "server" && selectedRef.current === r.channel_id) return;
-        setUnread((prev) => ({ ...prev, [r.channel_id]: (prev[r.channel_id] || 0) + 1 }));
+        setUnread((prev) => {
+          const next = { ...prev, [r.channel_id]: (prev[r.channel_id] || 0) + 1 };
+          console.log("[ch] unread agora:", JSON.stringify(next));
+          return next;
+        });
       })
       .subscribe((status: string, err?: any) => {
         console.log("[ch] inbox status:", status, err || "");
