@@ -7,6 +7,7 @@ import { APP_VERSION } from "@/lib/version";
 import VoicePreview from "@/components/VoicePreview";
 import Avatar from "@/components/Avatar";
 import type { Friend, FriendRequest } from "@/hooks/useFriends";
+import type { ActiveVoice } from "@/hooks/useActiveNow";
 
 type Props = {
   showMobileSidebar: boolean;
@@ -55,6 +56,8 @@ type Props = {
   onCancelFriend: (id: string) => void;
   onRemoveFriend: (id: string, username: string) => void;
   onFriendDM: (id: string) => void;
+  activeVoice: ActiveVoice[];
+  onJoinVoice: (serverId: string, channelId: string) => void;
 };
 
 // Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
@@ -65,6 +68,7 @@ export default function ChannelSidebar(props: Props) {
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
     username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onLeaveServer, channelUnread, setViewModeDM,
     friendsList, incomingRequests, outgoingRequests, sendingFriend, onAddFriend, onAcceptFriend, onRejectFriend, onCancelFriend, onRemoveFriend, onFriendDM,
+    activeVoice, onJoinVoice,
   } = props;
 
   const [sideTab, setSideTab] = useState<"dms" | "friends">("dms");
@@ -149,6 +153,31 @@ export default function ChannelSidebar(props: Props) {
         </>
       ) : (
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            {activeVoice.length > 0 && (
+              <div>
+                <p className="text-[11px] font-bold text-zinc-400 px-1 mb-1">ATIVO AGORA</p>
+                {activeVoice.map((g) => (
+                  <div key={g.channelId} className="mb-1.5 rounded-lg bg-[#232428] p-2">
+                    <div className="flex items-center gap-2">
+                      <Volume2 className="w-3.5 h-3.5 text-[#23A559] shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-zinc-200 truncate">{g.channelName}</div>
+                        <div className="text-[10px] text-zinc-500 truncate">{g.serverName} • {g.users.length} em voz</div>
+                      </div>
+                      <button onClick={() => onJoinVoice(g.serverId, g.channelId)} className="px-2 py-1 rounded bg-[#23A559] hover:bg-[#1A7F44] text-white text-[11px] font-bold shrink-0">Entrar</button>
+                    </div>
+                    <div className="mt-1.5 flex items-center">
+                      {g.users.slice(0, 5).map((u) => (
+                        <button key={u.id} onClick={() => onViewProfile(u.id)} title={u.username} className="-ml-1 first:ml-0">
+                          <Avatar src={u.avatar} name={u.username} className="w-6 h-6 rounded-full border-2 border-[#232428] bg-[#41434A] text-[10px]" />
+                        </button>
+                      ))}
+                      {g.users.length > 5 && <span className="ml-1 text-[10px] text-zinc-500">+{g.users.length - 5}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-1.5">
               <input
                 value={newFriendName}

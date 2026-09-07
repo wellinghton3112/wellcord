@@ -18,6 +18,7 @@ import PollModal from "@/components/modals/PollModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useFriends } from "@/hooks/useFriends";
+import { useActiveNow } from "@/hooks/useActiveNow";
 import { useServerManager } from "@/hooks/useServerManager";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
@@ -50,7 +51,15 @@ export default function DiscordClone() {
   const sendChannel = () => { chTyping.notifyStop(); handleSend(); };
   const typeChannel = (v: string) => { setInput(v); if (v) chTyping.notifyTyping(); else chTyping.notifyStop(); };
   const { redeemInvite } = useInvites(supabase, user);
+
+  const joinVoiceChannel = (serverId: string, channelId: string) => {
+    setViewMode("server");
+    setSelectedServer(serverId);
+    setSelectedChannel(channelId);
+    setShowMobileSidebar(false);
+  };
   const friends = useFriends(supabase, user);
+  const { active } = useActiveNow(supabase, user, friends.friends.map((f) => f.user_id));
   const [showMembersModal, setShowMembersModal] = useState(false);
   const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
   const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
@@ -290,6 +299,8 @@ export default function DiscordClone() {
         onCancelFriend={friends.cancelOutgoing}
         onRemoveFriend={friends.removeFriend}
         onFriendDM={startDMWith}
+        activeVoice={active}
+        onJoinVoice={joinVoiceChannel}
         unreadDMs={unread}
         onlineMembers={onlineMembers}
         setNewDMUsername={setNewDMUsername}
