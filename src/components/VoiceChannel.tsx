@@ -6,6 +6,7 @@ import { useVoice } from "@/context/VoiceContext";
 import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
 import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, preferCodecs, getVideoStats, type ScreenQuality, type CodecMode } from "@/lib/video";
 import Avatar from "@/components/Avatar";
+import ScreenPickerModal from "@/components/modals/ScreenPickerModal";
 
 type Props = {
   channelId: string;
@@ -37,6 +38,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   // Qualidade da transmissão de tela (downscale via applyConstraints, ao vivo)
   const [screenQuality, setScreenQuality] = useState<ScreenQuality>("auto");
   const screenQualityRef = useRef<ScreenQuality>("auto");
+  // Seletor próprio (.exe); no navegador usa o picker do OS
+  const [showScreenPicker, setShowScreenPicker] = useState(false);
+  const [screenSources, setScreenSources] = useState<{ id: string; name: string; screen: boolean; thumbnail: string | null }[] | null>(null);
   // Codec: sharp (VP9 nítido, CPU) x smooth (H264 hardware, fluido)
   const [codecMode, setCodecMode] = useState<CodecMode>("sharp");
   const codecModeRef = useRef<CodecMode>("sharp");
@@ -737,17 +741,87 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     }
   };
 
-  const toggleScreen = async () => {
-    if (screenOn) {
-      localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
-      peersRef.current.forEach((pc) => {
-        pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
+  const stopScreen = async () => {
+    localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
+    peersRef.current.forEach((pc) => {
+      pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
+    });
+    if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
+    setScreenOn(false);
+    await renegotiate();
+  };
+
+  // Captura direta de fonte do .exe (tela ou janela específica) + áudio do sistema
+  const startScreenFromSource = async (sourceId: string) => {
+    setShowScreenPicker(false);
+    setError("");
+    try {
+      const stream: MediaStream = await (navigator.mediaDevices as any).getUserMedia({
+        audio: false,
+        video: {
+          mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId },
+        } as any,
       });
-      if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
-      setScreenOn(false);
-      await renegotiate();
+      // Áudio do sistema (loopback) em trilha separada
+      let sysAudio: MediaStreamTrack | null = null;
+      try {
+        const aStream: MediaStream = await (navigator.mediaDevices as any).getUserMedia({
+          audio: { mandatory: { chromeMediaSource: "desktop" } } as any,
+          video: false,
+        });
+        sysAudio = aStream.getAudioTracks()[0] || null;
+      } catch {}
+      await attachScreenTrack(stream.getVideoTracks()[0], sysAudio);
+    } catch (e: any) {
+      if (e?.name !== "NotAllowedError") setError(e?.message || "Falha ao capturar tela");
+    }
+  };
+
+  const attachScreenTrack = async (track: MediaStreamTrack, audioTrack: MediaStreamTrack | null) => {
+    await applyScreenQuality(track, screenQualityRef.current);
+    if (!localStreamRef.current) localStreamRef.current = new MediaStream();
+    // remove câmera
+    localStreamRef.current.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
+    localStreamRef.current.addTrack(track);
+    if (audioTrack) { try { localStreamRef.current.addTrack(audioTrack); } catch {} }
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = new MediaStream([track]);
+      await localVideoRef.current.play().catch(() => {});
+    }
+    peersRef.current.forEach((pc) => {
+      pc.addTrack(track, localStreamRef.current!);
+      tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: codecModeRef.current, fps: qualityDims(screenQualityRef.current)?.[2] }).catch(() => {});
+    });
+    if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
+    track.onended = () => stopScreen();
+    setScreenOn(true);
+    setCameraOn(false);
+    await renegotiate();
+  };
+
+  const toggleScreen = async (sourceId?: string) => {
+    if (screenOn) {
+      await stopScreen();
       return;
     }
+    // No .exe com fonte escolhida: captura direta (janela ou tela) + áudio do sistema
+    if (sourceId && window.wellcord) {
+      await startScreenFromSource(sourceId);
+      return;
+    }
+    // No .exe sem fonte: abre o seletor próprio
+    if (!sourceId && window.wellcord?.screens) {
+      setScreenSources(null);
+      setShowScreenPicker(true);
+      try {
+        const list = await window.wellcord.screens.list();
+        setScreenSources(list);
+      } catch {
+        setScreenSources([]);
+      }
+      return;
+    }
+    // Navegador: seletor do OS
     try {
       // Pede fps já na captura (o navegador reduz sozinho em tela parada)
       const dims = qualityDims(screenQualityRef.current);
@@ -760,25 +834,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: videoReq, audio: true });
       const track = stream.getVideoTracks()[0];
       const audioTrack = stream.getAudioTracks()[0];
-      await applyScreenQuality(track, screenQualityRef.current);
-      if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-      // remove câmera
-      localStreamRef.current.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
-      localStreamRef.current.addTrack(track);
-      if (audioTrack) { try { localStreamRef.current.addTrack(audioTrack); } catch {} }
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = new MediaStream([track]);
-        await localVideoRef.current.play().catch(() => {});
-      }
-      peersRef.current.forEach((pc) => {
-        pc.addTrack(track, localStreamRef.current!);
-        tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: codecModeRef.current, fps: qualityDims(screenQualityRef.current)?.[2] }).catch(() => {});
-      });
-      if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
-      track.onended = () => toggleScreen();
-      setScreenOn(true);
-      setCameraOn(false);
-      await renegotiate();
+      await attachScreenTrack(track, audioTrack || null);
     } catch (e: any) {
       if (e.name !== "NotAllowedError") setError(e.message);
     }
@@ -934,7 +990,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         <button onClick={toggleCamera} className={`w-11 h-11 rounded-full flex items-center justify-center ${cameraOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={cameraOn ? "Desligar câmera" : "Ligar câmera"}>
           {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </button>
-        <button onClick={toggleScreen} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={screenOn ? "Parar tela" : "Compartilhar tela"}>
+        <button onClick={() => toggleScreen()} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={screenOn ? "Parar tela" : "Compartilhar tela"}>
           {screenOn ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
         </button>
         <button onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title="Surdo">
@@ -946,6 +1002,13 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         <button onClick={leave} className="w-11 h-11 rounded-full bg-[#DA373C] hover:bg-[#A12828] text-white flex items-center justify-center"><PhoneOff className="w-5 h-5" /></button>
       </div>
       <p className="text-xs text-zinc-500 text-center">Dica: mutar/desmutar rápido. P2P mesh — funciona melhor com até 4 pessoas sem servidor TURN.{denoiseActive ? " RNNoise ligado: fundo suprimido por IA local." : ""}</p>
+      {showScreenPicker && (
+        <ScreenPickerModal
+          sources={screenSources}
+          onPick={(id) => toggleScreen(id)}
+          onClose={() => setShowScreenPicker(false)}
+        />
+      )}
     </div>
   );
 }

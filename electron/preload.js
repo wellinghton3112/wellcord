@@ -28,4 +28,8 @@ contextBridge.exposeInMainWorld("wellcord", {
       return () => ipcRenderer.removeListener("voice-control", h);
     },
   },
+  screens: {
+    // Seletor próprio (só no .exe; no navegador é null)
+    list: () => ipcRenderer.invoke("screens-list"),
+  },
 });

@@ -89,8 +89,7 @@ ipcMain.on("tray-update", (_e, state) => {
   refreshTray();
 });
 
-ipcMain.handle("ptt-set", (_e, accelerator) => {
-  try {
+ipcMain.handle("ptt-set", (_e, accelerator) => {  try {
     if (pttAccelerator) globalShortcut.unregister(pttAccelerator);
     pttAccelerator = null;
     if (!accelerator) { refreshTray(); return true; }
@@ -101,6 +100,27 @@ ipcMain.handle("ptt-set", (_e, accelerator) => {
     return true;
   } catch {
     return false;
+  }
+});
+
+// Seletor de tela próprio (estilo Discord): telas + janelas com miniatura
+ipcMain.handle("screens-list", async () => {
+  try {
+    const sources = await desktopCapturer.getSources({
+      types: ["screen", "window"],
+      thumbnailSize: { width: 320, height: 180 },
+      fetchWindowIcons: false,
+    });
+    return sources
+      .filter((s) => !/wellcord/i.test(s.name))
+      .map((s) => ({
+        id: s.id,
+        name: s.name || (s.id.startsWith("screen:") ? "Tela" : "Janela"),
+        screen: s.id.startsWith("screen:"),
+        thumbnail: s.thumbnail.isEmpty() ? null : s.thumbnail.toDataURL(),
+      }));
+  } catch {
+    return [];
   }
 });
 
