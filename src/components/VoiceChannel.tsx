@@ -694,6 +694,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   const toggleScreen = async () => {
+    console.log("[voz] toggleScreen click, screenOn=", screenOn, "hasGDM=", !!navigator.mediaDevices?.getDisplayMedia);
     if (screenOn) {
       localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
       peersRef.current.forEach((pc) => {
@@ -727,7 +728,10 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       setScreenOn(true);
       setCameraOn(false);
       await renegotiate();
-    } catch (e: any) { if (e.name !== "NotAllowedError") setError(e.message); }
+    } catch (e: any) {
+      console.log("[voz] getDisplayMedia falhou:", e?.name, e?.message);
+      if (e.name !== "NotAllowedError") setError(e.message);
+    }
   };
 
   // Vendo outro canal no meio da chamada: oferece trocar (a sessão segue viva)
