@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X, Waves, Eye, EyeOff } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
-import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, type ScreenQuality } from "@/lib/video";
+import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, preferCodecs, getVideoStats, type ScreenQuality, type CodecMode } from "@/lib/video";
 import Avatar from "@/components/Avatar";
 
 type Props = {
@@ -37,6 +37,11 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   // Qualidade da transmissão de tela (downscale via applyConstraints, ao vivo)
   const [screenQuality, setScreenQuality] = useState<ScreenQuality>("auto");
   const screenQualityRef = useRef<ScreenQuality>("auto");
+  // Codec: sharp (VP9 nítido, CPU) x smooth (H264 hardware, fluido)
+  const [codecMode, setCodecMode] = useState<CodecMode>("sharp");
+  const codecModeRef = useRef<CodecMode>("sharp");
+  const [sendStats, setSendStats] = useState("");
+  const statsPrevRef = useRef<{ bytes: number; ts: number } | null>(null);
   // Supressão de ruído RNNoise (ML local). Ligada por padrão; cai p/ navegador se falhar.
   const [denoise, setDenoise] = useState(true);
   const [denoiseActive, setDenoiseActive] = useState(false);
@@ -104,6 +109,28 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       v.play().catch(() => {});
     }
   }, [expanded, remoteStreams, cameraOn, screenOn]);
+
+  // Leitura real do envio (1/s) enquanto transmite tela
+  useEffect(() => {
+    if (!screenOn) { setSendStats(""); statsPrevRef.current = null; return; }
+    const iv = setInterval(async () => {
+      try {
+        const track = localStreamRef.current?.getVideoTracks()[0];
+        const firstPc = peersRef.current.values().next().value as RTCPeerConnection | undefined;
+        if (!track || !firstPc) return;
+        const s = await getVideoStats(firstPc, track);
+        if (!s) return;
+        const prev = statsPrevRef.current;
+        statsPrevRef.current = { bytes: s.bytesSent, ts: s.ts };
+        let mbps = "";
+        if (prev && s.ts > prev.ts && s.bytesSent >= prev.bytes) {
+          mbps = (((s.bytesSent - prev.bytes) * 8) / ((s.ts - prev.ts) / 1000) / 1e6).toFixed(1);
+        }
+        setSendStats(`${s.width}x${s.height} @ ${s.fps}fps${mbps ? ` • ${mbps} Mbps` : ""}${s.limitation && s.limitation !== "?" ? ` • limite: ${s.limitation}` : ""}`);
+      } catch {}
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [screenOn]);
   // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
   const maybeEndCall = (cid?: string | null) => {
     const target = cid || sessionChannelRef.current || channelId;
@@ -671,6 +698,19 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     }
   };
 
+  const changeCodecMode = async (mode: CodecMode) => {
+    setCodecMode(mode);
+    codecModeRef.current = mode;
+    const track = localStreamRef.current?.getVideoTracks()[0];
+    if (!screenOn || !track) return;
+    const wants = mode === "smooth" ? [/h264/i] : [/vp9/i];
+    for (const pc of peersRef.current.values()) {
+      preferCodecs(pc, track, wants);
+    }
+    await renegotiate();
+    console.log(`[voz] codec tela: ${mode}`);
+  };
+
   const changeScreenQuality = async (q: ScreenQuality) => {
     setScreenQuality(q);
     screenQualityRef.current = q;
@@ -705,7 +745,15 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       return;
     }
     try {
-      const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: { displaySurface: "monitor" } as any, audio: true });
+      // Pede fps já na captura (o navegador reduz sozinho em tela parada)
+      const dims = qualityDims(screenQualityRef.current);
+      const videoReq: any = { displaySurface: "monitor" };
+      if (dims) {
+        videoReq.width = { ideal: dims[0] };
+        videoReq.height = { ideal: dims[1] };
+        videoReq.frameRate = { ideal: dims[2], max: dims[2] };
+      }
+      const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: videoReq, audio: true });
       const track = stream.getVideoTracks()[0];
       const audioTrack = stream.getAudioTracks()[0];
       await applyScreenQuality(track, screenQualityRef.current);
@@ -720,7 +768,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       }
       peersRef.current.forEach((pc) => {
         pc.addTrack(track, localStreamRef.current!);
-        tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current) }).catch(() => {});
+        tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: codecModeRef.current }).catch(() => {});
       });
       if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
       track.onended = () => toggleScreen();
@@ -785,7 +833,18 @@ export default function VoiceChannel({ channelId, username, status, channelName,
                   {qualityLabel(q)}
                 </button>
               ))}
+              <span className="w-px h-4 bg-[#3F4147] mx-1" />
+              <button
+                onClick={() => changeCodecMode(codecMode === "sharp" ? "smooth" : "sharp")}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${codecMode === "smooth" ? "bg-[#23A559] text-white" : "bg-[#2B2D31] text-zinc-400 hover:text-white"}`}
+                title={codecMode === "sharp" ? "VP9 nítido (CPU). Clique p/ H264 fluido (GPU)." : "H264 fluido via hardware. Clique p/ VP9 nítido."}
+              >
+                {codecMode === "sharp" ? "Nítido" : "Fluido"}
+              </button>
             </div>
+          )}
+          {screenOn && sendStats && (
+            <span className="text-[11px] font-mono text-zinc-500 whitespace-nowrap" title="Resolução, fps, bitrate real e gargalo (bandwidth/cpu/rede)">📡 {sendStats}</span>
           )}
           <button onClick={leave} className="bg-[#DA373C] hover:bg-[#A12828] text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><PhoneOff className="w-4 h-4" /> Sair</button>
         </div>

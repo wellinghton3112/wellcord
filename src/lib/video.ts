@@ -32,33 +32,49 @@ export const VIDEO_BITRATE: Record<string, number> = {
   ...Object.fromEntries(Object.entries(SPECS).map(([k, [, , , b]]) => [k, b])),
 };
 
-// Prefere VP9 (mais nítido por bit que VP8) mantendo os demais como fallback
-function preferVP9(pc: RTCPeerConnection, track: MediaStreamTrack) {
+// Prefere codecs na ordem dada (ex: H264 p/ fluidez via hardware, VP9 p/ nitidez)
+export function preferCodecs(pc: RTCPeerConnection, track: MediaStreamTrack, wants: RegExp[]) {
   try {
     const recv = (RTCRtpReceiver as any).getCapabilities?.("video");
     const codecs: any[] = recv?.codecs || [];
-    if (codecs.length === 0) return;
-    const vp9 = codecs.filter((c) => /vp9/i.test(c.mimeType));
-    const rest = codecs.filter((c) => !/vp9/i.test(c.mimeType));
-    if (vp9.length === 0) return;
+    if (codecs.length === 0) return false;
+    const ordered: any[] = [];
+    for (const w of wants) {
+      for (const c of codecs) {
+        if (w.test(c.mimeType) && !ordered.includes(c)) ordered.push(c);
+      }
+    }
+    for (const c of codecs) if (!ordered.includes(c)) ordered.push(c);
+    if (ordered.length === 0) return false;
     const transceiver = pc
       .getTransceivers()
       .find((t) => t.sender.track === track && (t as any).currentDirection !== "stopped");
-    (transceiver as any)?.setCodecPreferences?.([...vp9, ...rest]);
-  } catch {}
+    (transceiver as any)?.setCodecPreferences?.(ordered);
+    return true;
+  } catch {
+    return false;
+  }
 }
+
+// Prefere VP9 (mais nítido por bit que VP8) mantendo os demais como fallback
+function preferVP9(pc: RTCPeerConnection, track: MediaStreamTrack) {
+  preferCodecs(pc, track, [/vp9/i]);
+}
+
+export type CodecMode = "sharp" | "smooth"; // VP9 software nítido | H264 hardware fluido
 
 // Aplica nitidez + bitrate no sender da trilha de vídeo
 export async function tuneVideoSender(
   pc: RTCPeerConnection,
   track: MediaStreamTrack,
-  opts: { screen: boolean; maxBitrate?: number }
+  opts: { screen: boolean; maxBitrate?: number; codec?: CodecMode }
 ) {
   try {
     // Tela: prioriza detalhe (texto nítido). Câmera: prioriza fluidez.
     (track as any).contentHint = opts.screen ? "detail" : "motion";
   } catch {}
-  preferVP9(pc, track);
+  if (opts.codec === "smooth") preferCodecs(pc, track, [/h264/i]);
+  else preferVP9(pc, track);
   try {
     const sender = pc.getSenders().find((s) => s.track === track);
     if (!sender) return;
@@ -69,6 +85,36 @@ export async function tuneVideoSender(
     await sender.setParameters(params);
   } catch (e) {
     console.warn("[voz] navegador recusou tuning de vídeo, seguindo padrão", e);
+  }
+}
+
+// Leitura real do que está sendo enviado (prova do que mudou).
+// mbps calculado pelo chamador via delta de bytesSent/timestamp.
+export async function getVideoStats(
+  pc: RTCPeerConnection,
+  track: MediaStreamTrack
+): Promise<{ fps: number; bytesSent: number; ts: number; width: number; height: number; limitation: string } | null> {
+  try {
+    const sender = pc.getSenders().find((s) => s.track === track);
+    if (!sender) return null;
+    const stats: any = await sender.getStats();
+    let out: any = null;
+    let remote: any = null;
+    stats.forEach((r: any) => {
+      if (r.type === "outbound-rtp" && !r.isRemote) out = r;
+      if (r.type === "remote-inbound-rtp") remote = r;
+    });
+    if (!out) return null;
+    return {
+      fps: Math.round(out.framesPerSecond || 0),
+      bytesSent: out.bytesSent || 0,
+      ts: out.timestamp || 0,
+      width: out.frameWidth || 0,
+      height: out.frameHeight || 0,
+      limitation: remote?.qualityLimitationReason || (out as any).qualityLimitationReason || "?",
+    };
+  } catch {
+    return null;
   }
 }
 
