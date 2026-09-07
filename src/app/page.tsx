@@ -341,6 +341,7 @@ export default function DiscordClone() {
         userId={user?.id}
         currentChannel={currentChannel}
         selectedChannel={selectedChannel}
+        serverName={currentServer?.name}
         channelMessages={channelMessages}
         input={input}
         setInput={typeChannel}

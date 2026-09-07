@@ -6,6 +6,7 @@ import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
 import VoicePreview from "@/components/VoicePreview";
 import Avatar from "@/components/Avatar";
+import { useVoice } from "@/context/VoiceContext";
 import type { Friend, FriendRequest } from "@/hooks/useFriends";
 import type { ActiveVoice } from "@/hooks/useActiveNow";
 
@@ -72,6 +73,7 @@ export default function ChannelSidebar(props: Props) {
   } = props;
 
   const [sideTab, setSideTab] = useState<"dms" | "friends">("dms");
+  const { status: voiceStatus, controlsRef: voiceControls } = useVoice();
   const [friendQuery, setFriendQuery] = useState("");
   const [newFriendName, setNewFriendName] = useState("");
   const onlineIds = new Set(onlineMembers.map((m) => m.id));
@@ -281,6 +283,28 @@ export default function ChannelSidebar(props: Props) {
         </>
       )}
       <div className="h-[52px] bg-[#232428] flex items-center px-2 gap-2 shrink-0 relative">
+      {voiceStatus.joined && (
+        <div className="absolute bottom-full left-0 right-0 bg-[#1E1F22] border-t border-black/40 px-2 py-1.5">
+          <div className="flex items-center gap-1.5 text-[#23A559] text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-[#23A559] animate-pulse shrink-0" />
+            <span className="truncate">Voz conectada</span>
+          </div>
+          <div className="text-[11px] text-zinc-400 truncate mt-0.5">
+            {voiceStatus.channelName || "Canal de voz"}{voiceStatus.serverName ? ` / ${voiceStatus.serverName}` : ""}
+          </div>
+          <div className="flex items-center gap-1 mt-1">
+            <button onClick={() => voiceControls.current?.toggleMute()} className={`flex-1 py-1 rounded text-[11px] font-semibold ${voiceStatus.muted ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={voiceStatus.muted ? "Ativar microfone" : "Mutar"}>
+              {voiceStatus.muted ? "Mutado" : "Mutar"}
+            </button>
+            <button onClick={() => voiceControls.current?.toggleDeafen()} className={`flex-1 py-1 rounded text-[11px] font-semibold ${voiceStatus.deafened ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title="Surdo">
+              {voiceStatus.deafened ? "Ensurdecido" : "Ensurdecer"}
+            </button>
+            <button onClick={() => voiceControls.current?.leave()} className="flex-1 py-1 rounded text-[11px] font-semibold bg-[#DA373C] hover:bg-[#A12828] text-white" title="Sair da voz">
+              Sair
+            </button>
+          </div>
+        </div>
+      )}
         <button onClick={() => userId && onViewProfile(userId)} className="relative shrink-0" title="Meu perfil">
           <Avatar src={userAvatar || undefined} name={username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />

@@ -10,6 +10,8 @@ type Props = {
   channelId: string;
   username: string;
   status?: string;
+  channelName?: string;
+  serverName?: string;
 };
 
 type Peer = {
@@ -18,9 +20,9 @@ type Peer = {
   muted?: boolean;
 };
 
-export default function VoiceChannel({ channelId, username, status }: Props) {
+export default function VoiceChannel({ channelId, username, status, channelName, serverName }: Props) {
   const supabase = useMemo(() => createClient(), []);
-  const { setParticipants } = useVoice();
+  const { setParticipants, setStatus: setVoiceStatus, controlsRef } = useVoice();
   const [joined, setJoined] = useState(false);
   const [muted, setMuted] = useState(false);
   const [deafened, setDeafened] = useState(false);
@@ -78,8 +80,7 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
   }, [cameraOn, screenOn, joined]);
 
   // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
-  const maybeEndCall = () => {
-    supabase
+  const maybeEndCall = () => {    supabase
       .from("voice_sessions")
       .select("user_id", { count: "exact", head: true })
       .eq("channel_id", channelId)
@@ -533,6 +534,15 @@ export default function VoiceChannel({ channelId, username, status }: Props) {
     if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = v ? false : !muted));
     if (v && !muted) setMuted(true);
   };
+
+  // Publica status + controles no contexto (painel de voz no rodapé)
+  useEffect(() => {
+    controlsRef.current = { toggleMute, toggleDeafen, leave };
+  });
+  useEffect(() => {
+    setVoiceStatus({ joined, channelId, channelName, serverName, muted, deafened });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [joined, muted, deafened, channelId]);
 
   const renegotiate = async () => {
     for (const [peerId, pc] of peersRef.current) {

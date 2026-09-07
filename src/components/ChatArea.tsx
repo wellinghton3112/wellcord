@@ -27,6 +27,7 @@ type Props = {
   // Servidor
   currentChannel?: Channel;
   selectedChannel: string;
+  serverName?: string;
   channelMessages: Message[];
   input: string;
   setInput: (v: string) => void;
@@ -84,7 +85,7 @@ export default function ChatArea(props: Props) {
   const {
     viewMode, setShowMobileSidebar,
     dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers, userId,
-    currentChannel, selectedChannel, channelMessages, input, setInput, handleSend, username, status,
+    currentChannel, selectedChannel, serverName, channelMessages, input, setInput, handleSend, username, status,
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
@@ -645,7 +646,7 @@ export default function ChatArea(props: Props) {
           >
             {loadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
             {currentChannel?.type === "voice" ? (
-              <VoiceChannel channelId={selectedChannel} username={username} status={status} />
+              <VoiceChannel channelId={selectedChannel} username={username} status={status} channelName={currentChannel?.name} serverName={serverName} />
             ) : (
               <>
                 <div className="py-8 border-b border-[#3F4147] mb-4">
