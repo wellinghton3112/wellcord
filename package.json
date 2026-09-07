@@ -1,6 +1,6 @@
 {
   "name": "wellcord",
-  "version": "0.1.74",
+  "version": "0.1.75",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -40,13 +40,15 @@
       ".next/**/*",
       "public/**/*",
       "electron/**/*",
+      "assets/**/*",
       "package.json"
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "artifactName": "WellCORD-Setup-${version}.${ext}"
+      "artifactName": "WellCORD-Setup-${version}.${ext}",
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,

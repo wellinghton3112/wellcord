@@ -54,6 +54,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const joiningRef = useRef(false);
+  const mutedRef = useRef(false);
   const [sessionChannel, setSessionChannel] = useState<string | null>(null);
   // Mic cru (sempre guardado p/ poder ligar/desligar o denoise ao vivo)
   const rawStreamRef = useRef<MediaStream | null>(null);
@@ -553,7 +554,24 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   // Mantém a ref sempre apontando para o `leave` mais recente (usada pelo listener offline)
-  useEffect(() => { leaveRef.current = leave; });
+  useEffect(() => { leaveRef.current = leave; mutedRef.current = muted; });
+
+  // Desktop (.exe): push-to-talk global alterna o mute + menu do tray pode derrubar a call
+  useEffect(() => {
+    if (!window.wellcord) return;
+    const offPtt = window.wellcord.ptt.onPress(() => {
+      try {
+        const raw = localStorage.getItem("wellcord-ptt");
+        const enabled = raw ? JSON.parse(raw).enabled : false;
+        if (enabled && channelRef.current) toggleMute();
+      } catch {}
+    });
+    const offCtl = window.wellcord.voice.onControl((action) => {
+      if (action === "leave") leaveRef.current();
+    });
+    return () => { offPtt(); offCtl(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleHideVideo = (peerId: string) => {
     setHiddenVideo((prev) => {
@@ -570,8 +588,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   const toggleMute = () => {
+    const enabled = !mutedRef.current;
     if (!localStreamRef.current) return;
-    const enabled = !muted;
     localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = !enabled));
     setMuted(enabled);
     // notificar via presence update

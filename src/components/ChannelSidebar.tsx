@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
@@ -7,6 +7,7 @@ import { APP_VERSION } from "@/lib/version";
 import VoicePreview from "@/components/VoicePreview";
 import Avatar from "@/components/Avatar";
 import { useVoice } from "@/context/VoiceContext";
+import { loadPtt, savePtt, eventToAccelerator, type PttConfig } from "@/lib/ptt";
 import type { Friend, FriendRequest } from "@/hooks/useFriends";
 import type { ActiveVoice } from "@/hooks/useActiveNow";
 
@@ -74,6 +75,44 @@ export default function ChannelSidebar(props: Props) {
 
   const [sideTab, setSideTab] = useState<"dms" | "friends">("dms");
   const { status: voiceStatus, controlsRef: voiceControls } = useVoice();
+
+  // Tray do app desktop: badge de não-lidas + estado de voz
+  const dmTotal = Object.values(unreadDMs || {}).reduce((a, b) => a + b, 0);
+  const chTotal = Object.values(channelUnread || {}).reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    window.wellcord?.tray.update({ unread: dmTotal + chTotal, inVoice: voiceStatus.joined, muted: voiceStatus.muted });
+  }, [dmTotal, chTotal, voiceStatus.joined, voiceStatus.muted]);
+
+  // Push-to-talk (só no .exe): liga/desliga + captura da tecla
+  const [ptt, setPtt] = useState<PttConfig | null>(null);
+  const [capturingPtt, setCapturingPtt] = useState(false);
+  useEffect(() => {
+    if (!window.wellcord?.ptt) return;
+    const cfg = loadPtt();
+    setPtt(cfg);
+    if (cfg.enabled && cfg.accelerator) window.wellcord.ptt.set(cfg.accelerator);
+  }, []);
+  const isDesktop = typeof window !== "undefined" && !!window.wellcord?.ptt;
+
+  const applyPtt = (cfg: PttConfig) => {
+    setPtt(cfg);
+    savePtt(cfg);
+    if (cfg.enabled && cfg.accelerator) window.wellcord?.ptt.set(cfg.accelerator);
+    else window.wellcord?.ptt.set(null);
+  };
+
+  useEffect(() => {
+    if (!capturingPtt) return;
+    const h = (e: KeyboardEvent) => {
+      e.preventDefault();
+      const acc = eventToAccelerator(e);
+      if (acc && ptt) applyPtt({ ...ptt, accelerator: acc });
+      setCapturingPtt(false);
+    };
+    window.addEventListener("keydown", h, { once: false });
+    return () => window.removeEventListener("keydown", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capturingPtt]);
   const [friendQuery, setFriendQuery] = useState("");
   const [newFriendName, setNewFriendName] = useState("");
   const onlineIds = new Set(onlineMembers.map((m) => m.id));
@@ -317,12 +356,31 @@ export default function ChannelSidebar(props: Props) {
         <button onClick={() => setShowUsernameModal(true)} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
         <button onClick={onSignOut} className="p-1 hover:bg-[#DA373C] rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
         {showStatusMenu && (
-          <div className="absolute bottom-full left-2 mb-2 w-48 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">
+          <div className="absolute bottom-full left-2 mb-2 w-52 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">
             {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map((k) => (
               <button key={k} onClick={() => { setStatus(k); setShowStatusMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-[#35373C] ${status === k ? "bg-[#35373C] text-white" : "text-zinc-300"}`}>
                 <span className={`w-3 h-3 rounded-full ${statusConfig[k].color}`} /> {statusConfig[k].label}
               </button>
             ))}
+            {isDesktop && ptt && (
+              <div className="border-t border-[#1E1F22] px-3 py-2">
+                <button
+                  onClick={() => applyPtt({ ...ptt, enabled: !ptt.enabled })}
+                  className="w-full flex items-center gap-2 text-sm text-zinc-300 hover:text-white"
+                >
+                  <span className={`w-3 h-3 rounded-full ${ptt.enabled ? "bg-[#23A559]" : "bg-zinc-600"}`} />
+                  Push-to-talk {ptt.enabled ? "ligado" : "desligado"}
+                </button>
+                {ptt.enabled && (
+                  <button
+                    onClick={() => setCapturingPtt(true)}
+                    className="mt-1.5 w-full text-left text-xs bg-[#2B2D31] hover:bg-[#35373C] rounded px-2 py-1.5 text-zinc-300"
+                  >
+                    {capturingPtt ? "Pressione a tecla..." : `Tecla: ${ptt.accelerator}`}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
