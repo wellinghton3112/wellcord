@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain, globalShortcut } = require("electron");
+const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain, globalShortcut, session, desktopCapturer } = require("electron");
 const path = require("path");
 
 const isDev = !app.isPackaged;
@@ -162,6 +162,21 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(async () => {
+  // Electron não tem seletor de tela nativo: o app fornece a fonte
+  // (tela principal + áudio do sistema via loopback)
+  try {
+    session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
+      desktopCapturer
+        .getSources({ types: ["screen"] })
+        .then((sources) => {
+          if (sources.length > 0) callback({ video: sources[0], audio: "loopback" });
+          else callback({});
+        })
+        .catch(() => callback({}));
+    });
+  } catch (e) {
+    console.error("[wellcord] displayMedia handler falhou:", e);
+  }
   if (!isDev) {
     try {
       await startEmbeddedNext();
