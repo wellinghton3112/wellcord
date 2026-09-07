@@ -661,6 +661,7 @@ export default function ChatArea(props: Props) {
                   status={status}
                   channelName={inVoiceView ? currentChannel?.name : undefined}
                   serverName={inVoiceView ? serverName : undefined}
+                  avatar={userAvatar || undefined}
                 />
               </div>
             ) : (
