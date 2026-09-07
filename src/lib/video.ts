@@ -81,7 +81,13 @@ export async function tuneVideoSender(
     const params = sender.getParameters();
     if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
     params.encodings[0].maxBitrate = opts.maxBitrate ?? VIDEO_BITRATE.auto;
-    (params as any).degradationPreference = opts.screen ? "maintain-resolution" : "balanced";
+    // Tela nítida: segura resolução (cai fps). Tela fluida: segura fps (cai resolução).
+    // Câmera: equilibrado.
+    (params as any).degradationPreference = !opts.screen
+      ? "balanced"
+      : opts.codec === "smooth"
+        ? "maintain-framerate"
+        : "maintain-resolution";
     await sender.setParameters(params);
   } catch (e) {
     console.warn("[voz] navegador recusou tuning de vídeo, seguindo padrão", e);
