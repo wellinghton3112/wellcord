@@ -57,6 +57,7 @@ function trayMenu() {
       checked: !!login.openAtLogin,
       click: (item) => app.setLoginItemSettings({ openAtLogin: !!item.checked }),
     },
+    { label: "Abrir console (debug)", click: () => mainWindow?.webContents.openDevTools({ mode: "detach" }) },
     { type: "separator" },
     {
       label: trayState.inVoice ? "Sair da voz" : "Sair do WellCORD",
