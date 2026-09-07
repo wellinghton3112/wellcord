@@ -703,9 +703,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     codecModeRef.current = mode;
     const track = localStreamRef.current?.getVideoTracks()[0];
     if (!screenOn || !track) return;
-    const wants = mode === "smooth" ? [/h264/i] : [/vp9/i];
     for (const pc of peersRef.current.values()) {
-      preferCodecs(pc, track, wants);
+      await tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: mode, fps: qualityDims(screenQualityRef.current)?.[2] }).catch(() => {});
     }
     await renegotiate();
     console.log(`[voz] codec tela: ${mode}`);
@@ -717,8 +716,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     const track = localStreamRef.current?.getVideoTracks()[0];
     if (screenOn && track) {
       await applyScreenQuality(track, q);
-      // Reaplica o teto de bitrate nos senders ativos
+      // Reaplica o teto de bitrate + fps nos senders ativos
       const bitrate = videoBitrateFor(q);
+      const fps = qualityDims(q)?.[2];
       for (const pc of peersRef.current.values()) {
         const sender = pc.getSenders().find((s) => s.track === track);
         if (sender) {
@@ -726,6 +726,10 @@ export default function VoiceChannel({ channelId, username, status, channelName,
             const params = sender.getParameters();
             if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
             params.encodings[0].maxBitrate = bitrate;
+            if (fps) {
+              (params.encodings[0] as any).maxFramerate = fps;
+              (params.encodings[0] as any).scalabilityMode = "L1T3";
+            }
             await sender.setParameters(params);
           } catch {}
         }
@@ -768,7 +772,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       }
       peersRef.current.forEach((pc) => {
         pc.addTrack(track, localStreamRef.current!);
-        tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: codecModeRef.current }).catch(() => {});
+        tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: codecModeRef.current, fps: qualityDims(screenQualityRef.current)?.[2] }).catch(() => {});
       });
       if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
       track.onended = () => toggleScreen();

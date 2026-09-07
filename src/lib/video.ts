@@ -56,6 +56,33 @@ export function preferCodecs(pc: RTCPeerConnection, track: MediaStreamTrack, wan
   }
 }
 
+// H264 Baseline primeiro: é o perfil que toda GPU (Intel/NVIDIA/AMD) acelera.
+// Constrained-Baseline (42e0) > Baseline (4200) > resto, para máxima chance de HW.
+export function preferHardwareH264(pc: RTCPeerConnection, track: MediaStreamTrack) {
+  try {
+    const recv = (RTCRtpReceiver as any).getCapabilities?.("video");
+    const codecs: any[] = recv?.codecs || [];
+    const h264 = codecs.filter((c) => /h264/i.test(c.mimeType || ""));
+    if (h264.length === 0) return preferCodecs(pc, track, [/h264/i]);
+    const rank = (c: any) => {
+      const fmtp = String(c.sdpFmtpLine || "").toLowerCase();
+      if (/42e0/.test(fmtp)) return 0;
+      if (/4200/.test(fmtp) || /4d00/.test(fmtp)) return 1;
+      return 2;
+    };
+    const ordered = [...h264].sort((a, b) => rank(a) - rank(b));
+    for (const c of codecs) if (!ordered.includes(c)) ordered.push(c);
+    const transceiver = pc
+      .getTransceivers()
+      .find((t) => t.sender.track === track && (t as any).currentDirection !== "stopped");
+    (transceiver as any)?.setCodecPreferences?.(ordered);
+    console.log("[voz] codecs H264 ordenados (baseline primeiro):", ordered.slice(0, 3).map((c) => c.sdpFmtpLine).join(" | "));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Prefere VP9 (mais nítido por bit que VP8) mantendo os demais como fallback
 function preferVP9(pc: RTCPeerConnection, track: MediaStreamTrack) {
   preferCodecs(pc, track, [/vp9/i]);
@@ -67,13 +94,13 @@ export type CodecMode = "sharp" | "smooth"; // VP9 software nítido | H264 hardw
 export async function tuneVideoSender(
   pc: RTCPeerConnection,
   track: MediaStreamTrack,
-  opts: { screen: boolean; maxBitrate?: number; codec?: CodecMode }
+  opts: { screen: boolean; maxBitrate?: number; codec?: CodecMode; fps?: number }
 ) {
   try {
     // Tela: prioriza detalhe (texto nítido). Câmera: prioriza fluidez.
     (track as any).contentHint = opts.screen ? "detail" : "motion";
   } catch {}
-  if (opts.codec === "smooth") preferCodecs(pc, track, [/h264/i]);
+  if (opts.codec === "smooth") preferHardwareH264(pc, track);
   else preferVP9(pc, track);
   try {
     const sender = pc.getSenders().find((s) => s.track === track);
@@ -81,6 +108,11 @@ export async function tuneVideoSender(
     const params = sender.getParameters();
     if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
     params.encodings[0].maxBitrate = opts.maxBitrate ?? VIDEO_BITRATE.auto;
+    if (opts.fps && opts.fps > 0) {
+      (params.encodings[0] as any).maxFramerate = opts.fps;
+      // Camadas temporais: mantém fluidez quando a rede oscila
+      (params.encodings[0] as any).scalabilityMode = "L1T3";
+    }
     // Tela nítida: segura resolução (cai fps). Tela fluida: segura fps (cai resolução).
     // Câmera: equilibrado.
     (params as any).degradationPreference = !opts.screen
