@@ -41,6 +41,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   // Seletor próprio (.exe); no navegador usa o picker do OS
   const [showScreenPicker, setShowScreenPicker] = useState(false);
   const [screenSources, setScreenSources] = useState<{ id: string; name: string; screen: boolean; thumbnail: string | null }[] | null>(null);
+  // Acabou de escolher no picker: pula reabrir e vai direto ao getDisplayMedia
+  // (o main usa a fonte escolhida uma vez)
+  const pickedRef = useRef(false);
   // Codec: sharp (VP9 nítido, CPU) x smooth (H264 hardware, fluido)
   const [codecMode, setCodecMode] = useState<CodecMode>("sharp");
   const codecModeRef = useRef<CodecMode>("sharp");
@@ -751,30 +754,15 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     await renegotiate();
   };
 
-  // Captura direta de fonte do .exe (tela ou janela específica) + áudio do sistema
-  const startScreenFromSource = async (sourceId: string) => {
+  // Picker do .exe: avisa o main qual fonte usar e chama o getDisplayMedia padrão
+  // (caminho estável — sem constraints legacy que derrubam o renderer)
+  const pickAndShare = async (sourceId: string) => {
     setShowScreenPicker(false);
-    setError("");
     try {
-      const stream: MediaStream = await (navigator.mediaDevices as any).getUserMedia({
-        audio: false,
-        video: {
-          mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: sourceId },
-        } as any,
-      });
-      // Áudio do sistema (loopback) em trilha separada
-      let sysAudio: MediaStreamTrack | null = null;
-      try {
-        const aStream: MediaStream = await (navigator.mediaDevices as any).getUserMedia({
-          audio: { mandatory: { chromeMediaSource: "desktop" } } as any,
-          video: false,
-        });
-        sysAudio = aStream.getAudioTracks()[0] || null;
-      } catch {}
-      await attachScreenTrack(stream.getVideoTracks()[0], sysAudio);
-    } catch (e: any) {
-      if (e?.name !== "NotAllowedError") setError(e?.message || "Falha ao capturar tela");
-    }
+      await window.wellcord?.screens?.pick(sourceId);
+    } catch {}
+    pickedRef.current = true;
+    await toggleScreen();
   };
 
   const attachScreenTrack = async (track: MediaStreamTrack, audioTrack: MediaStreamTrack | null) => {
@@ -799,18 +787,13 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     await renegotiate();
   };
 
-  const toggleScreen = async (sourceId?: string) => {
+  const toggleScreen = async () => {
     if (screenOn) {
       await stopScreen();
       return;
     }
-    // No .exe com fonte escolhida: captura direta (janela ou tela) + áudio do sistema
-    if (sourceId && window.wellcord) {
-      await startScreenFromSource(sourceId);
-      return;
-    }
-    // No .exe sem fonte: abre o seletor próprio
-    if (!sourceId && window.wellcord?.screens) {
+    // No .exe: abre o seletor próprio (o main entrega a fonte ao getDisplayMedia)
+    if (window.wellcord?.screens && !pickedRef.current) {
       setScreenSources(null);
       setShowScreenPicker(true);
       try {
@@ -821,6 +804,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       }
       return;
     }
+    pickedRef.current = false;
     // Navegador: seletor do OS
     try {
       // Pede fps já na captura (o navegador reduz sozinho em tela parada)
@@ -1005,7 +989,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       {showScreenPicker && (
         <ScreenPickerModal
           sources={screenSources}
-          onPick={(id) => toggleScreen(id)}
+          onPick={(id) => pickAndShare(id)}
           onClose={() => setShowScreenPicker(false)}
         />
       )}

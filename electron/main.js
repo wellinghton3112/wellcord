@@ -104,6 +104,7 @@ ipcMain.handle("ptt-set", (_e, accelerator) => {  try {
 });
 
 // Seletor de tela próprio (estilo Discord): telas + janelas com miniatura
+let pendingScreenId = null;
 ipcMain.handle("screens-list", async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -122,6 +123,12 @@ ipcMain.handle("screens-list", async () => {
   } catch {
     return [];
   }
+});
+
+// Fonte escolhida no picker: usada UMA vez pelo getDisplayMedia seguinte
+ipcMain.handle("screens-pick", (_e, id) => {
+  pendingScreenId = id || null;
+  return true;
 });
 
 async function startEmbeddedNext() {
@@ -171,6 +178,21 @@ function createWindow() {
     }
   });
   mainWindow.on("closed", () => { mainWindow = null; });
+
+  // Se o renderer quebrar (ex: captura), recarrega em vez de tela cinza
+  mainWindow.webContents.on("render-process-gone", (_e, details) => {
+    console.error("[wellcord] renderer gone:", details?.reason);
+    try {
+      const { dialog } = require("electron");
+      dialog.showMessageBox(mainWindow, {
+        type: "warning",
+        title: "WellCORD",
+        message: "A janela travou e será recarregada.",
+        detail: `Motivo: ${details?.reason || "desconhecido"}`,
+      }).catch(() => {});
+    } catch {}
+    mainWindow?.reload();
+  });
 }
 
 app.on("second-instance", () => {
@@ -183,13 +205,18 @@ app.on("second-instance", () => {
 
 app.whenReady().then(async () => {
   // Electron não tem seletor de tela nativo: o app fornece a fonte
-  // (tela principal + áudio do sistema via loopback)
+  // (escolhida no picker, ou tela principal) + áudio do sistema via loopback
   try {
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
       desktopCapturer
-        .getSources({ types: ["screen"] })
+        .getSources({ types: ["screen", "window"] })
         .then((sources) => {
-          if (sources.length > 0) callback({ video: sources[0], audio: "loopback" });
+          const wanted = pendingScreenId
+            ? sources.find((s) => s.id === pendingScreenId)
+            : null;
+          pendingScreenId = null;
+          const pick = wanted || sources.find((s) => s.id.startsWith("screen:")) || sources[0];
+          if (pick) callback({ video: pick, audio: "loopback" });
           else callback({});
         })
         .catch(() => callback({}));

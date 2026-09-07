@@ -31,5 +31,6 @@ contextBridge.exposeInMainWorld("wellcord", {
   screens: {
     // Seletor próprio (só no .exe; no navegador é null)
     list: () => ipcRenderer.invoke("screens-list"),
+    pick: (id) => ipcRenderer.invoke("screens-pick", id),
   },
 });

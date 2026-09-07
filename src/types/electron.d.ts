@@ -13,6 +13,7 @@ declare global {
       voice: { onControl: (cb: (action: string) => void) => () => void };
       screens?: {
         list: () => Promise<{ id: string; name: string; screen: boolean; thumbnail: string | null }[]>;
+        pick: (id: string) => Promise<boolean>;
       };
     };
   }
