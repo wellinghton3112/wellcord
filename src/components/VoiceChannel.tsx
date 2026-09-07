@@ -47,6 +47,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const prevSpeakingRef = useRef<Record<string, boolean>>({});
 
   const localStreamRef = useRef<MediaStream | null>(null);
+  const joiningRef = useRef(false);
+  const [sessionChannel, setSessionChannel] = useState<string | null>(null);
   // Mic cru (sempre guardado p/ poder ligar/desligar o denoise ao vivo)
   const rawStreamRef = useRef<MediaStream | null>(null);
   const denoiseRef = useRef<{ stop: () => void } | null>(null);
@@ -54,6 +56,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
   const leaveRef = useRef<() => void>(() => {});
+  // Canal da SESSÃO ativa (pode diferir do canal em tela — a chamada sobrevive à navegação)
+  const sessionChannelRef = useRef<string | null>(null);
   // ID estável por montagem: gerado uma vez (sem regenerar ao trocar username — evita peers fantasmas).
   // O nome de exibição vem do payload de presença, não do prefixo do ID.
   const myIdRef = useRef<string>("");
@@ -78,14 +82,15 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       if (v.srcObject) v.srcObject = null;
     }
   }, [cameraOn, screenOn, joined]);
-
   // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
-  const maybeEndCall = () => {    supabase
+  const maybeEndCall = (cid?: string | null) => {
+    const target = cid || sessionChannelRef.current || channelId;
+    supabase
       .from("voice_sessions")
       .select("user_id", { count: "exact", head: true })
-      .eq("channel_id", channelId)
+      .eq("channel_id", target)
       .then(({ count }) => {
-        if (!count) supabase.from("voice_calls").delete().eq("channel_id", channelId).then(() => {});
+        if (!count) supabase.from("voice_calls").delete().eq("channel_id", target).then(() => {});
       });
   };
 
@@ -96,10 +101,11 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       rawStreamRef.current.getTracks().forEach((t) => t.stop());
       rawStreamRef.current = null;
     }
+    const cid = sessionChannelRef.current;
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id).then(() => {
-          maybeEndCall();
+      if (user && cid) {
+        supabase.from("voice_sessions").delete().eq("channel_id", cid).eq("user_id", user.id).then(() => {
+          maybeEndCall(cid);
         });
       }
     });
@@ -140,7 +146,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
 
   useEffect(() => {
     return () => cleanup();
-  }, [channelId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Só desconecta se ficar sem internet ou fechar o app, NÃO quando ficar invisível
   // (efeito posicionado após `leave` — usa a função já declarada)
@@ -152,7 +159,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       }
     };
     const handleBeforeUnload = () => {
-      if (joined) supabase.from("voice_sessions").delete().eq("channel_id", channelId).then(() => {});
+      const cid = sessionChannelRef.current;
+      if (joined && cid) supabase.from("voice_sessions").delete().eq("channel_id", cid).then(() => {});
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -328,7 +336,14 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   const join = async (asListener = false) => {
-    if (joined || channelRef.current) return;
+    // Já estou em outra chamada? Sai dela primeiro e entra nesta
+    if (joined && sessionChannelRef.current && sessionChannelRef.current !== channelId) {
+      await leave();
+    }
+    if ((joined && sessionChannelRef.current === channelId) || channelRef.current || joiningRef.current) return;
+    joiningRef.current = true;
+    sessionChannelRef.current = channelId;
+    setSessionChannel(channelId);
     if (!myIdRef.current) myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
     setError("");
     let stream: MediaStream | null = null;
@@ -487,6 +502,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         }
       });
     } catch (e: any) {
+      sessionChannelRef.current = null;
+      setSessionChannel(null);
       if (e.name === "NotFoundError" || e.message?.includes("Requested device")) {
         setError("Microfone não encontrado. Verifique: 1) Windows > Configurações > Privacidade > Microfone > Permitir 2) Chrome > cadeado na barra de endereço > Microfone > Permitir 3) Nenhum outro app usando o mic. Tente no celular!");
       } else if (e.name === "NotAllowedError") {
@@ -494,15 +511,20 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       } else {
         setError(e.message || "Erro ao acessar microfone");
       }
+    } finally {
+      joiningRef.current = false;
     }
   };
 
   const leave = async () => {
+    const cid = sessionChannelRef.current;
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
-      maybeEndCall();
+    if (user && cid) {
+      await supabase.from("voice_sessions").delete().eq("channel_id", cid).eq("user_id", user.id);
+      maybeEndCall(cid);
     }
+    sessionChannelRef.current = null;
+    setSessionChannel(null);
     cleanup();
     setJoined(false);
     setPeers([]);
@@ -540,9 +562,17 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     controlsRef.current = { toggleMute, toggleDeafen, leave };
   });
   useEffect(() => {
-    setVoiceStatus({ joined, channelId, channelName, serverName, muted, deafened });
+    // Nomes só quando em tela (navegar manda undefined — mantém os da sessão)
+    setVoiceStatus({
+      joined,
+      channelId: sessionChannel || channelId,
+      ...(channelName ? { channelName } : {}),
+      ...(serverName ? { serverName } : {}),
+      muted,
+      deafened,
+    } as any);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined, muted, deafened, channelId]);
+  }, [joined, muted, deafened, sessionChannel, channelId]);
 
   const renegotiate = async () => {
     for (const [peerId, pc] of peersRef.current) {
@@ -652,6 +682,23 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       await renegotiate();
     } catch (e: any) { if (e.name !== "NotAllowedError") setError(e.message); }
   };
+
+  // Vendo outro canal no meio da chamada: oferece trocar (a sessão segue viva)
+  if (joined && sessionChannel && sessionChannel !== channelId) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+        <Volume2 className="w-16 h-16 text-[#23A559] animate-pulse" />
+        <div>
+          <h2 className="text-xl font-bold">Você está em outra chamada</h2>
+          <p className="text-zinc-400 mt-2 max-w-md">Sua voz continua ativa. Para entrar em #{channelName || "este canal"}, saia da atual primeiro.</p>
+          {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
+        </div>
+        <button onClick={() => join(false)} className="bg-[#5865F2] hover:bg-[#4752C4] text-white px-8 py-3 rounded-full font-bold">
+          Sair e entrar aqui
+        </button>
+      </div>
+    );
+  }
 
   if (!joined) {
     return (

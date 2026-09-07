@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, Poll, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
+import { useVoice } from "@/context/VoiceContext";
 import Avatar from "@/components/Avatar";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
@@ -321,6 +322,13 @@ export default function ChatArea(props: Props) {
   const dmFileInputRef = useRef<HTMLInputElement>(null);
   const channelInputRef = useRef<HTMLInputElement>(null);
   const dmInputRef = useRef<HTMLInputElement>(null);
+
+  // Voz persistente: UMA instância. Visível só na tela da própria chamada;
+  // escondida (display:none) ela mantém áudio/presença ao navegar.
+  const { status: voiceStatus } = useVoice();
+  const inVoiceView = viewMode === "server" && currentChannel?.type === "voice";
+  const voiceActiveId = voiceStatus.joined && voiceStatus.channelId ? voiceStatus.channelId : null;
+  const vcChannelId = inVoiceView ? selectedChannel : (voiceActiveId || selectedChannel);
 
   // Scroll inteligente: topo carrega histórico (preserva posição),
   // novas mensagens descem sozinhas só se já estou no fim
@@ -645,8 +653,16 @@ export default function ChatArea(props: Props) {
             className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col"
           >
             {loadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
-            {currentChannel?.type === "voice" ? (
-              <VoiceChannel channelId={selectedChannel} username={username} status={status} channelName={currentChannel?.name} serverName={serverName} />
+            {(inVoiceView || voiceActiveId) ? (
+              <div className={inVoiceView ? "contents" : "hidden"}>
+                <VoiceChannel
+                  channelId={vcChannelId}
+                  username={username}
+                  status={status}
+                  channelName={inVoiceView ? currentChannel?.name : undefined}
+                  serverName={inVoiceView ? serverName : undefined}
+                />
+              </div>
             ) : (
               <>
                 <div className="py-8 border-b border-[#3F4147] mb-4">
