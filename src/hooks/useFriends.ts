@@ -40,12 +40,14 @@ export function useFriends(supabase: any, user: any) {
       return { username: p?.username || id.slice(0, 6), avatar: p?.avatar || "😎" };
     };
     setFriends(
-      rows
-        .filter((r: any) => r.status === "accepted")
-        .map((r: any) => {
-          const id = r.from_user === user.id ? r.to_user : r.from_user;
-          return { user_id: id, ...info(id) };
-        })
+      [...new Map<string, Friend>(
+        rows
+          .filter((r: any) => r.status === "accepted")
+          .map((r: any) => {
+            const id = r.from_user === user.id ? r.to_user : r.from_user;
+            return [id, { user_id: id, ...info(id) }] as [string, Friend];
+          })
+      ).values()]
     );
     setIncoming(
       rows
@@ -98,10 +100,9 @@ export function useFriends(supabase: any, user: any) {
   };
 
   const accept = async (fromId: string) => {
-    // Aceita o pedido dele + garante o meu lado como aceito (amizade mútua visível)
+    // Aceita o pedido dele (linha única — sem espelho, sem duplicar)
     const { error } = await supabase.from("friend_requests").update({ status: "accepted" }).eq("from_user", fromId).eq("to_user", user.id);
     if (error) { alert(error.message); return; }
-    await supabase.from("friend_requests").upsert({ from_user: user.id, to_user: fromId, status: "accepted" }, { onConflict: "from_user,to_user" });
     await load();
   };
 
