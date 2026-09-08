@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain, globalShortcut, session, desktopCapturer } = require("electron");
+const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain, globalShortcut, session, desktopCapturer, dialog } = require("electron");
 const path = require("path");
 
 const isDev = !app.isPackaged;
@@ -43,6 +43,7 @@ function trayMenu() {
   const login = app.getLoginItemSettings();
   return [
     { label: "Abrir WellCORD", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    { label: "Verificar atualizações", click: () => checkUpdates(true) },
     { type: "separator" },
     {
       label: "Push-to-talk",
@@ -203,8 +204,55 @@ app.on("second-instance", () => {
   }
 });
 
-app.whenReady().then(async () => {
-  // Electron não tem seletor de tela nativo: o app fornece a fonte
+// Auto-update via Releases do GitHub (só no .exe instalado)
+let updateCheckTimer = null;
+function setupAutoUpdate() {
+  if (isDev) return;
+  let autoUpdater = null;
+  try {
+    ({ autoUpdater } = require("electron-updater"));
+  } catch (e) {
+    console.error("[wellcord] updater indisponível:", e);
+    return;
+  }
+  autoUpdater.autoDownload = true;
+  autoUpdater.on("update-available", (info) => {
+    console.log("[wellcord] atualização disponível:", info?.version);
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "WellCORD atualizado",
+      message: `Versão ${info?.version || "nova"} baixada. Reiniciar agora para aplicar?`,
+      buttons: ["Reiniciar agora", "Depois"],
+      defaultId: 0,
+    }).then(({ response }) => {
+      if (response === 0) {
+        try { autoUpdater.quitAndInstall(false, true); } catch {}
+      }
+    }).catch(() => {});
+  });
+  autoUpdater.on("error", (e) => console.warn("[wellcord] updater:", e?.message || e));
+  const check = () => { try { autoUpdater.checkForUpdates().catch(() => {}); } catch {} };
+  setTimeout(check, 30 * 1000); // após abrir
+  updateCheckTimer = setInterval(check, 6 * 60 * 60 * 1000); // a cada 6h
+}
+
+function checkUpdates(manual) {
+  if (isDev) return;
+  try {
+    const { autoUpdater } = require("electron-updater");
+    autoUpdater.checkForUpdates().then((r) => {
+      if (manual && r && !r.updateInfo && mainWindow) {
+        dialog.showMessageBox(mainWindow, { type: "info", title: "WellCORD", message: "Você já está na versão mais recente." }).catch(() => {});
+      }
+    }).catch(() => {
+      if (manual && mainWindow) dialog.showMessageBox(mainWindow, { type: "warning", title: "WellCORD", message: "Não foi possível verificar agora. Tente mais tarde." }).catch(() => {});
+    });
+  } catch {}
+}
+
+app.whenReady().then(async () => {  // Electron não tem seletor de tela nativo: o app fornece a fonte
   // (escolhida no picker, ou tela principal) + áudio do sistema via loopback
   try {
     session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
@@ -234,6 +282,7 @@ app.whenReady().then(async () => {
     }
   }
   setupTray();
+  setupAutoUpdate();
   createWindow();
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
