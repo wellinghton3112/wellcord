@@ -265,7 +265,7 @@ export default function DiscordClone() {
   const signOut = async () => { await supabase.auth.signOut(); router.push("/login"); };
 
   if (loading) {
-    return <div className="h-screen w-screen bg-[#313338] flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳</div>;
+    return <div className="h-screen w-screen bg-[#313338] flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳ v0.1.86</div>;
   }
 
   return (
