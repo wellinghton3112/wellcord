@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { Server } from "@/lib/chat-types";
+import { toast, confirmDialog } from "@/lib/ui";
 
 // Ações de servidor/canal: modais, CRUD e upload de ícones.
 // Extraído de page.tsx sem mudança de comportamento.
@@ -39,7 +40,7 @@ export function useServerActions(
   const canManage = (s: Server) => !s.owner_id || s.owner_id === userId;
 
   const openEditServer = (s: Server) => {
-    if (!canManage(s)) { alert("Só o dono do servidor pode editar."); return; }
+    if (!canManage(s)) { toast("Só o dono do servidor pode editar."); return; }
     setEditingServer(s);
     setNewServerName(s.name);
     setNewServerIcon(s.icon);
@@ -49,14 +50,14 @@ export function useServerActions(
   };
   const handleServerSave = async () => {
     if (!newServerName.trim()) return;
-    if (!userId) { alert("Sessão expirada — faça login de novo antes de criar o servidor."); return; }
+    if (!userId) { toast("Sessão expirada — faça login de novo antes de criar o servidor."); return; }
     setCreatingServer(true);
     let image_url: string | null = editingServer?.image_url || null;
     if (newServerImage) {
       const ext = newServerImage.name.split(".").pop();
       const path = `${userId}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("server-icons").upload(path, newServerImage);
-      if (upErr) { alert("Erro ao subir imagem: " + upErr.message); setCreatingServer(false); return; }
+      if (upErr) { toast("Erro ao subir imagem: " + upErr.message); setCreatingServer(false); return; }
       const { data } = supabase.storage.from("server-icons").getPublicUrl(path);
       image_url = data.publicUrl;
     } else if (!newServerPreview && editingServer?.image_url) {
@@ -64,14 +65,14 @@ export function useServerActions(
     }
     if (editingServer) {
       const { error } = await supabase.from("servers").update({ name: newServerName, icon: newServerIcon, image_url }).eq("id", editingServer.id);
-      if (error) alert(error.message);
+      if (error) toast(error.message);
     } else {
       const { data, error } = await supabase.from("servers").insert({ name: newServerName, icon: newServerIcon, image_url, owner_id: userId }).select().single();
-      if (error) { alert(error.message); setCreatingServer(false); return; }
+      if (error) { toast(error.message); setCreatingServer(false); return; }
       await supabase.from("channels").insert({ server_id: data.id, name: "geral", type: "text", icon: "💬" });
       // Dono entra como primeiro membro: servidor nasce privado (erro aqui não pode passar batido)
       const { error: memErr } = await supabase.from("server_members").insert({ server_id: data.id, user_id: userId, role: "owner" });
-      if (memErr) { alert("Servidor criado, mas falhou ao te registrar como dono: " + memErr.message); setCreatingServer(false); return; }
+      if (memErr) { toast("Servidor criado, mas falhou ao te registrar como dono: " + memErr.message); setCreatingServer(false); return; }
       setSelectedServer(data.id);
       setTimeout(async () => {
         const { data: ch } = await supabase.from("channels").select("*").eq("server_id", data.id).limit(1).single();
@@ -83,9 +84,9 @@ export function useServerActions(
   };
 
   const deleteServer = async () => {    if (!currentServer) return;
-    if (!confirm(`Excluir servidor "${currentServer.name}" e todos os canais?`)) return;
+    if (!(await confirmDialog(`Excluir servidor "${currentServer.name}" e todos os canais?`, { confirmLabel: "Excluir" }))) return;
     const { error } = await supabase.from("servers").delete().eq("id", currentServer.id);
-    if (error) return alert(error.message);
+    if (error) return toast(error.message);
     // seleciona outro servidor
     const remaining = servers.filter((s) => s.id !== currentServer.id);
     if (remaining.length > 0) {
@@ -101,12 +102,12 @@ export function useServerActions(
   const leaveServer = async (userIdSelf: string | undefined) => {
     if (!currentServer || !userIdSelf) return;
     if (currentServer.owner_id && currentServer.owner_id === userIdSelf) {
-      alert("Você é o dono — transfira ou exclua o servidor em vez de sair.");
+      toast("Você é o dono — transfira ou exclua o servidor em vez de sair.");
       return;
     }
-    if (!confirm(`Sair de "${currentServer.name}"?`)) return;
+    if (!(await confirmDialog(`Sair de "${currentServer.name}"?`, { confirmLabel: "Sair", danger: false }))) return;
     const { error } = await supabase.from("server_members").delete().eq("server_id", currentServer.id).eq("user_id", userIdSelf);
-    if (error) return alert(error.message);
+    if (error) return toast(error.message);
     const remaining = servers.filter((s) => s.id !== currentServer.id);
     if (remaining.length > 0) {
       setSelectedServer(remaining[0].id);
@@ -118,9 +119,9 @@ export function useServerActions(
   };
 
   const deleteChannel = async (channelId: string, channelName: string) => {
-    if (!confirm(`Excluir canal #${channelName}? Mensagens serão perdidas.`)) return;
+    if (!(await confirmDialog(`Excluir canal #${channelName}? Mensagens serão perdidas.`, { confirmLabel: "Excluir" }))) return;
     const { error } = await supabase.from("channels").delete().eq("id", channelId);
-    if (error) alert(error.message);
+    if (error) toast(error.message);
     else if (selectedChannel === channelId) {
       const next = currentServer?.channels.find((c) => c.id !== channelId);
       if (next) setSelectedChannel(next.id);
@@ -145,7 +146,7 @@ export function useServerActions(
       const ext = newChannelImage.name.split(".").pop();
       const path = `${userId}/${currentServer.id}/${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from("channel-icons").upload(path, newChannelImage);
-      if (upErr) { alert("Erro ao subir imagem: " + upErr.message); setCreatingChannel(false); return; }
+      if (upErr) { toast("Erro ao subir imagem: " + upErr.message); setCreatingChannel(false); return; }
       const { data } = supabase.storage.from("channel-icons").getPublicUrl(path);
       image_url = data.publicUrl;
     }
@@ -157,7 +158,7 @@ export function useServerActions(
       image_url,
     });
     setCreatingChannel(false);
-    if (error) alert(error.message);
+    if (error) toast(error.message);
     else setShowCreateChannelModal(false);
   };
 

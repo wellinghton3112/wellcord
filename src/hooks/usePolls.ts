@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Poll } from "@/lib/chat-types";
+import { toast, confirmDialog } from "@/lib/ui";
 
 // Enquetes do canal: criar, votar (troca liberada) e realtime. Novo (feature polls).
 export function usePolls(supabase: any, user: any, username: string, selectedChannel: string) {
@@ -72,11 +73,11 @@ export function usePolls(supabase: any, user: any, username: string, selectedCha
       .insert({ channel_id: selectedChannel, user_id: user.id, username, question: question.trim() })
       .select()
       .single();
-    if (error || !poll) { alert("Erro ao criar enquete: " + (error?.message || "")); return null; }
+    if (error || !poll) { toast("Erro ao criar enquete: " + (error?.message || "")); return null; }
     const { error: optErr } = await supabase.from("poll_options").insert(
       clean.map((label, i) => ({ poll_id: poll.id, label, position: i }))
     );
-    if (optErr) alert("Enquete criada, mas falhou opções: " + optErr.message);
+    if (optErr) toast("Enquete criada, mas falhou opções: " + optErr.message);
     await load();
     return poll.id as string;
   };
@@ -87,19 +88,19 @@ export function usePolls(supabase: any, user: any, username: string, selectedCha
     const mine = poll?.options.find((o) => o.id === optionId)?.mine;
     if (mine) {
       const { error } = await supabase.from("poll_votes").delete().eq("poll_id", pollId).eq("user_id", user.id);
-      if (error) alert("Erro ao tirar voto: " + error.message);
+      if (error) toast("Erro ao tirar voto: " + error.message);
     } else {
       const { error } = await supabase
         .from("poll_votes")
         .upsert({ poll_id: pollId, option_id: optionId, user_id: user.id }, { onConflict: "poll_id,user_id" });
-      if (error) alert("Erro ao votar: " + error.message);
+      if (error) toast("Erro ao votar: " + error.message);
     }
   };
 
   const deletePoll = async (pollId: string) => {
-    if (!confirm("Apagar esta enquete?")) return;
+    if (!(await confirmDialog("Apagar esta enquete?", { confirmLabel: "Apagar" }))) return;
     const { error } = await supabase.from("polls").delete().eq("id", pollId);
-    if (error) alert("Erro ao apagar: " + error.message);
+    if (error) toast("Erro ao apagar: " + error.message);
   };
 
   return { polls, createPoll, toggleVote, deletePoll };

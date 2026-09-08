@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { toast } from "@/lib/ui";
 
 export type PinnedItem = {
   message_id: string;
@@ -52,10 +53,10 @@ export function usePins(supabase: any, user: any, selectedChannel: string, isOwn
     if (!user) return;
     if (pinnedIds.has(messageId)) {
       const { error } = await supabase.from("pinned_messages").delete().eq("channel_id", selectedChannel).eq("message_id", messageId);
-      if (error) alert("Erro ao desafixar: " + error.message);
+      if (error) toast("Erro ao desafixar: " + error.message);
     } else {
       const { error } = await supabase.from("pinned_messages").insert({ channel_id: selectedChannel, message_id: messageId, pinned_by: user.id });
-      if (error) alert("Erro ao fixar: " + error.message);
+      if (error) toast("Erro ao fixar: " + error.message);
     }
   };
 

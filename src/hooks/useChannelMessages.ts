@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Message, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { extractMentions, sendNotify } from "@/lib/notify";
+import { toast, confirmDialog } from "@/lib/ui";
 
 const PAGE = 100;
 
@@ -155,7 +156,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
 
   const attachFile = async (file: File) => {
     if (!user || !serverId) return;
-    if (file.size > MAX_FILE_MB * 1024 * 1024) { alert(`Arquivo maior que ${MAX_FILE_MB}MB.`); return; }
+    if (file.size > MAX_FILE_MB * 1024 * 1024) { toast(`Arquivo maior que ${MAX_FILE_MB}MB.`); return; }
     setUploading(true);
     try {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -165,7 +166,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       const { data } = supabase.storage.from("chat-files").getPublicUrl(path);
       setPendingFile({ url: data.publicUrl, name: file.name, type: file.type });
     } catch (e: any) {
-      alert("Falha no upload: " + (e?.message || e));
+      toast("Falha no upload: " + (e?.message || e));
     } finally {
       setUploading(false);
     }
@@ -203,7 +204,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     });
     if (error) {
       console.error(error);
-      alert("Erro ao enviar: " + error.message);
+      toast("Erro ao enviar: " + error.message);
       setInput(content);
       setReplyTo(reply);
       setPendingFile(file);
@@ -224,13 +225,13 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
   const editMessage = async (id: string, content: string) => {
     if (!content.trim()) return;
     const { error } = await supabase.from("messages").update({ content }).eq("id", id);
-    if (error) alert("Erro ao editar: " + error.message);
+    if (error) toast("Erro ao editar: " + error.message);
   };
 
   const deleteMessage = async (id: string) => {
-    if (!confirm("Excluir esta mensagem?")) return;
+    if (!(await confirmDialog("Excluir esta mensagem?", { confirmLabel: "Excluir" }))) return;
     const { error } = await supabase.from("messages").delete().eq("id", id);
-    if (error) alert("Erro ao excluir: " + error.message);
+    if (error) toast("Erro ao excluir: " + error.message);
   };
 
   const toggleReaction = async (messageId: string, emoji: string) => {
@@ -238,10 +239,10 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
     const mine = reactions[messageId]?.find((r) => r.emoji === emoji)?.mine;
     if (mine) {
       const { error } = await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", user.id).eq("emoji", emoji);
-      if (error) alert("Erro ao remover reação: " + error.message);
+      if (error) toast("Erro ao remover reação: " + error.message);
     } else {
       const { error } = await supabase.from("message_reactions").insert({ message_id: messageId, user_id: user.id, emoji });
-      if (error) alert("Erro ao reagir: " + error.message);
+      if (error) toast("Erro ao reagir: " + error.message);
     }
   };
 

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { toast, confirmDialog } from "@/lib/ui";
 
 export type Friend = {
   user_id: string;
@@ -78,12 +79,12 @@ export function useFriends(supabase: any, user: any) {
     setSending(true);
     try {
       const { data: prof } = await supabase.from("profiles").select("id, username").ilike("username", username.trim()).limit(1).maybeSingle();
-      if (!prof) { alert("Usuário não encontrado"); return false; }
-      if (prof.id === user.id) { alert("Não dá para adicionar você mesmo."); return false; }
+      if (!prof) { toast("Usuário não encontrado"); return false; }
+      if (prof.id === user.id) { toast("Não dá para adicionar você mesmo."); return false; }
       const { error } = await supabase.from("friend_requests").insert({ from_user: user.id, to_user: prof.id });
       if (error) {
-        if (/duplicate|conflict|unique/i.test(error.message)) alert("Pedido já existe (ou já são amigos).");
-        else alert(error.message);
+        if (/duplicate|conflict|unique/i.test(error.message)) toast("Pedido já existe (ou já são amigos).");
+        else toast(error.message);
         return false;
       }
       // Se o outro já tinha pedido pra mim, vira amizade na hora
@@ -102,25 +103,25 @@ export function useFriends(supabase: any, user: any) {
   const accept = async (fromId: string) => {
     // Aceita o pedido dele (linha única — sem espelho, sem duplicar)
     const { error } = await supabase.from("friend_requests").update({ status: "accepted" }).eq("from_user", fromId).eq("to_user", user.id);
-    if (error) { alert(error.message); return; }
+    if (error) { toast(error.message); return; }
     await load();
   };
 
   const reject = async (fromId: string) => {
-    if (!confirm("Recusar o pedido?")) return;
+    if (!(await confirmDialog("Recusar o pedido?", { confirmLabel: "Recusar" }))) return;
     const { error } = await supabase.from("friend_requests").delete().eq("from_user", fromId).eq("to_user", user.id);
-    if (error) alert(error.message);
+    if (error) toast(error.message);
     else load();
   };
 
   const cancelOutgoing = async (toId: string) => {
     const { error } = await supabase.from("friend_requests").delete().eq("from_user", user.id).eq("to_user", toId);
-    if (error) alert(error.message);
+    if (error) toast(error.message);
     else load();
   };
 
   const removeFriend = async (friendId: string, username: string) => {
-    if (!confirm(`Remover ${username} dos amigos? (DMs existentes continuam)`)) return;
+    if (!(await confirmDialog(`Remover ${username} dos amigos? (DMs existentes continuam)`, { confirmLabel: "Remover" }))) return;
     await supabase.from("friend_requests").delete().eq("from_user", user.id).eq("to_user", friendId);
     await supabase.from("friend_requests").delete().eq("from_user", friendId).eq("to_user", user.id);
     load();

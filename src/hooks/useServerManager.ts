@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { toast, confirmDialog } from "@/lib/ui";
 
 export type ServerMember = {
   user_id: string;
@@ -73,11 +74,11 @@ export function useServerManager(supabase: any, serverId: string | undefined, ow
   }, [serverId, supabase]);
 
   const kick = async (target: ServerMember, myId: string | undefined) => {
-    if (target.user_id === myId) { alert("Você não pode se remover — use Sair."); return; }
-    if (target.user_id === ownerId) { alert("Não dá para remover o dono."); return; }
-    if (!confirm(`Remover ${target.username} do servidor?`)) return;
+    if (target.user_id === myId) { toast("Você não pode se remover — use Sair."); return; }
+    if (target.user_id === ownerId) { toast("Não dá para remover o dono."); return; }
+    if (!(await confirmDialog(`Remover ${target.username} do servidor?`, { confirmLabel: "Remover" }))) return;
     const { error } = await supabase.from("server_members").delete().eq("server_id", serverId).eq("user_id", target.user_id);
-    if (error) alert(error.message);
+    if (error) toast(error.message);
     else load();
   };
 
@@ -96,14 +97,14 @@ export function useServerManager(supabase: any, serverId: string | undefined, ow
       });
       if (!error) { load(); return code; }
     }
-    alert("Não foi possível criar o convite.");
+    toast("Não foi possível criar o convite.");
     return null;
   };
 
   const revokeInvite = async (code: string) => {
-    if (!confirm(`Revogar o convite ${code}? Links já enviados param de funcionar.`)) return;
+    if (!(await confirmDialog(`Revogar o convite ${code}? Links já enviados param de funcionar.`, { confirmLabel: "Revogar" }))) return;
     const { error } = await supabase.from("server_invites").delete().eq("code", code);
-    if (error) alert(error.message);
+    if (error) toast(error.message);
     else load();
   };
 

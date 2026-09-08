@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DMConversation, DMMessage, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import { extractMentions, sendNotify } from "@/lib/notify";
 import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
+import { toast, confirmDialog } from "@/lib/ui";
 
 const PAGE = 100;
 
@@ -189,7 +190,7 @@ export function useDMs(
 
   const attachDmFile = async (file: File) => {
     if (!user || !selectedDM) return;
-    if (file.size > MAX_FILE_MB * 1024 * 1024) { alert(`Arquivo maior que ${MAX_FILE_MB}MB.`); return; }
+    if (file.size > MAX_FILE_MB * 1024 * 1024) { toast(`Arquivo maior que ${MAX_FILE_MB}MB.`); return; }
     setUploadingDm(true);
     try {
       const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
@@ -199,7 +200,7 @@ export function useDMs(
       const { data } = supabase.storage.from("chat-files").getPublicUrl(path);
       setPendingDmFile({ url: data.publicUrl, name: file.name, type: file.type });
     } catch (e: any) {
-      alert("Falha no upload: " + (e?.message || e));
+      toast("Falha no upload: " + (e?.message || e));
     } finally {
       setUploadingDm(false);
     }
@@ -285,7 +286,7 @@ export function useDMs(
       file_name: file?.name || null,
       file_type: file?.type || null,
     });
-    if (error) { alert(error.message); setDmInput(content); setDmReplyTo(reply); setPendingDmFile(file); return; }
+    if (error) { toast(error.message); setDmInput(content); setDmReplyTo(reply); setPendingDmFile(file); return; }
     // DM sempre notifica o outro participante (fire-and-forget)
     const other = conv?.participants.find((p) => p.id !== user.id);
     if (other) {
@@ -300,8 +301,8 @@ export function useDMs(
     if (!newDMUsername.trim() || !user) return;
     setCreatingDM(true);
     const { data: prof } = await supabase.from("profiles").select("id, username").ilike("username", `%${newDMUsername.trim()}%`).limit(1).maybeSingle();
-    if (!prof) { alert("Usuário não encontrado"); setCreatingDM(false); return; }
-    if (prof.id === user.id) { alert("Não pode criar DM consigo mesmo"); setCreatingDM(false); return; }
+    if (!prof) { toast("Usuário não encontrado"); setCreatingDM(false); return; }
+    if (prof.id === user.id) { toast("Não pode criar DM consigo mesmo"); setCreatingDM(false); return; }
     await openWithId(prof.id);
     setShowNewDMModal(false);
     setCreatingDM(false);
@@ -322,7 +323,7 @@ export function useDMs(
     if (existing) { setSelectedDM(existing); setViewMode("dm"); return; }
     const convId = crypto.randomUUID();
     const { error } = await supabase.from("dm_conversations").insert({ id: convId });
-    if (error) { alert(error?.message || "Erro"); return; }
+    if (error) { toast(error?.message || "Erro"); return; }
     await supabase.from("dm_participants").insert([{ conversation_id: convId, user_id: user.id }, { conversation_id: convId, user_id: otherId }]);
     await loadDMs();
     setSelectedDM(convId);
@@ -336,13 +337,13 @@ export function useDMs(
   const editDMMessage = async (id: string, content: string) => {
     if (!content.trim()) return;
     const { error } = await supabase.from("dm_messages").update({ content }).eq("id", id);
-    if (error) alert("Erro ao editar: " + error.message);
+    if (error) toast("Erro ao editar: " + error.message);
   };
 
   const deleteDMMessage = async (id: string) => {
-    if (!confirm("Excluir esta mensagem?")) return;
+    if (!(await confirmDialog("Excluir esta mensagem?", { confirmLabel: "Excluir" }))) return;
     const { error } = await supabase.from("dm_messages").delete().eq("id", id);
-    if (error) alert("Erro ao excluir: " + error.message);
+    if (error) toast("Erro ao excluir: " + error.message);
   };
 
   const toggleDMReaction = async (messageId: string, emoji: string) => {
@@ -350,10 +351,10 @@ export function useDMs(
     const mine = dmReactions[messageId]?.find((r) => r.emoji === emoji)?.mine;
     if (mine) {
       const { error } = await supabase.from("dm_reactions").delete().eq("message_id", messageId).eq("user_id", user.id).eq("emoji", emoji);
-      if (error) alert("Erro ao remover reação: " + error.message);
+      if (error) toast("Erro ao remover reação: " + error.message);
     } else {
       const { error } = await supabase.from("dm_reactions").insert({ message_id: messageId, user_id: user.id, emoji });
-      if (error) alert("Erro ao reagir: " + error.message);
+      if (error) toast("Erro ao reagir: " + error.message);
     }
   };
 

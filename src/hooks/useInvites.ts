@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { toast } from "@/lib/ui";
 
 // Convites de servidor: criar/copiar e resgatar.
 // Extraído como hook novo (feature membership).
@@ -39,7 +40,7 @@ export function useInvites(supabase: any, user: any) {
         return code;
       }
     }
-    alert("Não foi possível criar o convite.");
+    toast("Não foi possível criar o convite.");
     setCreatingInvite(false);
     return "";
   };
@@ -50,7 +51,7 @@ export function useInvites(supabase: any, user: any) {
     if (!clean || !user) return null;
     const { data, error } = await supabase.rpc("redeem_invite", { p_code: clean });
     if (error) {
-      alert(error.message);
+      toast(error.message);
       return null;
     }
     return data as string;

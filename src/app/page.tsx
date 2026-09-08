@@ -20,6 +20,8 @@ import { useInvites } from "@/hooks/useInvites";
 import { useFriends } from "@/hooks/useFriends";
 import { useActiveNow } from "@/hooks/useActiveNow";
 import { useServerManager } from "@/hooks/useServerManager";
+import Toaster from "@/components/Toaster";
+import { toast as uiToast } from "@/lib/ui";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
@@ -234,7 +236,7 @@ export default function DiscordClone() {
       setAvatarRemoved(false);
       setShowUsernameModal(false);
     } catch (e: any) {
-      alert("Erro ao salvar perfil: " + (e?.message || e));
+      uiToast("Erro ao salvar perfil: " + (e?.message || e));
     } finally {
       setSavingProfile(false);
     }
@@ -486,8 +488,7 @@ export default function DiscordClone() {
 
       {toast && (
         <button
-          onClick={openToast}
-          className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-[#2B2D31] border border-[#5865F2] rounded-lg p-3 shadow-2xl flex items-start gap-3 text-left hover:brightness-110 transition"
+          onClick={openToast}          className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-[#2B2D31] border border-[#5865F2] rounded-lg p-3 shadow-2xl flex items-start gap-3 text-left hover:brightness-110 transition"
         >
           <span className="w-9 h-9 rounded-full bg-[#5865F2] flex items-center justify-center shrink-0">
             <Bell className="w-4 h-4 text-white" />
@@ -532,6 +533,7 @@ export default function DiscordClone() {
           onCreate={createPoll}
         />
       )}
+      <Toaster />
     </div>
     </VoiceProvider>
   );
