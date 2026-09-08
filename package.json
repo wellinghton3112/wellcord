@@ -46,7 +46,10 @@
     ],
     "win": {
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
       ],
       "artifactName": "WellCORD-Setup-${version}.${ext}",
       "icon": "assets/icon.ico"
