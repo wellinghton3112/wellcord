@@ -399,26 +399,22 @@ async function downloadAndUpdate(zipUrl, newVersion) {
       "@echo off",
       "title WellCORD - Atualizando...",
       "echo Aguardando WellCORD fechar...",
-      // Espera o WellCORD.exe fechar (checagem a cada 1s, max 30s)
-      `tasklist /FI "IMAGENAME eq WellCORD.exe" 2>NUL | find /I "WellCORD.exe" >NUL`,
-      `if %errorlevel%==0 (`,
-      `  echo Processo ainda rodando, aguardando...`,
-      `  timeout /t 2 /nobreak >NUL`,
-      `  taskkill /F /IM WellCORD.exe >NUL 2>&1`,
-      `  timeout /t 1 /nobreak >NUL`,
-      `)`,
-      // Copiar novos arquivos sobre os antigos (ignora erros de arquivos em uso)
-      `echo Copiando arquivos atualizados...`,
-      `xcopy /E /Y /Q "${srcDir}\\*" "${currentAppDir}\\" >NUL 2>&1`,
+      // Mata o processo se ainda estiver rodando
+      "taskkill /F /IM WellCORD.exe >NUL 2>&1",
+      // Espera 2 segundos para garantir que libera os arquivos
+      "timeout /t 2 /nobreak >NUL",
+      // Copiar novos arquivos sobre os antigos
+      "echo Copiando arquivos atualizados...",
+      `robocopy "${srcDir}" "${currentAppDir}" /E /Y /R:1 /W:1 >NUL 2>&1`,
       // Limpar temporários
-      `echo Limpando arquivos temporários...`,
+      "echo Limpando arquivos temporários...",
       `rd /S /Q "${extractDir}" >NUL 2>&1`,
       `del "${zipPath}" >NUL 2>&1`,
       // Reabrir o app
-      `echo Iniciando WellCORD...`,
+      "echo Iniciando WellCORD...",
       `start "" "${currentAppDir}\\WellCORD.exe"`,
       // Auto-deletar o script
-      `timeout /t 3 /nobreak >NUL`,
+      "timeout /t 3 /nobreak >NUL",
       `del "%~f0" >NUL 2>&1`,
     ].join("\r\n");
 
