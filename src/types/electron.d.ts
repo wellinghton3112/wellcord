@@ -19,6 +19,10 @@ declare global {
         list: () => Promise<{ id: string; name: string; screen: boolean; thumbnail: string | null }[]>;
         pick: (id: string) => Promise<boolean>;
       };
+      update?: {
+        check: () => void;
+        onProgress: (cb: (data: { phase: string; pct?: number; downloaded?: number; total?: number; path?: string; error?: string; version?: string }) => void) => () => void;
+      };
     };
   }
 }

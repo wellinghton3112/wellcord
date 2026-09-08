@@ -42,4 +42,14 @@ contextBridge.exposeInMainWorld("wellcord", {
     list: () => ipcRenderer.invoke("screens-list"),
     pick: (id) => ipcRenderer.invoke("screens-pick", id),
   },
+  update: {
+    // Verifica atualização (abre diálogo se disponível)
+    check: () => ipcRenderer.send("update-check"),
+    // Progresso do download (para exibir no renderer)
+    onProgress: (cb) => {
+      const h = (_e, data) => cb(data);
+      ipcRenderer.on("update-download-progress", h);
+      return () => ipcRenderer.removeListener("update-download-progress", h);
+    },
+  },
 });

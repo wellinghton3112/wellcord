@@ -43,7 +43,7 @@ function trayMenu() {
   const login = app.getLoginItemSettings();
   return [
     { label: "Abrir WellCORD", click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-    { label: "Verificar atualizações", click: () => checkUpdates(true) },
+      { label: "Verificar atualizações", click: () => checkForUpdate(true) },
     { type: "separator" },
     {
       label: "Push-to-talk",
@@ -106,6 +106,9 @@ ipcMain.handle("ptt-set", (_e, accelerator) => {  try {
 
 // Seletor de tela próprio (estilo Discord): telas + janelas com miniatura
 let pendingScreenId = null;
+
+// Update progress para o renderer
+ipcMain.on("update-check", () => checkForUpdate(true));
 ipcMain.handle("screens-list", async () => {
   try {
     const sources = await desktopCapturer.getSources({
@@ -226,56 +229,160 @@ ipcMain.on("notify-show", (_e, n) => {
   } catch {}
 });
 
-// Auto-update via Releases do GitHub (só no .exe instalado)
-let updateCheckTimer = null;
-function setupAutoUpdate() {
-  if (isDev) return;
-  let autoUpdater = null;
-  try {
-    ({ autoUpdater } = require("electron-updater"));
-  } catch (e) {
-    console.error("[wellcord] updater indisponível:", e);
-    return;
-  }
-  autoUpdater.autoDownload = true;
-  autoUpdater.on("update-available", (info) => {
-    console.log("[wellcord] atualização disponível:", info?.version);
+// Auto-update via API do GitHub Releases (só no .exe instalado)
+// Usa https direto — mais confiável que electron-updater (evita erros de provider/config)
+const https = require("https");
+const { pipeline } = require("stream");
+const { promisify } = require("util");
+const streamPipeline = promisify(pipeline);
+const fs = require("fs");
+
+const GITHUB_REPO = "wellinghton3112/wellcord";
+
+function fetchLatestRelease() {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "api.github.com",
+      path: `/repos/${GITHUB_REPO}/releases/latest`,
+      headers: { "User-Agent": "WellCORD-Updater", "Accept": "application/vnd.github+json" },
+    };
+    https.get(options, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        try { resolve(JSON.parse(data)); } catch { reject(new Error("JSON parse error")); }
+      });
+    }).on("error", reject);
   });
-  autoUpdater.on("update-downloaded", (info) => {
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "WellCORD atualizado",
-      message: `Versão ${info?.version || "nova"} baixada. Reiniciar agora para aplicar?`,
-      buttons: ["Reiniciar agora", "Depois"],
-      defaultId: 0,
-    }).then(({ response }) => {
-      if (response === 0) {
-        try { autoUpdater.quitAndInstall(false, true); } catch {}
-      }
-    }).catch(() => {});
-  });
-  autoUpdater.on("error", (e) => console.warn("[wellcord] updater:", e?.message || e));
-  const check = () => { try { autoUpdater.checkForUpdates().catch(() => {}); } catch {} };
-  setTimeout(check, 30 * 1000); // após abrir
-  updateCheckTimer = setInterval(check, 6 * 60 * 60 * 1000); // a cada 6h
 }
 
-function checkUpdates(manual) {
+function compareVersions(a, b) {
+  const pa = a.replace(/^v/, "").split(".").map(Number);
+  const pb = b.replace(/^v/, "").split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0, nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+let updateCheckTimer = null;
+let downloading = false;
+let pendingUpdate = null; // { version, exeUrl, size }
+
+function setupAutoUpdate() {
   if (isDev) return;
+  const check = () => checkForUpdate(false);
+  setTimeout(check, 30 * 1000);
+  updateCheckTimer = setInterval(check, 6 * 60 * 60 * 1000);
+}
+
+async function checkForUpdate(manual) {
   const done = (msg, type) => {
     if (manual && mainWindow) dialog.showMessageBox(mainWindow, { type: type || "info", title: "WellCORD", message: msg }).catch(() => {});
   };
   try {
-    const { autoUpdater } = require("electron-updater");
-    autoUpdater.checkForUpdates().then((r) => {
-      // Sem update disponível: avisa (antes ficava em silêncio)
-      if (!r || !r.updateInfo || r.updateInfo.version === app.getVersion()) {
-        done(`Você já está na versão mais recente (${app.getVersion()}).`);
-      }
-      // Com update: o download começa sozinho e avisa ao terminar
-    }).catch(() => done("Não foi possível verificar agora. Tente mais tarde.", "warning"));
-  } catch {
-    done("Verificação indisponível.", "warning");
+    const release = await fetchLatestRelease();
+    if (!release || !release.tag_name) {
+      done("Não foi possível ler informações do GitHub.", "warning");
+      return;
+    }
+    const latestVersion = release.tag_name.replace(/^v/, "");
+    const currentVersion = app.getVersion();
+    if (compareVersions(latestVersion, currentVersion) <= 0) {
+      done(`Você já está na versão mais recente (${currentVersion}).`);
+      return;
+    }
+    // Versão nova encontrada
+    const exeAsset = release.assets.find((a) => /\.exe$/i.test(a.name));
+    if (!exeAsset) {
+      done(`Versão ${latestVersion} disponível, mas o instalador não foi encontrado no GitHub.`, "warning");
+      return;
+    }
+    pendingUpdate = { version: latestVersion, exeUrl: exeAsset.browser_download_url, size: exeAsset.size };
+    console.log(`[wellcord] update disponível: v${latestVersion} (atual: v${currentVersion})`);
+    if (downloading) {
+      done(`Atualização v${latestVersion} já está baixando...`);
+      return;
+    }
+    // Perguntar se quer baixar
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "WellCORD — Atualização disponível",
+      message: `Versão ${latestVersion} disponível!`,
+      detail: `Sua versão: ${currentVersion}\nTamanho: ${Math.round(exeAsset.size / 1024 / 1024)} MB`,
+      buttons: ["Baixar e instalar", "Depois"],
+      defaultId: 0,
+    }).catch(() => ({ response: 1 }));
+    if (response !== 0) return;
+    await downloadAndInstall(pendingUpdate);
+  } catch (e) {
+    console.error("[wellcord] erro ao verificar atualização:", e?.message || e);
+    if (manual) done("Não foi possível verificar agora. Tente mais tarde.", "warning");
+  }
+}
+
+async function downloadAndInstall(update) {
+  if (downloading) return;
+  downloading = true;
+  const tempPath = path.join(app.getPath("temp"), `WellCORD-Setup-${update.version}.exe`);
+  try {
+    console.log(`[wellcord] baixando ${update.exeUrl} -> ${tempPath}`);
+    // Notificar o renderer que começou
+    mainWindow?.webContents.send("update-download-progress", { phase: "start", version: update.version });
+    const file = fs.createWriteStream(tempPath);
+    await new Promise((resolve, reject) => {
+      https.get(update.exeUrl, (res) => {
+        // Seguir redirecionamentos (GitHub CDN)
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          https.get(res.headers.location, (res2) => {
+            streamPipeline(res2, file).then(resolve).catch(reject);
+          }).on("error", reject);
+          return;
+        }
+        if (res.statusCode !== 200) {
+          reject(new Error(`HTTP ${res.statusCode}`));
+          return;
+        }
+        const total = parseInt(res.headers["content-length"] || "0", 10);
+        let downloaded = 0;
+        res.on("data", (chunk) => {
+          downloaded += chunk.length;
+          if (total > 0) {
+            const pct = Math.round((downloaded / total) * 100);
+            mainWindow?.webContents.send("update-download-progress", { phase: "downloading", pct, downloaded, total });
+          }
+        });
+        streamPipeline(res, file).then(resolve).catch(reject);
+      }).on("error", reject);
+    });
+    console.log(`[wellcord] download concluído: ${tempPath}`);
+    mainWindow?.webContents.send("update-download-progress", { phase: "done", path: tempPath });
+    // Perguntar para instalar
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "info",
+      title: "WellCORD atualizado",
+      message: `Versão ${update.version} baixada com sucesso!`,
+      detail: "O instalador será aberto. Siga as instruções para atualizar.",
+      buttons: ["Instalar agora", "Depois"],
+      defaultId: 0,
+    }).catch(() => ({ response: 1 }));
+    if (response === 0) {
+      require("shell").openExternal(tempPath);
+      app.quit();
+    }
+  } catch (e) {
+    console.error("[wellcord] erro no download:", e?.message || e);
+    dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      title: "WellCORD",
+      message: "Falha ao baixar a atualização.",
+      detail: e?.message || "Verifique sua conexão e tente novamente.",
+    }).catch(() => {});
+    mainWindow?.webContents.send("update-download-progress", { phase: "error", error: e?.message });
+  } finally {
+    downloading = false;
   }
 }
 
