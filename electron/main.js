@@ -304,6 +304,20 @@ async function checkForUpdate(manual) {
       done(`Versão ${latestVersion} disponível, mas o pacote portable não foi encontrado.`, "warning");
       return;
     }
+    // Aviso se estiver em pasta protegida (Program Files, Windows, etc.)
+    const currentDir = appDir();
+    const isProtected = /\\(Program Files|Windows|WinSxS)/i.test(currentDir);
+    if (isProtected) {
+      const { response } = await dialog.showMessageBox(mainWindow, {
+        type: "warning",
+        title: "WellCORD — Localização protegida",
+        message: `O WellCORD está em:\n${currentDir}\n\nEsta pasta precisa de permissão de administrador para atualizar.`,
+        detail: "Mova o WellCORD para uma pasta pessoal (ex: C:\\WellCORD\\ ou Desktop\\WellCORD\\) para que as atualizações funcionem automaticamente.",
+        buttons: ["Mover manualmente", "Tentar mesmo assim"],
+        defaultId: 0,
+      }).catch(() => ({ response: 1 }));
+      if (response === 0) return;
+    }
     console.log(`[wellcord] update disponível: v${latestVersion} (atual: v${currentVersion})`);
     if (downloading) {
       done(`Atualização v${latestVersion} já está baixando...`);
@@ -398,16 +412,25 @@ async function downloadAndUpdate(zipUrl, newVersion) {
     const batContent = [
       "@echo off",
       "title WellCORD - Atualizando...",
-      "echo Aguardando WellCORD fechar...",
-      // Mata o processo se ainda estiver rodando
+      "",
+      "REM Verificar se já é admin (elevação automática)",
+      "net session >NUL 2>&1",
+      "if %errorlevel% neq 0 (",
+      "  echo Solicitando permissao de administrador...",
+      `  powershell -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"`,
+      "  exit /b",
+      ")",
+      "",
+      "echo Atualizando WellCORD...",
+      // Matar o processo se ainda estiver rodando
       "taskkill /F /IM WellCORD.exe >NUL 2>&1",
-      // Espera 2 segundos para garantir que libera os arquivos
+      // Esperar liberar os arquivos
       "timeout /t 2 /nobreak >NUL",
       // Copiar novos arquivos sobre os antigos
-      "echo Copiando arquivos atualizados...",
-      `robocopy "${srcDir}" "${currentAppDir}" /E /Y /R:1 /W:1 >NUL 2>&1`,
+      "echo Copiando arquivos...",
+      `robocopy "${srcDir}" "${currentAppDir}" /E /Y /R:2 /W:1 >NUL 2>&1`,
       // Limpar temporários
-      "echo Limpando arquivos temporários...",
+      "echo Limpando...",
       `rd /S /Q "${extractDir}" >NUL 2>&1`,
       `del "${zipPath}" >NUL 2>&1`,
       // Reabrir o app
