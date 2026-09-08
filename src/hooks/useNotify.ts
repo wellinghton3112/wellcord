@@ -13,7 +13,8 @@ export function useNotify(supabase: any, user: any) {
   useEffect(() => {
     unlockAudio();
     if (!user) return;
-    // Pendentes que chegaram com o app fechado
+    // Pendentes que chegaram com o app fechado — só se forem recentes (<2min),
+    // resto é passado e apaga silencioso para não ressuscitar
     supabase
       .from("notifications")
       .select("*")
@@ -22,19 +23,23 @@ export function useNotify(supabase: any, user: any) {
       .limit(1)
       .maybeSingle()
       .then(({ data }: any) => {
-        if (data) {
-          playPop();
-          setToast({
-            key: Date.now(),
-            notifId: data.id,
-            kind: data.kind,
-            from: data.sender,
-            snippet: data.snippet,
-            serverId: data.server_id || undefined,
-            channelId: data.channel_id || undefined,
-            conversationId: data.conversation_id || undefined,
-          });
+        if (!data) return;
+        const ageMs = Date.now() - new Date(data.created_at).getTime();
+        if (ageMs > 2 * 60 * 1000) {
+          supabase.from("notifications").delete().eq("user_id", user.id).then(() => {});
+          return;
         }
+        playPop();
+        setToast({
+          key: Date.now(),
+          notifId: data.id,
+          kind: data.kind,
+          from: data.sender,
+          snippet: data.snippet,
+          serverId: data.server_id || undefined,
+          channelId: data.channel_id || undefined,
+          conversationId: data.conversation_id || undefined,
+        });
       });
     const ch = supabase
       .channel(`notifications-${user.id}`)
@@ -63,18 +68,19 @@ export function useNotify(supabase: any, user: any) {
     return () => { supabase.removeChannel(ch); };
   }, [user, supabase]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 12000);
-    return () => clearTimeout(t);
-  }, [toast]);
-
   const dismiss = useCallback(() => {
     setToast((cur) => {
       if (cur) supabase.from("notifications").delete().eq("id", cur.notifId).then(() => {});
       return null;
     });
   }, [supabase]);
+
+  // Sumir sozinho também apaga (senão volta no próximo login)
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => dismiss(), 12000);
+    return () => clearTimeout(t);
+  }, [toast, dismiss]);
 
   return { toast, dismiss };
 }
