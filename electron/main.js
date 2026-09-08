@@ -240,16 +240,21 @@ function setupAutoUpdate() {
 
 function checkUpdates(manual) {
   if (isDev) return;
+  const done = (msg, type) => {
+    if (manual && mainWindow) dialog.showMessageBox(mainWindow, { type: type || "info", title: "WellCORD", message: msg }).catch(() => {});
+  };
   try {
     const { autoUpdater } = require("electron-updater");
     autoUpdater.checkForUpdates().then((r) => {
-      if (manual && r && !r.updateInfo && mainWindow) {
-        dialog.showMessageBox(mainWindow, { type: "info", title: "WellCORD", message: "Você já está na versão mais recente." }).catch(() => {});
+      // Sem update disponível: avisa (antes ficava em silêncio)
+      if (!r || !r.updateInfo || r.updateInfo.version === app.getVersion()) {
+        done(`Você já está na versão mais recente (${app.getVersion()}).`);
       }
-    }).catch(() => {
-      if (manual && mainWindow) dialog.showMessageBox(mainWindow, { type: "warning", title: "WellCORD", message: "Não foi possível verificar agora. Tente mais tarde." }).catch(() => {});
-    });
-  } catch {}
+      // Com update: o download começa sozinho e avisa ao terminar
+    }).catch(() => done("Não foi possível verificar agora. Tente mais tarde.", "warning"));
+  } catch {
+    done("Verificação indisponível.", "warning");
+  }
 }
 
 app.whenReady().then(async () => {  // Electron não tem seletor de tela nativo: o app fornece a fonte
