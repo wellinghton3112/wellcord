@@ -28,6 +28,15 @@ contextBridge.exposeInMainWorld("wellcord", {
       return () => ipcRenderer.removeListener("voice-control", h);
     },
   },
+  notify: {
+    // Toast nativo do Windows (main decide se mostra: só fora de foco)
+    show: (n) => ipcRenderer.send("notify-show", n),
+    onClick: (cb) => {
+      const h = (_e, ref) => cb(ref);
+      ipcRenderer.on("notify-click", h);
+      return () => ipcRenderer.removeListener("notify-click", h);
+    },
+  },
   screens: {
     // Seletor próprio (só no .exe; no navegador é null)
     list: () => ipcRenderer.invoke("screens-list"),

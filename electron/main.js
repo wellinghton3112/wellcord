@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain, globalShortcut, session, desktopCapturer, dialog } = require("electron");
+const { app, BrowserWindow, shell, Tray, Menu, nativeImage, ipcMain, globalShortcut, session, desktopCapturer, dialog, Notification } = require("electron");
 const path = require("path");
 
 const isDev = !app.isPackaged;
@@ -202,6 +202,28 @@ app.on("second-instance", () => {
     mainWindow.show();
     mainWindow.focus();
   }
+});
+
+// Notificação nativa do Windows (só quando o app não está em foco)
+ipcMain.on("notify-show", (_e, n) => {
+  try {
+    if (!n || mainWindow?.isFocused()) return;
+    const notif = new Notification({
+      title: n.title || "WellCORD",
+      body: n.body || "",
+      icon: assetPath("tray.png"),
+      appName: "WellCORD",
+    });
+    notif.on("click", () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+        mainWindow.webContents.send("notify-click", n.ref || null);
+      }
+    });
+    notif.show();
+  } catch {}
 });
 
 // Auto-update via Releases do GitHub (só no .exe instalado)

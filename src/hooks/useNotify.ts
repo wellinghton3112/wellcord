@@ -5,6 +5,16 @@ import { playPop, unlockAudio } from "@/lib/sound";
 
 export type Toast = NotifyPayload & { key: number; notifId: string };
 
+function fireNative(t: { kind: string; from: string; snippet: string; serverId?: string; channelId?: string; conversationId?: string }) {
+  try {
+    window.wellcord?.notify.show({
+      title: t.kind === "dm" ? `DM de ${t.from}` : `${t.from} mencionou você`,
+      body: t.snippet || "Nova mensagem",
+      ref: { kind: t.kind, serverId: t.serverId, channelId: t.channelId, conversationId: t.conversationId },
+    });
+  } catch {}
+}
+
 // Escuta minhas notificações (tabela + realtime) e toca som.
 // Dispensar apaga a linha (não volta no próximo login).
 export function useNotify(supabase: any, user: any) {
@@ -30,6 +40,14 @@ export function useNotify(supabase: any, user: any) {
           return;
         }
         playPop();
+        fireNative({
+          kind: data.kind,
+          from: data.sender,
+          snippet: data.snippet,
+          serverId: data.server_id || undefined,
+          channelId: data.channel_id || undefined,
+          conversationId: data.conversation_id || undefined,
+        });
         setToast({
           key: Date.now(),
           notifId: data.id,
@@ -50,6 +68,14 @@ export function useNotify(supabase: any, user: any) {
           const r = payload.new;
           if (!r) return;
           playPop();
+          fireNative({
+            kind: r.kind,
+            from: r.sender,
+            snippet: r.snippet,
+            serverId: r.server_id || undefined,
+            channelId: r.channel_id || undefined,
+            conversationId: r.conversation_id || undefined,
+          });
           setToast({
             key: Date.now(),
             notifId: r.id,

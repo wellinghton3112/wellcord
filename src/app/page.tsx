@@ -117,6 +117,26 @@ export default function DiscordClone() {
 
   // Notificações (menções + DMs): toast clicável que navega
   const { toast, dismiss } = useNotify(supabase, user);
+
+  const openToastRef = (ref: { kind: string; serverId?: string; channelId?: string; conversationId?: string } | null) => {
+    if (!ref) return;
+    if (ref.kind === "dm" && ref.conversationId) {
+      setViewMode("dm");
+      setSelectedDM(ref.conversationId);
+    } else if (ref.kind === "channel" && ref.serverId && ref.channelId) {
+      setViewMode("server");
+      setSelectedServer(ref.serverId);
+      setSelectedChannel(ref.channelId);
+    }
+  };
+
+  // Clique no toast NATIVO do Windows (app em 2º plano)
+  useEffect(() => {
+    if (window.wellcord?.notify) {
+      return window.wellcord.notify.onClick((ref) => openToastRef(ref));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { channelUnread } = useChannelUnread(supabase, user, selectedChannel, viewMode);
   const unreadByServer: Record<string, number> = {};
   for (const s of servers) {

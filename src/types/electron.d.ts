@@ -11,6 +11,10 @@ declare global {
         onPress: (cb: () => void) => () => void;
       };
       voice: { onControl: (cb: (action: string) => void) => () => void };
+      notify: {
+        show: (n: { title: string; body: string; ref?: any }) => void;
+        onClick: (cb: (ref: any) => void) => () => void;
+      };
       screens?: {
         list: () => Promise<{ id: string; name: string; screen: boolean; thumbnail: string | null }[]>;
         pick: (id: string) => Promise<boolean>;
