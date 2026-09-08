@@ -1,6 +1,6 @@
 {
   "name": "wellcord",
-  "version": "0.1.84",
+  "version": "0.1.85",
   "private": true,
   "main": "electron/main.js",
   "scripts": {
@@ -48,7 +48,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "WellCORD-Setup-${version}.${ext}",

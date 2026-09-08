@@ -229,13 +229,13 @@ ipcMain.on("notify-show", (_e, n) => {
   } catch {}
 });
 
-// Auto-update via API do GitHub Releases (só no .exe instalado)
-// Usa https direto — mais confiável que electron-updater (evita erros de provider/config)
+// Auto-update via API do GitHub Releases (portable: baixa zip e substitui arquivos)
 const https = require("https");
 const { pipeline } = require("stream");
 const { promisify } = require("util");
 const streamPipeline = promisify(pipeline);
 const fs = require("fs");
+const { execSync, spawn } = require("child_process");
 
 const GITHUB_REPO = "wellinghton3112/wellcord";
 
@@ -267,9 +267,13 @@ function compareVersions(a, b) {
   return 0;
 }
 
+// Diretório onde o app está rodando (portable: pasta do WellCORD.exe)
+function appDir() {
+  return path.dirname(app.getPath("exe"));
+}
+
 let updateCheckTimer = null;
 let downloading = false;
-let pendingUpdate = null; // { version, exeUrl, size }
 
 function setupAutoUpdate() {
   if (isDev) return;
@@ -294,13 +298,12 @@ async function checkForUpdate(manual) {
       done(`Você já está na versão mais recente (${currentVersion}).`);
       return;
     }
-    // Versão nova encontrada
-    const exeAsset = release.assets.find((a) => /\.exe$/i.test(a.name));
-    if (!exeAsset) {
-      done(`Versão ${latestVersion} disponível, mas o instalador não foi encontrado no GitHub.`, "warning");
+    // Procurar o zip portable
+    const zipAsset = release.assets.find((a) => /portable\.zip$/i.test(a.name));
+    if (!zipAsset) {
+      done(`Versão ${latestVersion} disponível, mas o pacote portable não foi encontrado.`, "warning");
       return;
     }
-    pendingUpdate = { version: latestVersion, exeUrl: exeAsset.browser_download_url, size: exeAsset.size };
     console.log(`[wellcord] update disponível: v${latestVersion} (atual: v${currentVersion})`);
     if (downloading) {
       done(`Atualização v${latestVersion} já está baixando...`);
@@ -311,34 +314,24 @@ async function checkForUpdate(manual) {
       type: "info",
       title: "WellCORD — Atualização disponível",
       message: `Versão ${latestVersion} disponível!`,
-      detail: `Sua versão: ${currentVersion}\nTamanho: ${Math.round(exeAsset.size / 1024 / 1024)} MB`,
-      buttons: ["Baixar e instalar", "Depois"],
+      detail: `Sua versão: ${currentVersion}\nTamanho: ${Math.round(zipAsset.size / 1024 / 1024)} MB\n\nO app será fechado e atualizado automaticamente.`,
+      buttons: ["Atualizar agora", "Depois"],
       defaultId: 0,
     }).catch(() => ({ response: 1 }));
     if (response !== 0) return;
-    await downloadAndInstall(pendingUpdate);
+    await downloadAndUpdate(zipAsset.browser_download_url, latestVersion);
   } catch (e) {
     console.error("[wellcord] erro ao verificar atualização:", e?.message || e);
     if (manual) done("Não foi possível verificar agora. Tente mais tarde.", "warning");
   }
 }
 
-async function downloadAndInstall(update) {
-  if (downloading) return;
-  downloading = true;
-  const tempPath = path.join(app.getPath("temp"), `WellCORD-Setup-${update.version}.exe`);
-  try {
-    console.log(`[wellcord] baixando ${update.exeUrl} -> ${tempPath}`);
-    // Notificar o renderer que começou
-    mainWindow?.webContents.send("update-download-progress", { phase: "start", version: update.version });
-    const file = fs.createWriteStream(tempPath);
-    await new Promise((resolve, reject) => {
-      https.get(update.exeUrl, (res) => {
-        // Seguir redirecionamentos (GitHub CDN)
+function downloadFile(url, destPath, onProgress) {
+  return new Promise((resolve, reject) => {
+    const doDownload = (downloadUrl) => {
+      https.get(downloadUrl, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          https.get(res.headers.location, (res2) => {
-            streamPipeline(res2, file).then(resolve).catch(reject);
-          }).on("error", reject);
+          doDownload(res.headers.location);
           return;
         }
         if (res.statusCode !== 200) {
@@ -347,40 +340,115 @@ async function downloadAndInstall(update) {
         }
         const total = parseInt(res.headers["content-length"] || "0", 10);
         let downloaded = 0;
+        const file = fs.createWriteStream(destPath);
         res.on("data", (chunk) => {
           downloaded += chunk.length;
-          if (total > 0) {
-            const pct = Math.round((downloaded / total) * 100);
-            mainWindow?.webContents.send("update-download-progress", { phase: "downloading", pct, downloaded, total });
-          }
+          if (total > 0 && onProgress) onProgress(downloaded, total);
         });
         streamPipeline(res, file).then(resolve).catch(reject);
       }).on("error", reject);
+    };
+    doDownload(url);
+  });
+}
+
+function extractZip(zipPath, destDir) {
+  // Usa PowerShell Expand-Archive (disponível em todo Windows 10+)
+  execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${destDir}' -Force"`, { timeout: 120000 });
+}
+
+async function downloadAndUpdate(zipUrl, newVersion) {
+  if (downloading) return;
+  downloading = true;
+  const tempBase = app.getPath("temp");
+  const zipPath = path.join(tempBase, `WellCORD-${newVersion}.zip`);
+  const extractDir = path.join(tempBase, `WellCORD-update-${newVersion}`);
+  const currentAppDir = appDir();
+
+  try {
+    console.log(`[wellcord] baixando ${zipUrl}`);
+    mainWindow?.webContents.send("update-download-progress", { phase: "start", version: newVersion });
+
+    // Limpar extras anteriores
+    try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(zipPath, { force: true }); } catch {}
+
+    // 1. Baixar zip
+    await downloadFile(zipUrl, zipPath, (downloaded, total) => {
+      const pct = Math.round((downloaded / total) * 100);
+      mainWindow?.webContents.send("update-download-progress", { phase: "downloading", pct, downloaded, total });
     });
-    console.log(`[wellcord] download concluído: ${tempPath}`);
-    mainWindow?.webContents.send("update-download-progress", { phase: "done", path: tempPath });
-    // Perguntar para instalar
-    const { response } = await dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "WellCORD atualizado",
-      message: `Versão ${update.version} baixada com sucesso!`,
-      detail: "O instalador será aberto. Siga as instruções para atualizar.",
-      buttons: ["Instalar agora", "Depois"],
-      defaultId: 0,
-    }).catch(() => ({ response: 1 }));
-    if (response === 0) {
-      require("shell").openExternal(tempPath);
-      app.quit();
+    console.log(`[wellcord] download concluído: ${zipPath}`);
+    mainWindow?.webContents.send("update-download-progress", { phase: "extracting" });
+
+    // 2. Extrair zip
+    extractZip(zipPath, extractDir);
+    console.log(`[wellcord] extraído em: ${extractDir}`);
+
+    // O zip pode ter uma pasta raiz ou os arquivos direto
+    // Verificar se tem uma subpasta com o conteúdo
+    const entries = fs.readdirSync(extractDir);
+    let srcDir = extractDir;
+    if (entries.length === 1 && fs.statSync(path.join(extractDir, entries[0])).isDirectory()) {
+      srcDir = path.join(extractDir, entries[0]);
     }
+
+    // 3. Criar script .bat que substitui os arquivos após o fechamento
+    const batPath = path.join(tempBase, `wellcord-update-${newVersion}.bat`);
+    const batContent = [
+      "@echo off",
+      "title WellCORD - Atualizando...",
+      "echo Aguardando WellCORD fechar...",
+      // Espera o WellCORD.exe fechar (checagem a cada 1s, max 30s)
+      `tasklist /FI "IMAGENAME eq WellCORD.exe" 2>NUL | find /I "WellCORD.exe" >NUL`,
+      `if %errorlevel%==0 (`,
+      `  echo Processo ainda rodando, aguardando...`,
+      `  timeout /t 2 /nobreak >NUL`,
+      `  taskkill /F /IM WellCORD.exe >NUL 2>&1`,
+      `  timeout /t 1 /nobreak >NUL`,
+      `)`,
+      // Copiar novos arquivos sobre os antigos (ignora erros de arquivos em uso)
+      `echo Copiando arquivos atualizados...`,
+      `xcopy /E /Y /Q "${srcDir}\\*" "${currentAppDir}\\" >NUL 2>&1`,
+      // Limpar temporários
+      `echo Limpando arquivos temporários...`,
+      `rd /S /Q "${extractDir}" >NUL 2>&1`,
+      `del "${zipPath}" >NUL 2>&1`,
+      // Reabrir o app
+      `echo Iniciando WellCORD...`,
+      `start "" "${currentAppDir}\\WellCORD.exe"`,
+      // Auto-deletar o script
+      `timeout /t 3 /nobreak >NUL`,
+      `del "%~f0" >NUL 2>&1`,
+    ].join("\r\n");
+
+    fs.writeFileSync(batPath, batContent, "ascii");
+    console.log(`[wellcord] script de atualização criado: ${batPath}`);
+
+    // 4. Notificar o renderer
+    mainWindow?.webContents.send("update-download-progress", { phase: "installing" });
+
+    // 5. Executar o .bat desanexado e fechar o app
+    spawn("cmd.exe", ["/c", batPath], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    }).unref();
+
+    // 6. Fechar o app
+    app.quit();
   } catch (e) {
-    console.error("[wellcord] erro no download:", e?.message || e);
+    console.error("[wellcord] erro na atualização:", e?.message || e);
     dialog.showMessageBox(mainWindow, {
       type: "warning",
       title: "WellCORD",
-      message: "Falha ao baixar a atualização.",
+      message: "Falha ao atualizar.",
       detail: e?.message || "Verifique sua conexão e tente novamente.",
     }).catch(() => {});
     mainWindow?.webContents.send("update-download-progress", { phase: "error", error: e?.message });
+    // Limpar temporários em caso de erro
+    try { fs.rmSync(zipPath, { force: true }); } catch {}
+    try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch {}
   } finally {
     downloading = false;
   }
