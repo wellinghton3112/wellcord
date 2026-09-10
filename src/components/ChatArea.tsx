@@ -337,6 +337,7 @@ export default function ChatArea(props: Props) {
   const nearBottom = useRef(true);
   const dmNearBottom = useRef(true);
   const holding = useRef(false);
+  const dmHolding = useRef(false);
   const prevLastId = useRef<string | null>(null);
   const prevDmLastId = useRef<string | null>(null);
 
@@ -571,7 +572,7 @@ export default function ChatArea(props: Props) {
           </div>
           <div
             ref={dmListRef}
-            onScroll={(e) => trackScroll(e.currentTarget, dmNearBottom, holding, dmHasMore, dmLoadingOlder, onLoadOlderDM)}
+            onScroll={(e) => trackScroll(e.currentTarget, dmNearBottom, dmHolding, dmHasMore, dmLoadingOlder, onLoadOlderDM)}
             className="flex-1 overflow-y-auto p-4 space-y-1"
           >
             {dmLoadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
