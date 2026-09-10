@@ -667,10 +667,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
 
   const toggleMute = () => {
     const enabled = !mutedRef.current;
-    if (!localStreamRef.current) return;
-    localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = !enabled));
+    if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = !enabled));
+    mutedRef.current = enabled;
     setMuted(enabled);
-    // notificar via presence update
     if (channelRef.current) channelRef.current.track({ id: myIdRef.current, username, avatar: avatar || "😎", muted: enabled });
   };
 
@@ -679,7 +678,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     setDeafened(v);
     remoteAudiosRef.current.forEach((a) => (a.muted = v));
     if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = v ? false : !mutedRef.current));
-    if (v && !muted) setMuted(true);
+    if (v && !mutedRef.current) { mutedRef.current = true; setMuted(true); }
   };
 
   // Publica status + controles no contexto (painel de voz no rodapé)
