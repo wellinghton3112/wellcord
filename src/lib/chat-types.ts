@@ -97,7 +97,14 @@ export const statusConfig = {
 export function formatTime(dateStr: string) {
   try {
     const d = new Date(dateStr);
-    return "Hoje às " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const now = new Date();
+    const time = d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) return "Hoje às " + time;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return "Ontem às " + time;
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }) + " às " + time;
   } catch { return dateStr; }
 }
 
