@@ -522,7 +522,7 @@ export default function ChatArea(props: Props) {
         <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></span>
       </button>
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span>{pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}</div>
+        <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span>{(msg as any).edited_at && <span className="text-[10px] text-zinc-500">(editado)</span>}{pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}</div>
         {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
         {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
         {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
@@ -542,7 +542,10 @@ export default function ChatArea(props: Props) {
               <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
             </>
           ) : isOwner ? (
-            <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação do dono)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
+            <>
+              <button onClick={() => startEdit(msg.id, msg.content)} title="Editar (moderação)"><Pencil className="w-4 h-4 text-amber-400 hover:text-white" /></button>
+              <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
+            </>
           ) : null}
           <MoreHorizontal className="w-4 h-4" />
         </div>

@@ -82,6 +82,24 @@ export function useServerManager(supabase: any, serverId: string | undefined, ow
     else load();
   };
 
+  const ban = async (target: ServerMember, myId: string | undefined) => {
+    if (target.user_id === myId) { toast("Você não pode se banir."); return; }
+    if (target.user_id === ownerId) { toast("Não dá para banir o dono."); return; }
+    if (!(await confirmDialog(`Banir ${target.username} do servidor? Eles não poderão entrar novamente.`, { confirmLabel: "Banir", danger: true }))) return;
+    const { error: banErr } = await supabase.from("server_bans").insert({ server_id: serverId, user_id: target.user_id, banned_by: myId, reason: "Banido pelo dono" });
+    if (banErr) { toast(banErr.message); return; }
+    const { error } = await supabase.from("server_members").delete().eq("server_id", serverId).eq("user_id", target.user_id);
+    if (error) toast(error.message);
+    else { toast(`${target.username} foi banido.`); load(); }
+  };
+
+  const unban = async (userId: string) => {
+    if (!(await confirmDialog("Desbanir este usuário?", { confirmLabel: "Desbanir" }))) return;
+    const { error } = await supabase.from("server_bans").delete().eq("server_id", serverId).eq("user_id", userId);
+    if (error) toast(error.message);
+    else { toast("Usuário desbanido."); load(); }
+  };
+
   const makeCode = () => Math.random().toString(36).slice(2, 10).replace(/[^a-z0-9]/g, "x");
 
   const createInvite = async (userId: string | undefined, maxUses: number | null, expiresHours: number | null) => {
@@ -108,5 +126,5 @@ export function useServerManager(supabase: any, serverId: string | undefined, ow
     else load();
   };
 
-  return { members, invites, loading, reload: load, kick, createInvite, revokeInvite };
+  return { members, invites, loading, reload: load, kick, ban, unban, createInvite, revokeInvite };
 }

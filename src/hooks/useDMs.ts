@@ -347,7 +347,7 @@ export function useDMs(
 
   const editDMMessage = async (id: string, content: string) => {
     if (!content.trim()) return;
-    const { error } = await supabase.from("dm_messages").update({ content }).eq("id", id);
+    const { error } = await supabase.from("dm_messages").update({ content, edited_at: new Date().toISOString() }).eq("id", id);
     if (error) toast("Erro ao editar: " + error.message);
   };
 

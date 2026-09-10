@@ -11,13 +11,14 @@ type Props = {
   members: ServerMember[];
   invites: ServerInvite[];
   onKick: (m: ServerMember) => void;
+  onBan: (m: ServerMember) => void;
   onRevoke: (code: string) => void;
   onCreateInvite: (maxUses: number | null, expiresHours: number | null) => Promise<string | null>;
   onClose: () => void;
 };
 
 // Gestão do servidor: membros, kick e convites. Novo (feature membros).
-export default function MembersModal({ serverName, isOwner, userId, members, invites, onKick, onRevoke, onCreateInvite, onClose }: Props) {
+export default function MembersModal({ serverName, isOwner, userId, members, invites, onKick, onBan, onRevoke, onCreateInvite, onClose }: Props) {
   const [maxUses, setMaxUses] = useState("0");
   const [expires, setExpires] = useState("0");
   const [creating, setCreating] = useState(false);
@@ -77,9 +78,14 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
                 <div className="text-xs text-zinc-500">{m.role === "owner" ? "👑 Dono" : "Membro"}</div>
               </div>
               {isOwner && m.user_id !== userId && (
-                <button onClick={() => onKick(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#DA373C] rounded" title={`Remover ${m.username}`}>
-                  <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
-                </button>
+                <>
+                  <button onClick={() => onBan(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#DA373C] rounded" title={`Banir ${m.username}`}>
+                    <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
+                  </button>
+                  <button onClick={() => onKick(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#F0B132] rounded" title={`Remover ${m.username}`}>
+                    <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
+                  </button>
+                </>
               )}
             </div>
           ))}

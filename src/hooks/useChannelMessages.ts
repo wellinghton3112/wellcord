@@ -231,7 +231,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
 
   const editMessage = async (id: string, content: string) => {
     if (!content.trim()) return;
-    const { error } = await supabase.from("messages").update({ content }).eq("id", id);
+    const { error } = await supabase.from("messages").update({ content, edited_at: new Date().toISOString() }).eq("id", id);
     if (error) toast("Erro ao editar: " + error.message);
   };
 

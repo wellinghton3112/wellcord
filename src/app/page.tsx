@@ -16,11 +16,13 @@ import JoinModal from "@/components/modals/JoinModal";
 import MembersModal from "@/components/modals/MembersModal";
 import PinsModal from "@/components/modals/PinsModal";
 import PollModal from "@/components/modals/PollModal";
+import RolesModal from "@/components/modals/RolesModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useFriends } from "@/hooks/useFriends";
 import { useActiveNow } from "@/hooks/useActiveNow";
 import { useServerManager } from "@/hooks/useServerManager";
+import { useRoles } from "@/hooks/useRoles";
 import Toaster from "@/components/Toaster";
 import { toast as uiToast } from "@/lib/ui";
 import { VoiceProvider } from "@/context/VoiceContext";
@@ -65,11 +67,13 @@ export default function DiscordClone() {
   const { active } = useActiveNow(supabase, user, friends.friends.map((f) => f.user_id));
   const [showMembersModal, setShowMembersModal] = useState(false);
   const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
+  const roles = useRoles(supabase, currentServer?.id);
   const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
   const { pins, pinnedIds, canPin, togglePin } = usePins(supabase, user, selectedChannel, isOwner);
   const [showPinsModal, setShowPinsModal] = useState(false);
   const { polls, createPoll, toggleVote, deletePoll } = usePolls(supabase, user, username, selectedChannel);
   const [showPollModal, setShowPollModal] = useState(false);
+  const [showRolesModal, setShowRolesModal] = useState(false);
 
   const jumpToMessage = async (id: string) => {
     setShowPinsModal(false);
@@ -347,6 +351,7 @@ export default function DiscordClone() {
         userAvatar={avatar}
         onViewProfile={openProfile}
         onOpenMembers={() => setShowMembersModal(true)}
+        onOpenRoles={() => setShowRolesModal(true)}
         onLeaveServer={() => leaveServer(user?.id)}
         channelUnread={channelUnread}
       />
@@ -417,7 +422,23 @@ export default function DiscordClone() {
         onOpenPollModal={() => setShowPollModal(true)}
       />
 
-      <MembersSidebar showMobileMembers={showMobileMembers} onlineMembers={onlineMembers} allProfiles={allProfiles} status={status} onViewProfile={openProfile} />
+      <MembersSidebar
+        showMobileMembers={showMobileMembers}
+        onlineMembers={onlineMembers}
+        allProfiles={allProfiles}
+        status={status}
+        onViewProfile={openProfile}
+        isOwner={isOwner}
+        currentUserId={user?.id}
+        onKick={(userId) => {
+          const member = serverMgr.members.find(m => m.user_id === userId);
+          if (member) serverMgr.kick(member, user?.id);
+        }}
+        onBan={(userId) => {
+          const member = serverMgr.members.find(m => m.user_id === userId);
+          if (member) serverMgr.ban(member, user?.id);
+        }}
+      />
       </div>
 
       {showUsernameModal && (
@@ -491,6 +512,7 @@ export default function DiscordClone() {
           members={serverMgr.members}
           invites={serverMgr.invites}
           onKick={(m) => serverMgr.kick(m, user?.id)}
+          onBan={(m) => serverMgr.ban(m, user?.id)}
           onRevoke={serverMgr.revokeInvite}
           onCreateInvite={(maxUses, expiresHours) => serverMgr.createInvite(user?.id, maxUses, expiresHours)}
           onClose={() => setShowMembersModal(false)}
@@ -552,6 +574,15 @@ export default function DiscordClone() {
         <PollModal
           onClose={() => setShowPollModal(false)}
           onCreate={createPoll}
+        />
+      )}
+      {showRolesModal && (
+        <RolesModal
+          roles={roles.roles}
+          onCreateRole={roles.createRole}
+          onUpdateRole={roles.updateRole}
+          onDeleteRole={roles.deleteRole}
+          onClose={() => setShowRolesModal(false)}
         />
       )}
       <Toaster />

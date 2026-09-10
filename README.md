@@ -74,6 +74,9 @@ No painel do Supabase → SQL Editor, execute os arquivos `.sql` **nesta ordem**
 20. `supabase-replies.sql` — Respostas
 21. `supabase-members-manage.sql` — Gerenciamento de membros
 22. `supabase-avatars.sql` — Avatares do storage
+23. `supabase-bans.sql` — Sistema de banimento
+24. `supabase-message-policies.sql` — Políticas de edição/exclusão de mensagens
+25. `supabase-roles.sql` — Sistema de cargos e permissões
 
 > ⚠️ **NÃO** execute `supabase-fix.sql` — está obsoleto.
 

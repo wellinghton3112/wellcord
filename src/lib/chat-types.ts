@@ -10,6 +10,7 @@ export type Message = {
   timestamp: string;
   channelId: string;
   created_at?: string;
+  edited_at?: string | null;
   reply_to?: string | null;
   reply_user?: string | null;
   reply_content?: string | null;
@@ -51,6 +52,7 @@ export type DMMessage = {
   username: string;
   content: string;
   created_at: string;
+  edited_at?: string | null;
   reply_to?: string | null;
   reply_user?: string | null;
   reply_content?: string | null;
