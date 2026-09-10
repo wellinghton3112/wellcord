@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { Menu, Users, Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase";
+import { APP_VERSION } from "@/lib/version";
 import MembersSidebar from "@/components/MembersSidebar";
 import ServerRail from "@/components/ServerRail";
 import ChannelSidebar from "@/components/ChannelSidebar";
@@ -265,7 +266,7 @@ export default function DiscordClone() {
   const signOut = async () => { await supabase.auth.signOut(); router.push("/login"); };
 
   if (loading) {
-    return <div className="h-screen w-screen bg-[#313338] flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳ v0.1.86</div>;
+    return <div className="h-screen w-screen bg-[#313338] flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳ {APP_VERSION}</div>;
   }
 
   return (

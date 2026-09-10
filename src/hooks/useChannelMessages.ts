@@ -7,13 +7,20 @@ import { toast, confirmDialog } from "@/lib/ui";
 
 const PAGE = 100;
 
+const USER_COLORS = ["#5865F2","#EB459E","#57F287","#FEE75C","#ED4245","#F47B67","#E8A12F","#45DDC0","#9B59B6","#3498DB"];
+function userColor(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  return USER_COLORS[Math.abs(h) % USER_COLORS.length];
+}
+
 function toMessage(r: any): Message {
   return {
     id: r.id,
     user: r.username,
     user_id: r.user_id,
     avatar: r.avatar || "😎",
-    color: r.color || "#5865F2",
+    color: r.color || userColor(r.user_id || ""),
     content: r.content,
     timestamp: formatTime(r.created_at),
     channelId: r.channel_id,
@@ -193,7 +200,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       username,
       content,
       avatar,
-      color: "#5865F2",
+      color: userColor(user.id),
       reply_to: reply?.id || null,
       reply_user: reply?.user || null,
       reply_content: reply?.content || null,

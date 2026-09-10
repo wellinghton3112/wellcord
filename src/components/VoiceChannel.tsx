@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X, Waves, Eye, EyeOff } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
 import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
-import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, preferCodecs, getVideoStats, type ScreenQuality, type CodecMode } from "@/lib/video";
+import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, getVideoStats, type ScreenQuality, type CodecMode } from "@/lib/video";
 import Avatar from "@/components/Avatar";
 import ScreenPickerModal from "@/components/modals/ScreenPickerModal";
 

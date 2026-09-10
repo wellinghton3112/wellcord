@@ -565,7 +565,7 @@ export default function ChatArea(props: Props) {
               <span className="font-bold text-zinc-400">Selecione uma conversa</span>
             )}
             <div className="ml-auto flex items-center gap-3 text-zinc-400">
-              <Phone className="w-5 h-5" /><Video className="w-5 h-5" />
+              <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 cursor-not-allowed opacity-50" /></span>
               {searchBox("Buscar na DM")}
             </div>
           </div>
@@ -642,7 +642,7 @@ export default function ChatArea(props: Props) {
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
               <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-                <Phone className="w-5 h-5 hidden md:block" /><Video className="w-5 h-5 hidden md:block" /><button onClick={onOpenPins} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
+                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={onOpenPins} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
                 {searchBox("Buscar")}
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
               </div>

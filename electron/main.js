@@ -437,7 +437,7 @@ async function downloadAndUpdate(zipUrl, newVersion) {
       "echo Iniciando WellCORD...",
       `start "" "${currentAppDir}\\WellCORD.exe"`,
       // Auto-deletar o script
-      "timeout /t 3 /nobreak >NUL",
+      "timeout /t 8 /nobreak >NUL",
       `del "%~f0" >NUL 2>&1`,
     ].join("\r\n");
 

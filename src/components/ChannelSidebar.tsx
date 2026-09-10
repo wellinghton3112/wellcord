@@ -74,7 +74,12 @@ export default function ChannelSidebar(props: Props) {
   } = props;
 
   const [sideTab, setSideTab] = useState<"dms" | "friends">("dms");
+  const [dmSearch, setDmSearch] = useState("");
   const { status: voiceStatus, controlsRef: voiceControls } = useVoice();
+
+  const filteredDMs = dmConversations.filter((dm) =>
+    dm.otherUser?.username?.toLowerCase().includes(dmSearch.toLowerCase())
+  );
 
   // Tray do app desktop: badge de não-lidas + estado de voz
   const dmTotal = Object.values(unreadDMs || {}).reduce((a, b) => a + b, 0);
@@ -157,13 +162,13 @@ export default function ChannelSidebar(props: Props) {
           <div className="p-2">
             <div className="relative mb-2">
               <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input placeholder="Buscar DM" className="w-full bg-[#1E1F22] rounded pl-7 pr-2 py-1.5 text-sm focus:outline-none placeholder:text-zinc-500" />
+              <input value={dmSearch} onChange={(e) => setDmSearch(e.target.value)} placeholder="Buscar DM" className="w-full bg-[#1E1F22] rounded pl-7 pr-2 py-1.5 text-sm focus:outline-none placeholder:text-zinc-500" />
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {dmConversations.length === 0 ? (
-              <p className="text-xs text-zinc-500 px-2">Nenhuma DM ainda. Clique + para iniciar.</p>
-            ) : dmConversations.map((dm) => (
+            {filteredDMs.length === 0 ? (
+              <p className="text-xs text-zinc-500 px-2">{dmSearch ? "Nenhuma DM encontrada." : "Nenhuma DM ainda. Clique + para iniciar."}</p>
+            ) : filteredDMs.map((dm) => (
               <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewModeDM(); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">
                   <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
