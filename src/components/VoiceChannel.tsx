@@ -125,9 +125,17 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     const iv = setInterval(async () => {
       try {
         const track = localStreamRef.current?.getVideoTracks()[0];
-        const firstPc = peersRef.current.values().next().value as RTCPeerConnection | undefined;
-        if (!track || !firstPc) return;
-        const s = await getVideoStats(firstPc, track);
+        if (!track) return;
+        // Find the peer connection that actually has this video sender
+        let targetPc: RTCPeerConnection | undefined;
+        for (const pc of peersRef.current.values()) {
+          if (pc.getSenders().some((s) => s.track?.kind === "video")) {
+            targetPc = pc;
+            break;
+          }
+        }
+        if (!targetPc) return;
+        const s = await getVideoStats(targetPc, track);
         if (!s) return;
         const prev = statsPrevRef.current;
         statsPrevRef.current = { bytes: s.bytesSent, ts: s.ts };
@@ -183,7 +191,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     setSpeaking({});
     setRemoteStreams({});
-    setParticipants(channelId, []);
+    setParticipants(sessionChannelRef.current || channelId, []);
   };
 
   const cleanupAndLeave = async () => {
@@ -225,23 +233,15 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     };
     const handleBeforeUnload = () => {
       if (!joined) return;
-      const cid = sessionChannelRef.current;
-      if (!cid) return;
-      // Close peer connections immediately
+      // Close peer connections immediately so remote peers don't wait 30s+ for ICE timeout
       peersRef.current.forEach((pc) => { try { pc.close(); } catch {} });
       peersRef.current.clear();
-      // Remove audio elements
       remoteAudiosRef.current.forEach((a) => a.remove());
       remoteAudiosRef.current.clear();
-      // Use sendBeacon for reliable DB delete
-      try {
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        if (supabaseUrl && anonKey) {
-          const url = `${supabaseUrl}/rest/v1/voice_sessions?channel_id=eq.${cid}`;
-          navigator.sendBeacon(url, new Blob([JSON.stringify({})], { type: "application/json" }));
-        }
-      } catch {}
+      // sendBeacon can't do DELETE with auth headers, so we rely on
+      // Supabase's heartbeat timeout to clean up the session row.
+      // The DB cleanup is best-effort anyway — the local cleanup above
+      // ensures remote peers see the departure quickly via presence.
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -371,7 +371,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   // Troca a trilha de áudio enviada sem renegociar (usado pelo toggle de denoise)
   const swapAudioTrack = async (track: MediaStreamTrack | null) => {
     if (!track) return;
-    track.enabled = !muted;
+    track.enabled = !mutedRef.current;
     for (const pc of peersRef.current.values()) {
       const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
       if (sender) {
@@ -422,12 +422,13 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   const join = async (asListener = false) => {
+    if (joiningRef.current) return;
+    joiningRef.current = true;
     // Já estou em outra chamada? Sai dela primeiro e entra nesta
     if (joined && sessionChannelRef.current && sessionChannelRef.current !== channelId) {
       await leave();
     }
-    if ((joined && sessionChannelRef.current === channelId) || channelRef.current || joiningRef.current) return;
-    joiningRef.current = true;
+    if ((joined && sessionChannelRef.current === channelId) || channelRef.current) { joiningRef.current = false; return; }
     sessionChannelRef.current = channelId;
     setSessionChannel(channelId);
     if (!myIdRef.current) myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
@@ -615,6 +616,16 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     setJoined(false);
     setPeers([]);
     setExpanded(null);
+    setCameraOn(false);
+    setScreenOn(false);
+    setScreenQuality("auto");
+    screenQualityRef.current = "auto";
+    setCodecMode("sharp");
+    codecModeRef.current = "sharp";
+    setMuted(false);
+    setDeafened(false);
+    setDenoiseActive(false);
+    setSendStats("");
   };
 
   // Mantém a ref sempre apontando para o `leave` mais recente (usada pelo listener offline)
