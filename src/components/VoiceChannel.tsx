@@ -256,10 +256,13 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     peersRef.current.set(peerId, pc);
 
-    // add local tracks
+    // Sempre adiciona tracks locais (áudio + vídeo/tela) — necessário tanto
+    // para quem inicia quanto para quem responde, senão o novo peer não recebe tela.
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current!);
+        try {
+          pc.addTrack(track, localStreamRef.current!);
+        } catch {}
         if (track.kind === "video") {
           tuneVideoSender(pc, track, { screen: screenOn, maxBitrate: videoBitrateFor(screenQualityRef.current) }).catch(() => {});
         }
