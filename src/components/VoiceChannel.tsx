@@ -482,6 +482,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         try {
           if (pc.signalingState !== "stable") {
             if (!polite) return;
+            // Se estamos compartilhando tela, NÃO cedemos — nossa offer tem o track de tela.
+            // Se cedermos, o outro peer recebe offer sem tela e o share some.
+            if (screenOn) return;
             await pc.setLocalDescription({ type: "rollback" });
           }
           await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
