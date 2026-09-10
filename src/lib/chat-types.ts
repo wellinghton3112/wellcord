@@ -41,6 +41,7 @@ export type DMConversation = {
   id: string;
   participants: { id: string; username: string; avatar: string }[];
   otherUser?: { id: string; username: string; avatar: string };
+  lastMessage?: { created_at: string } | null;
 };
 
 export type DMMessage = {

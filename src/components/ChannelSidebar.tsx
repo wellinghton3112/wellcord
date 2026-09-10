@@ -77,9 +77,11 @@ export default function ChannelSidebar(props: Props) {
   const [dmSearch, setDmSearch] = useState("");
   const { status: voiceStatus, controlsRef: voiceControls } = useVoice();
 
-  const filteredDMs = dmConversations.filter((dm) =>
-    dm.otherUser?.username?.toLowerCase().includes(dmSearch.toLowerCase())
-  );
+  const filteredDMs = dmConversations.filter((dm) => {
+    const name = dm.otherUser?.username;
+    if (!name) return true;
+    return name.toLowerCase().includes(dmSearch.toLowerCase());
+  });
 
   // Tray do app desktop: badge de não-lidas + estado de voz
   const dmTotal = Object.values(unreadDMs || {}).reduce((a, b) => a + b, 0);

@@ -48,6 +48,10 @@ export function useDMs(
     const ids = parts.map((p: any) => p.conversation_id);
     const { data: allParts } = await supabase.from("dm_participants").select("conversation_id, user_id").in("conversation_id", ids);
     const { data: profiles } = await supabase.from("profiles").select("id, username, avatar");
+    // Get latest message per conversation for sorting
+    const { data: lastMsgs } = await supabase.from("dm_messages").select("conversation_id, created_at").in("conversation_id", ids).order("created_at", { ascending: false });
+    const lastMsgMap = new Map<string, string>();
+    (lastMsgs || []).forEach((m: any) => { if (!lastMsgMap.has(m.conversation_id)) lastMsgMap.set(m.conversation_id, m.created_at); });
     const convs: DMConversation[] = ids.map((id: string) => {
       const p = (allParts || []).filter((x: any) => x.conversation_id === id);
       const participants = p.map((x: any) => {
@@ -55,7 +59,14 @@ export function useDMs(
         return { id: x.user_id, username: prof?.username || x.user_id.slice(0, 6), avatar: prof?.avatar || "😎" };
       });
       const other = participants.find((x: { id: string }) => x.id !== user.id);
-      return { id, participants, otherUser: other };
+      const lastCreated = lastMsgMap.get(id);
+      return { id, participants, otherUser: other, lastMessage: lastCreated ? { created_at: lastCreated } : null };
+    });
+    // Sort by most recently active (latest message timestamp)
+    convs.sort((a, b) => {
+      const aTime = a.lastMessage?.created_at || "";
+      const bTime = b.lastMessage?.created_at || "";
+      return bTime.localeCompare(aTime);
     });
     setDmConversations(convs);
   };

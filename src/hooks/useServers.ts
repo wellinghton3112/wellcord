@@ -82,6 +82,17 @@ export function useServers(supabase: any, user: any) {
   const currentServer = servers.find((s) => s.id === selectedServer);
   const currentChannel = currentServer?.channels.find((c) => c.id === selectedChannel);
 
+  // Reset stale selection when server/channel no longer exists (externally deleted)
+  useEffect(() => {
+    if (selectedServer && servers.length > 0 && !currentServer) {
+      const first = servers[0];
+      setSelectedServer(first?.id || "");
+      setSelectedChannel(first?.channels[0]?.id || "");
+    } else if (selectedChannel && currentServer && !currentChannel) {
+      setSelectedChannel(currentServer.channels[0]?.id || "");
+    }
+  }, [servers, currentServer, currentChannel, selectedServer, selectedChannel]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return {
     servers, setServers,
     selectedServer, setSelectedServer,
