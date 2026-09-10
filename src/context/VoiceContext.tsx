@@ -33,7 +33,12 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<VoiceStatus>(IDLE);
   const controlsRef = useRef<VoiceControls | null>(null);
   const setParticipants = (channelId: string, peers: { id: string; username: string }[]) => {
-    setParticipantsState((prev) => ({ ...prev, [channelId]: peers }));
+    setParticipantsState((prev) => {
+      const next = { ...prev };
+      if (peers.length === 0) delete next[channelId];
+      else next[channelId] = peers;
+      return next;
+    });
   };
   return <VoiceContext.Provider value={{ participants, setParticipants, status, setStatus, controlsRef }}>{children}</VoiceContext.Provider>;
 }

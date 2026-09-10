@@ -63,6 +63,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const audioContextRef = useRef<AudioContext | null>(null);
   const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
   const prevSpeakingRef = useRef<Record<string, boolean>>({});
+  const cleanedUpRef = useRef(false);
+  const speakingLoopRef = useRef(false);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const joiningRef = useRef(false);
@@ -151,20 +153,20 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   const cleanup = () => {
+    if (cleanedUpRef.current) return;
+    cleanedUpRef.current = true;
+    speakingLoopRef.current = false;
     if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} denoiseRef.current = null; }
     setDenoiseActive(false);
     if (rawStreamRef.current) {
       rawStreamRef.current.getTracks().forEach((t) => t.stop());
       rawStreamRef.current = null;
     }
-    const cid = sessionChannelRef.current;
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user && cid) {
-        supabase.from("voice_sessions").delete().eq("channel_id", cid).eq("user_id", user.id).then(() => {
-          maybeEndCall(cid);
-        });
-      }
-    });
+    // Unsubscribes channel FIRST to stop presence events before closing PCs
+    if (channelRef.current) {
+      try { supabase.removeChannel(channelRef.current); } catch {}
+      channelRef.current = null;
+    }
     peersRef.current.forEach((pc) => pc.close());
     peersRef.current.clear();
     remoteAudiosRef.current.forEach((a) => a.remove());
@@ -172,19 +174,26 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     remoteVideosRef.current.forEach((v) => v.remove());
     remoteVideosRef.current.clear();
     analysersRef.current.clear();
+    prevSpeakingRef.current = {};
     if (audioContextRef.current) { try { audioContextRef.current.close(); } catch {} audioContextRef.current = null; }
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
     setSpeaking({});
     setRemoteStreams({});
     setParticipants(channelId, []);
+  };
+
+  const cleanupAndLeave = async () => {
+    const cid = sessionChannelRef.current;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && cid) {
+      await supabase.from("voice_sessions").delete().eq("channel_id", cid).eq("user_id", user.id);
+      maybeEndCall(cid);
+    }
+    cleanup();
   };
 
   const setupAnalyser = (id: string, stream: MediaStream) => {
@@ -201,7 +210,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   useEffect(() => {
-    return () => cleanup();
+    return () => { cleanupAndLeave(); cleanedUpRef.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -215,8 +224,24 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       }
     };
     const handleBeforeUnload = () => {
+      if (!joined) return;
       const cid = sessionChannelRef.current;
-      if (joined && cid) supabase.from("voice_sessions").delete().eq("channel_id", cid).then(() => {});
+      if (!cid) return;
+      // Close peer connections immediately
+      peersRef.current.forEach((pc) => { try { pc.close(); } catch {} });
+      peersRef.current.clear();
+      // Remove audio elements
+      remoteAudiosRef.current.forEach((a) => a.remove());
+      remoteAudiosRef.current.clear();
+      // Use sendBeacon for reliable DB delete
+      try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (supabaseUrl && anonKey) {
+          const url = `${supabaseUrl}/rest/v1/voice_sessions?channel_id=eq.${cid}`;
+          navigator.sendBeacon(url, new Blob([JSON.stringify({})], { type: "application/json" }));
+        }
+      } catch {}
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -256,13 +281,15 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         let audio = remoteAudiosRef.current.get(peerId);
         if (!audio) {
           audio = document.createElement("audio");
-          audio.autoplay = true;
           (audio as any).playsInline = true;
           document.body.appendChild(audio);
           remoteAudiosRef.current.set(peerId, audio);
         }
         audio.srcObject = e.streams[0];
         audio.muted = deafened;
+        audio.play().catch(() => {
+          setError("Clique em qualquer lugar para ativar o áudio");
+        });
         setupAnalyser(peerId, e.streams[0]);
       }
       if (e.track.kind === "video") {
@@ -290,8 +317,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
           (pc as any).__iceRestarts = retries + 1;
           pc.restartIce();
           if (peersRef.current.has(peerId)) {
-            pc.createOffer({ iceRestart: true }).then((offer) => {
-              pc.setLocalDescription(offer);
+            pc.createOffer({ iceRestart: true }).then(async (offer) => {
+              await pc.setLocalDescription(offer);
               channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
             }).catch(() => {});
           }
@@ -316,8 +343,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     };
 
     if (isInitiator) {
-      pc.createOffer().then((offer) => {
-        pc.setLocalDescription(offer);
+      pc.createOffer().then(async (offer) => {
+        await pc.setLocalDescription(offer);
         channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
       });
     }
@@ -487,6 +514,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       });
 
       ch.on("presence", { event: "sync" }, () => {
+        if (cleanedUpRef.current) return;
         const state: any = ch.presenceState();
         // Nome E foto vêm do payload de presença (não do prefixo do ID — o ID é estável)
         const seen = new Map<string, { username: string; avatar: string }>();
@@ -509,6 +537,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
             remoteAudiosRef.current.delete(id);
             remoteVideosRef.current.get(id)?.remove();
             remoteVideosRef.current.delete(id);
+            analysersRef.current.delete(id);
+            delete prevSpeakingRef.current[id];
             setRemoteStreams((prev) => {
               const n = { ...prev };
               delete n[id];
@@ -537,7 +567,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
           }
           setJoined(true);
           // loop de detecção de voz com histerese para não piscar
+          speakingLoopRef.current = true;
           const checkSpeaking = () => {
+            if (!speakingLoopRef.current || !channelRef.current) return;
             const next: Record<string, boolean> = {};
             analysersRef.current.forEach((analyser, id) => {
               const data = new Uint8Array(analyser.frequencyBinCount);
@@ -552,7 +584,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
               prevSpeakingRef.current = next;
               setSpeaking(next);
             }
-            if (channelRef.current) setTimeout(() => requestAnimationFrame(checkSpeaking), 80);
+            setTimeout(() => requestAnimationFrame(checkSpeaking), 80);
           };
           requestAnimationFrame(checkSpeaking);
         }
@@ -573,15 +605,10 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   };
 
   const leave = async () => {
-    const cid = sessionChannelRef.current;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user && cid) {
-      await supabase.from("voice_sessions").delete().eq("channel_id", cid).eq("user_id", user.id);
-      maybeEndCall(cid);
-    }
+    await cleanupAndLeave();
+    cleanedUpRef.current = false;
     sessionChannelRef.current = null;
     setSessionChannel(null);
-    cleanup();
     setJoined(false);
     setPeers([]);
     setExpanded(null);
@@ -634,7 +661,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     const v = !deafened;
     setDeafened(v);
     remoteAudiosRef.current.forEach((a) => (a.muted = v));
-    if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = v ? false : !muted));
+    if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = v ? false : !mutedRef.current));
     if (v && !muted) setMuted(true);
   };
 
@@ -657,9 +684,14 @@ export default function VoiceChannel({ channelId, username, status, channelName,
 
   const renegotiate = async () => {
     for (const [peerId, pc] of peersRef.current) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
+      if (pc.signalingState !== "stable") continue;
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
+      } catch (e) {
+        console.warn(`[voz] renegotiation with ${peerId} failed:`, e);
+      }
     }
   };
 

@@ -35,8 +35,8 @@ export const VIDEO_BITRATE: Record<string, number> = {
 // Prefere codecs na ordem dada (ex: H264 p/ fluidez via hardware, VP9 p/ nitidez)
 export function preferCodecs(pc: RTCPeerConnection, track: MediaStreamTrack, wants: RegExp[]) {
   try {
-    const recv = (RTCRtpReceiver as any).getCapabilities?.("video");
-    const codecs: any[] = recv?.codecs || [];
+    const caps = (RTCRtpSender as any).getCapabilities?.("video");
+    const codecs: any[] = caps?.codecs || [];
     if (codecs.length === 0) return false;
     const ordered: any[] = [];
     for (const w of wants) {
@@ -48,7 +48,7 @@ export function preferCodecs(pc: RTCPeerConnection, track: MediaStreamTrack, wan
     if (ordered.length === 0) return false;
     const transceiver = pc
       .getTransceivers()
-      .find((t) => t.sender.track === track && (t as any).currentDirection !== "stopped");
+      .find((t) => t.sender.track?.kind === track.kind && (t as any).currentDirection !== "stopped");
     (transceiver as any)?.setCodecPreferences?.(ordered);
     return true;
   } catch {
@@ -60,8 +60,8 @@ export function preferCodecs(pc: RTCPeerConnection, track: MediaStreamTrack, wan
 // Constrained-Baseline (42e0) > Baseline (4200) > resto, para máxima chance de HW.
 export function preferHardwareH264(pc: RTCPeerConnection, track: MediaStreamTrack) {
   try {
-    const recv = (RTCRtpReceiver as any).getCapabilities?.("video");
-    const codecs: any[] = recv?.codecs || [];
+    const caps = (RTCRtpSender as any).getCapabilities?.("video");
+    const codecs: any[] = caps?.codecs || [];
     const h264 = codecs.filter((c) => /h264/i.test(c.mimeType || ""));
     if (h264.length === 0) return preferCodecs(pc, track, [/h264/i]);
     const rank = (c: any) => {
@@ -74,9 +74,8 @@ export function preferHardwareH264(pc: RTCPeerConnection, track: MediaStreamTrac
     for (const c of codecs) if (!ordered.includes(c)) ordered.push(c);
     const transceiver = pc
       .getTransceivers()
-      .find((t) => t.sender.track === track && (t as any).currentDirection !== "stopped");
+      .find((t) => t.sender.track?.kind === track.kind && (t as any).currentDirection !== "stopped");
     (transceiver as any)?.setCodecPreferences?.(ordered);
-    console.log("[voz] codecs H264 ordenados (baseline primeiro):", ordered.slice(0, 3).map((c) => c.sdpFmtpLine).join(" | "));
     return true;
   } catch {
     return false;
@@ -103,7 +102,7 @@ export async function tuneVideoSender(
   if (opts.codec === "smooth") preferHardwareH264(pc, track);
   else preferVP9(pc, track);
   try {
-    const sender = pc.getSenders().find((s) => s.track === track);
+    const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
     if (!sender) return;
     const params = sender.getParameters();
     if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
@@ -133,7 +132,7 @@ export async function getVideoStats(
   track: MediaStreamTrack
 ): Promise<{ fps: number; bytesSent: number; ts: number; width: number; height: number; limitation: string } | null> {
   try {
-    const sender = pc.getSenders().find((s) => s.track === track);
+    const sender = pc.getSenders().find((s) => s.track?.kind === track.kind);
     if (!sender) return null;
     const stats: any = await sender.getStats();
     let out: any = null;
