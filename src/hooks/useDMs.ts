@@ -4,6 +4,7 @@ import type { DMConversation, DMMessage, PendingFile, ReactionMap, ReplyTarget }
 import { extractMentions, sendNotify } from "@/lib/notify";
 import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { toast, confirmDialog } from "@/lib/ui";
+import { logger } from "@/lib/logger";
 
 const PAGE = 100;
 

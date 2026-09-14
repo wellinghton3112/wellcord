@@ -4,6 +4,7 @@ import type { Message, PendingFile, ReactionMap, ReplyTarget } from "@/lib/chat-
 import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { extractMentions, sendNotify } from "@/lib/notify";
 import { toast, confirmDialog } from "@/lib/ui";
+import { logger } from "@/lib/logger";
 
 const PAGE = 100;
 
@@ -210,7 +211,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       file_type: file?.type || null,
     });
     if (error) {
-      console.error(error);
+      logger.error("Falha ao enviar mensagem", "useChannelMessages", { error: error.message, channelId: selectedChannel });
       toast("Erro ao enviar: " + error.message);
       setInput(content);
       setReplyTo(reply);
@@ -232,13 +233,13 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
   const editMessage = async (id: string, content: string) => {
     if (!content.trim()) return;
     const { error } = await supabase.from("messages").update({ content, edited_at: new Date().toISOString() }).eq("id", id);
-    if (error) toast("Erro ao editar: " + error.message);
+    if (error) { logger.error("Falha ao editar mensagem", "useChannelMessages", { error: error.message }); toast("Erro ao editar: " + error.message); }
   };
 
   const deleteMessage = async (id: string) => {
     if (!(await confirmDialog("Excluir esta mensagem?", { confirmLabel: "Excluir" }))) return;
     const { error } = await supabase.from("messages").delete().eq("id", id);
-    if (error) toast("Erro ao excluir: " + error.message);
+    if (error) { logger.error("Falha ao excluir mensagem", "useChannelMessages", { error: error.message }); toast("Erro ao excluir: " + error.message); }
   };
 
   const toggleReaction = async (messageId: string, emoji: string) => {

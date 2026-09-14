@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useRef, useState } from "react";
+import { logger } from "@/lib/logger";
 
 type VoiceParticipants = Record<string, { id: string; username: string }[]>;
 
