@@ -64,7 +64,7 @@ export default function WebhooksModal({ channelId, serverId, onClose }: { channe
       <div className="bg-[#232428] rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <div className="flex items-center gap-2">
-            <Webhook className="w-5 h-5 text-[var(--accent)]" />
+            <Webhook className="w-5 h-5 text-accent" />
             <h2 className="text-white font-bold text-lg">Webhooks</h2>
           </div>
           <button onClick={onClose} className="text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
@@ -80,9 +80,9 @@ export default function WebhooksModal({ channelId, serverId, onClose }: { channe
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && create()}
               placeholder="Nome do webhook (ex: GitHub)"
-              className="flex-1 bg-[var(--input-bg)] text-white rounded px-3 py-2 text-sm border border-zinc-700 focus:border-[var(--accent)] outline-none"
+              className="flex-1 bg-input-bg text-white rounded px-3 py-2 text-sm border border-zinc-700 focus:border-accent outline-none"
             />
-            <button onClick={create} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
+            <button onClick={create} className="bg-accent hover:bg-accent-hover text-white px-4 py-2 rounded text-sm font-medium flex items-center gap-1">
               <Plus className="w-4 h-4" /> Criar
             </button>
           </div>
@@ -94,10 +94,10 @@ export default function WebhooksModal({ channelId, serverId, onClose }: { channe
             <p className="text-zinc-400 text-sm text-center py-4">Nenhum webhook criado.</p>
           )}
           {webhooks.map((wh) => (
-            <div key={wh.id} className="bg-[var(--input-bg)] rounded-lg p-3 border border-zinc-700">
+            <div key={wh.id} className="bg-input-bg rounded-lg p-3 border border-zinc-700">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center text-white text-sm font-bold">
+                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white text-sm font-bold">
                     {wh.name.charAt(0).toUpperCase()}
                   </div>
                   <span className="text-white font-medium">{wh.name}</span>

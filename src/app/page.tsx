@@ -316,24 +316,24 @@ export default function DiscordClone() {
   const signOut = async () => { await supabase.auth.signOut(); router.push("/login"); };
 
   if (loading) {
-    return <div className="h-screen w-screen bg-[var(--background)] flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳ {APP_VERSION}</div>;
+    return <div className="h-screen w-screen bg-background flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳ {APP_VERSION}</div>;
   }
 
   return (
     <VoiceProvider>
-    <div className="h-screen w-screen bg-[var(--background)] text-zinc-100 overflow-hidden">
+    <div className="h-screen w-screen bg-background text-zinc-100 overflow-hidden">
 
       {showMobileSidebar && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowMobileSidebar(false)} />}
       {showMobileMembers && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowMobileMembers(false)} />}
 
       {!showMobileSidebar && (
-        <button onClick={() => setShowMobileSidebar(true)} className="fixed top-3 left-3 z-30 lg:hidden p-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
+        <button onClick={() => setShowMobileSidebar(true)} className="fixed top-3 left-3 z-30 lg:hidden p-3 bg-accent hover:bg-accent-hover rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
           <Menu className="w-6 h-6 text-white" />
         </button>
       )}
 
       {!showMobileMembers && (
-        <button onClick={() => setShowMobileMembers(true)} className="fixed top-3 right-3 z-30 lg:hidden p-3 bg-[var(--surface-active)] hover:bg-[#4A4D53] rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
+        <button onClick={() => setShowMobileMembers(true)} className="fixed top-3 right-3 z-30 lg:hidden p-3 bg-surface-active hover:bg-[#4A4D53] rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
           <Users className="w-6 h-6 text-white" />
         </button>
       )}
@@ -556,9 +556,9 @@ export default function DiscordClone() {
 
       {toast && (
         <button
-          onClick={openToast}          className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-[var(--surface)] border border-[var(--accent)] rounded-lg p-3 shadow-2xl flex items-start gap-3 text-left hover:brightness-110 transition"
+          onClick={openToast}          className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-surface border border-accent rounded-lg p-3 shadow-2xl flex items-start gap-3 text-left hover:brightness-110 transition"
         >
-          <span className="w-9 h-9 rounded-full bg-[var(--accent)] flex items-center justify-center shrink-0">
+          <span className="w-9 h-9 rounded-full bg-accent flex items-center justify-center shrink-0">
             <Bell className="w-4 h-4 text-white" />
           </span>
           <span className="flex-1 min-w-0">
@@ -569,7 +569,7 @@ export default function DiscordClone() {
           </span>
           <span
             onClick={(e) => { e.stopPropagation(); dismiss(); }}
-            className="p-1 hover:bg-[var(--surface-hover)] rounded shrink-0"
+            className="p-1 hover:bg-surface-hover rounded shrink-0"
           >
             <X className="w-3.5 h-3.5 text-zinc-400" />
           </span>

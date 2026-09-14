@@ -21,7 +21,7 @@ export default function Toaster() {
                 ? "bg-[#DA373C] text-white border-[#A12828]"
                 : t.kind === "success"
                   ? "bg-[#23A559] text-white border-[#1A7F44]"
-                  : "bg-[var(--surface)] text-zinc-200 border-[#4A4D53]"
+                  : "bg-surface text-zinc-200 border-[#4A4D53]"
             }`}
           >
             {t.kind === "error" ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> : t.kind === "success" ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <Info className="w-4 h-4 mt-0.5 shrink-0" />}
@@ -32,13 +32,13 @@ export default function Toaster() {
       </div>
       {confirm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[90] p-4">
-          <div className="bg-[var(--background)] rounded-lg w-full max-w-sm p-5 shadow-2xl">
+          <div className="bg-background rounded-lg w-full max-w-sm p-5 shadow-2xl">
             <p className="text-[15px] text-zinc-100 whitespace-pre-wrap">{confirm.message}</p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => resolveConfirm(false)} className="px-4 py-2 text-sm text-zinc-300 hover:text-white">Cancelar</button>
               <button
                 onClick={() => resolveConfirm(true)}
-                className={`px-5 py-2 rounded text-sm font-semibold text-white ${confirm.danger ? "bg-[#DA373C] hover:bg-[#A12828]" : "bg-[var(--accent)] hover:bg-[var(--accent-hover)]"}`}
+                className={`px-5 py-2 rounded text-sm font-semibold text-white ${confirm.danger ? "bg-[#DA373C] hover:bg-[#A12828]" : "bg-accent hover:bg-accent-hover"}`}
               >
                 {confirm.confirmLabel}
               </button>

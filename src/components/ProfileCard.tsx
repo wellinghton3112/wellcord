@@ -63,7 +63,7 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
         <div className="bg-[#232428] px-4 pb-4">
           <div className="flex items-end gap-3 -mt-10 mb-2">
             <div className="relative shrink-0">
-              <Avatar src={profile.avatar} name={profile.username} className="w-20 h-20 rounded-full border-[6px] border-[#232428] bg-[var(--accent)] text-3xl" />
+              <Avatar src={profile.avatar} name={profile.username} className="w-20 h-20 rounded-full border-[6px] border-[#232428] bg-accent text-3xl" />
               <span className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-[#232428] ${statusColor}`} title={statusLabel} />
             </div>
             {profile.status_text ? (

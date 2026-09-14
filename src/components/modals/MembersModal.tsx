@@ -56,10 +56,10 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[var(--background)] rounded-lg w-full max-w-lg p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+      <div className="bg-background rounded-lg w-full max-w-lg p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xl font-bold">Membros de {serverName || "servidor"}</h2>
-          <button onClick={onClose} className="p-1 hover:bg-[var(--surface-active)] rounded"><X className="w-5 h-5 text-zinc-400" /></button>
+          <button onClick={onClose} className="p-1 hover:bg-surface-active rounded"><X className="w-5 h-5 text-zinc-400" /></button>
         </div>
         <p className="text-sm text-zinc-400 mb-4">{members.length} no servidor</p>
 
@@ -68,7 +68,7 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
             const userRoles = roles.filter(r => hasRole(m.user_id, r.id));
             const isEditing = editingRoles === m.user_id;
             return (
-              <div key={m.user_id} className="px-2 py-1.5 rounded hover:bg-[var(--surface-hover)] group">
+              <div key={m.user_id} className="px-2 py-1.5 rounded hover:bg-surface-hover group">
                 <div className="flex items-center gap-3">
                   <Avatar src={m.avatar} name={m.username} className="w-8 h-8 rounded-full bg-[#41434A] text-sm" />
                   <div className="flex-1 min-w-0">
@@ -90,7 +90,7 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
                   </div>
                   {isOwner && m.user_id !== userId && m.role !== "owner" && (
                     <div className="flex gap-0.5">
-                      <button onClick={() => setEditingRoles(isEditing ? null : m.user_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[var(--accent)] rounded" title="Gerenciar cargos">
+                      <button onClick={() => setEditingRoles(isEditing ? null : m.user_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-accent rounded" title="Gerenciar cargos">
                         <Shield className="w-4 h-4 text-zinc-400 hover:text-white" />
                       </button>
                       <button onClick={() => onBan(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#DA373C] rounded" title={`Banir ${m.username}`}>
@@ -108,7 +108,7 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
                       <button
                         key={r.id}
                         onClick={() => hasRole(m.user_id, r.id) ? onRemoveRole(m.user_id, r.id) : onAssignRole(m.user_id, r.id)}
-                        className={`text-xs px-2 py-1 rounded border transition-colors ${hasRole(m.user_id, r.id) ? "border-current" : "border-[var(--border)] hover:border-[var(--accent)]"}`}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${hasRole(m.user_id, r.id) ? "border-current" : "border-border hover:border-accent"}`}
                         style={{ color: r.color, background: hasRole(m.user_id, r.id) ? r.color + "22" : "transparent" }}
                       >
                         {hasRole(m.user_id, r.id) ? "✓ " : ""}{r.name}
@@ -126,34 +126,34 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
         <div className="flex gap-2 mb-3">
           <label className="flex-1 text-xs text-zinc-400">
             Usos
-            <select value={maxUses} onChange={(e) => setMaxUses(e.target.value)} className="w-full mt-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-2 py-1.5 text-white text-sm outline-none">
+            <select value={maxUses} onChange={(e) => setMaxUses(e.target.value)} className="w-full mt-1 bg-surface border border-input-bg rounded px-2 py-1.5 text-white text-sm outline-none">
               <option value="0">Ilimitado</option><option value="1">1 uso</option><option value="5">5 usos</option><option value="25">25 usos</option>
             </select>
           </label>
           <label className="flex-1 text-xs text-zinc-400">
             Expira em
-            <select value={expires} onChange={(e) => setExpires(e.target.value)} className="w-full mt-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-2 py-1.5 text-white text-sm outline-none">
+            <select value={expires} onChange={(e) => setExpires(e.target.value)} className="w-full mt-1 bg-surface border border-input-bg rounded px-2 py-1.5 text-white text-sm outline-none">
               <option value="0">Nunca</option><option value="1">1 hora</option><option value="24">24 horas</option><option value="168">7 dias</option>
             </select>
           </label>
-          <button onClick={create} disabled={creating} className="self-end px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 rounded text-sm font-medium text-white shrink-0">
+          <button onClick={create} disabled={creating} className="self-end px-4 py-1.5 bg-accent hover:bg-accent-hover disabled:opacity-50 rounded text-sm font-medium text-white shrink-0">
             {creating ? "..." : "Criar"}
           </button>
         </div>
         {lastLink && (
           <div className="flex items-center gap-2 mb-3">
-            <input value={lastLink} readOnly className="flex-1 bg-[var(--surface)] border border-[var(--accent)] rounded px-2 py-1.5 text-white text-xs outline-none min-w-0" />
-            <button onClick={() => copy(lastLink.split("/join/")[1] || "")} className="px-3 py-1.5 bg-[var(--surface-active)] hover:bg-[#4A4D53] rounded-xs text-white shrink-0">Copiar</button>
+            <input value={lastLink} readOnly className="flex-1 bg-surface border border-accent rounded px-2 py-1.5 text-white text-xs outline-none min-w-0" />
+            <button onClick={() => copy(lastLink.split("/join/")[1] || "")} className="px-3 py-1.5 bg-surface-active hover:bg-[#4A4D53] rounded-xs text-white shrink-0">Copiar</button>
           </div>
         )}
         <div className="space-y-1">
           {invites.map((inv) => (
-            <div key={inv.code} className="flex items-center gap-2 px-2 py-1.5 rounded bg-[var(--surface)] text-xs">
+            <div key={inv.code} className="flex items-center gap-2 px-2 py-1.5 rounded bg-surface text-xs">
               <Hash className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span className="font-mono text-zinc-200 truncate">{inv.code}</span>
               <span className="text-zinc-400 shrink-0">{inv.uses}{inv.max_uses ? `/${inv.max_uses}` : ""} usos</span>
               <span className="text-zinc-400 flex items-center gap-1 shrink-0"><Clock className="w-3 h-3" />{fmtExpiry(inv.expires_at)}</span>
-              <button onClick={() => copy(inv.code)} className="ml-auto p-1 hover:bg-[var(--surface-active)] rounded shrink-0" title="Copiar link">
+              <button onClick={() => copy(inv.code)} className="ml-auto p-1 hover:bg-surface-active rounded shrink-0" title="Copiar link">
                 {copied === inv.code ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5 text-zinc-400" />}
               </button>
               <button onClick={() => onRevoke(inv.code)} className="p-1 hover:bg-[#DA373C] rounded shrink-0" title="Revogar">
@@ -165,7 +165,7 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="px-6 py-2 bg-[var(--surface-active)] hover:bg-[#4A4D53] rounded text-sm font-medium text-white">Fechar</button>
+          <button onClick={onClose} className="px-6 py-2 bg-surface-active hover:bg-[#4A4D53] rounded text-sm font-medium text-white">Fechar</button>
         </div>
       </div>
     </div>

@@ -30,7 +30,7 @@ export function ModalShell({ onClose, children, className = "", maxWidth = "max-
       onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}
     >
       <div
-        className={`bg-[var(--background)] rounded-xl shadow-2xl border border-[var(--border)] w-full ${maxWidth} modal-content ${className}`}
+        className={`bg-background rounded-xl shadow-2xl border border-border w-full ${maxWidth} modal-content ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}

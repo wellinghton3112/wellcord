@@ -42,10 +42,10 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
         <div className="h-24 relative rounded-t-xl" style={{ background: `linear-gradient(135deg, var(--accent), #1E1F22 130%)` }}>
           <div className="absolute -bottom-8 left-4">
             <div className="relative">
-              <Avatar src={preview || avatar} name={username} className="w-20 h-20 rounded-full border-[6px] border-[#313338] bg-[var(--accent)] text-3xl" />
+              <Avatar src={preview || avatar} name={username} className="w-20 h-20 rounded-full border-[6px] border-[#313338] bg-accent text-3xl" />
               <button
                 onClick={() => fileRef.current?.click()}
-                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] flex items-center justify-center border-4 border-[#313338] transition-colors"
+                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-accent hover:bg-accent-hover flex items-center justify-center border-4 border-[#313338] transition-colors"
                 title="Trocar foto"
               >
                 <Camera className="w-4 h-4 text-white" />
@@ -64,7 +64,7 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full mt-1 bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-3 py-2 outline-none focus:border-[var(--accent)] text-white transition-colors"
+              className="w-full mt-1 bg-input-bg border border-border rounded-lg px-3 py-2 outline-none focus:border-accent text-white transition-colors"
               placeholder="Seu nome"
               autoFocus
             />
@@ -78,7 +78,7 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
                 value={statusText}
                 onChange={(e) => setStatusText(e.target.value)}
                 maxLength={60}
-                className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-3 py-2 pr-12 outline-none focus:border-[var(--accent)] text-white text-sm transition-colors"
+                className="w-full bg-input-bg border border-border rounded-lg px-3 py-2 pr-12 outline-none focus:border-accent text-white text-sm transition-colors"
                 placeholder="Ex: Pensamento de chuveiro?"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-600">{statusText.length}/60</span>
@@ -94,7 +94,7 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
                 onChange={(e) => setBio(e.target.value)}
                 maxLength={300}
                 rows={3}
-                className="w-full bg-[var(--input-bg)] border border-[var(--border)] rounded-lg px-3 py-2 pr-12 outline-none focus:border-[var(--accent)] text-white text-sm resize-none transition-colors"
+                className="w-full bg-input-bg border border-border rounded-lg px-3 py-2 pr-12 outline-none focus:border-accent text-white text-sm resize-none transition-colors"
                 placeholder="Conte algo sobre você..."
               />
               <span className="absolute right-3 bottom-2 text-[10px] text-zinc-600">{bio.length}/300</span>
@@ -110,9 +110,9 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-[var(--border)]">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm hover:underline text-zinc-300">Cancelar</button>
-          <button onClick={onSave} disabled={saving || !username.trim()} className="px-6 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors">
+          <button onClick={onSave} disabled={saving || !username.trim()} className="px-6 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors">
             {saving ? "Salvando..." : "Salvar alterações"}
           </button>
         </div>

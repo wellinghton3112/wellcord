@@ -19,11 +19,11 @@ export function useMessageEdit() {
         value={editDraft}
         onChange={(e) => setEditDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") saveEdit(save); if (e.key === "Escape") cancelEdit(); }}
-        className="flex-1 bg-[var(--surface)] rounded px-2 py-1 text-[15px] outline-none focus:ring-1 focus:ring-[var(--accent)] min-w-0"
+        className="flex-1 bg-surface rounded px-2 py-1 text-[15px] outline-none focus:ring-1 focus:ring-accent min-w-0"
         autoFocus
       />
-      <button onClick={() => saveEdit(save)} className="text-xs text-[var(--accent)] hover:underline shrink-0">Salvar</button>
-      <button onClick={cancelEdit} className="p-1 hover:bg-[var(--surface)] rounded shrink-0"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
+      <button onClick={() => saveEdit(save)} className="text-xs text-accent hover:underline shrink-0">Salvar</button>
+      <button onClick={cancelEdit} className="p-1 hover:bg-surface rounded shrink-0"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
     </div>
   );
 

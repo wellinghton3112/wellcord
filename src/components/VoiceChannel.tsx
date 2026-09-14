@@ -471,7 +471,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
           <p className="text-zinc-400 mt-2 max-w-md">Sua voz continua ativa. Para entrar em #{channelName || "este canal"}, saia da atual primeiro.</p>
           {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
         </div>
-        <button onClick={() => join(false)} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-8 py-3 rounded-full font-bold">
+        <button onClick={() => join(false)} className="bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-full font-bold">
           Sair e entrar aqui
         </button>
       </div>
@@ -490,8 +490,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         <button onClick={() => join(false)} className="bg-[#23A559] hover:bg-[#1A7F44] text-white px-8 py-3 rounded-full font-bold flex items-center gap-2">
           <PhoneOff className="w-5 h-5 rotate-[-135deg]" /> Entrar na voz
         </button>
-        <button onClick={() => join(true)} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white px-6 py-2 rounded-full text-sm">Entrar como ouvinte</button>
-        <button onClick={testMic} className="bg-[var(--surface-hover)] hover:bg-[var(--surface-active)] text-white px-6 py-2 rounded-full text-sm">Testar microfone</button>
+        <button onClick={() => join(true)} className="bg-accent hover:bg-accent-hover text-white px-6 py-2 rounded-full text-sm">Entrar como ouvinte</button>
+        <button onClick={testMic} className="bg-surface-hover hover:bg-surface-active text-white px-6 py-2 rounded-full text-sm">Testar microfone</button>
         <p className="text-xs text-zinc-400">Seu navegador vai pedir permissao do microfone - Abra F12 para ver logs</p>
         {!hasTurnConfigured() && <p className="text-[11px] text-amber-400/80 max-w-md">Modo STUN: voz direta funciona na maioria das redes. Atrás de NAT restrito pode falhar — TURN será ativado pelo admin em breve.</p>}
       </div>
@@ -509,7 +509,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
                 <button
                   key={q}
                   onClick={() => screenShare.changeScreenQuality(q)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenShare.screenQuality === q ? "bg-[var(--accent)] text-white" : "text-zinc-400 hover:text-white"}`}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenShare.screenQuality === q ? "bg-accent text-white" : "text-zinc-400 hover:text-white"}`}
                 >
                   {qualityLabel(q)}
                 </button>
@@ -517,7 +517,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
               <span className="w-px h-4 bg-[#3F4147] mx-1" />
               <button
                 onClick={() => screenShare.changeCodecMode(screenShare.codecMode === "sharp" ? "smooth" : "sharp")}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenShare.codecMode === "smooth" ? "bg-[#23A559] text-white" : "bg-[var(--surface)] text-zinc-400 hover:text-white"}`}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenShare.codecMode === "smooth" ? "bg-[#23A559] text-white" : "bg-surface text-zinc-400 hover:text-white"}`}
                 title={screenShare.codecMode === "sharp" ? "VP9 nítido (CPU). Clique p/ H264 fluido (GPU)." : "H264 fluido via hardware. Clique p/ VP9 nítido."}
               >
                 {screenShare.codecMode === "sharp" ? "Nítido" : "Fluido"}
@@ -539,7 +539,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
             {showVideo ? (
               <video ref={expandedVideoRef} autoPlay playsInline muted={isLocal} className="w-full h-full object-contain bg-black" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-[var(--surface)]">
+              <div className="w-full h-full flex items-center justify-center bg-surface">
                 <Avatar src={isLocal ? avatar : peer?.avatar} name={isLocal ? username : peer?.username} className="w-24 h-24 rounded-full text-4xl" />
               </div>
             )}
@@ -559,7 +559,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         const count = peers.length + 1;
         const gridClass = count <= 1 ? "grid-cols-1" : count <= 2 ? "grid-cols-1 md:grid-cols-2" : count <= 4 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3";
         return <div className={`grid ${gridClass} gap-3`}>
-        <div onClick={() => setExpanded("local")} className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"} ${expanded === "local" ? "ring-2 ring-[var(--accent)]" : ""}`}>
+        <div onClick={() => setExpanded("local")} className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"} ${expanded === "local" ? "ring-2 ring-accent" : ""}`}>
           <div className="w-full aspect-video bg-black rounded overflow-hidden relative group">
             {screenShare.screenOn ? (
               <>
@@ -577,7 +577,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
             ) : cameraOn ? (
               <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             ) : (
-              <div className={`w-full h-full flex items-center justify-center ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[var(--accent)]`}>
+              <div className={`w-full h-full flex items-center justify-center ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-accent`}>
                 <Avatar src={avatar} name={username} className="w-16 h-16 rounded-full text-3xl" />
               </div>
             )}
@@ -590,7 +590,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
           const stream = remoteStreams[p.id];
           const hasVideo = !!stream && stream.getVideoTracks().some((t) => t.readyState === "live" && t.enabled) && !hiddenVideo[p.id];
           return (
-            <div key={p.id} onClick={() => setExpanded(p.id)} className={`bg-[var(--surface)] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-transparent"} ${expanded === p.id ? "ring-2 ring-[var(--accent)]" : ""}`}>
+            <div key={p.id} onClick={() => setExpanded(p.id)} className={`bg-surface rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking[p.id] ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-transparent"} ${expanded === p.id ? "ring-2 ring-accent" : ""}`}>
               <div className="w-full aspect-video bg-black rounded overflow-hidden relative group">
                 {hasVideo ? (
                   <video
@@ -631,19 +631,19 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       })()}
 
       <div className="mt-auto flex items-center justify-center gap-2 p-3 bg-[#232428] rounded-lg flex-wrap">
-        <button onClick={toggleMute} className={`w-11 h-11 rounded-full flex items-center justify-center ${muted ? "bg-[#DA373C] text-white" : "bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-zinc-200"}`} title={muted ? "Ativar microfone" : "Mutar"}>
+        <button onClick={toggleMute} className={`w-11 h-11 rounded-full flex items-center justify-center ${muted ? "bg-[#DA373C] text-white" : "bg-surface hover:bg-surface-hover text-zinc-200"}`} title={muted ? "Ativar microfone" : "Mutar"}>
           {muted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
         </button>
-        <button onClick={toggleCamera} className={`w-11 h-11 rounded-full flex items-center justify-center ${cameraOn ? "bg-[#23A559] text-white" : "bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-zinc-200"}`} title={cameraOn ? "Desligar câmera" : "Ligar câmera"}>
+        <button onClick={toggleCamera} className={`w-11 h-11 rounded-full flex items-center justify-center ${cameraOn ? "bg-[#23A559] text-white" : "bg-surface hover:bg-surface-hover text-zinc-200"}`} title={cameraOn ? "Desligar câmera" : "Ligar câmera"}>
           {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </button>
-        <button onClick={() => screenShare.toggleScreen(cameraOn)} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenShare.screenOn ? "bg-[#23A559] text-white" : "bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-zinc-200"}`} title={screenShare.screenOn ? "Parar tela" : "Compartilhar tela"}>
+        <button onClick={() => screenShare.toggleScreen(cameraOn)} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenShare.screenOn ? "bg-[#23A559] text-white" : "bg-surface hover:bg-surface-hover text-zinc-200"}`} title={screenShare.screenOn ? "Parar tela" : "Compartilhar tela"}>
           {screenShare.screenOn ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
         </button>
-        <button onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-zinc-200"}`} title="Surdo">
+        <button onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-surface hover:bg-surface-hover text-zinc-200"}`} title="Surdo">
           <Headphones className="w-5 h-5" />
         </button>
-        <button onClick={toggleDenoiseUI} className={`w-11 h-11 rounded-full flex items-center justify-center ${denoiseActive ? "bg-[#23A559] text-white" : "bg-[var(--surface)] hover:bg-[var(--surface-hover)] text-zinc-200"}`} title={denoiseActive ? "Supressão de ruído RNNoise ATIVADA (clique p/ desligar)" : "Supressão de ruído desligada (clique p/ ativar RNNoise)"}>
+        <button onClick={toggleDenoiseUI} className={`w-11 h-11 rounded-full flex items-center justify-center ${denoiseActive ? "bg-[#23A559] text-white" : "bg-surface hover:bg-surface-hover text-zinc-200"}`} title={denoiseActive ? "Supressão de ruído RNNoise ATIVADA (clique p/ desligar)" : "Supressão de ruído desligada (clique p/ ativar RNNoise)"}>
           <Waves className="w-5 h-5" />
         </button>
         <button onClick={leave} className="w-11 h-11 rounded-full bg-[#DA373C] hover:bg-[#A12828] text-white flex items-center justify-center"><PhoneOff className="w-5 h-5" /></button>

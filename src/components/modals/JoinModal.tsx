@@ -21,12 +21,12 @@ export default function JoinModal({ code, setCode, joining, onClose, onJoin }: P
           onChange={(e) => setCode(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onJoin()}
           placeholder="ex: a1b2c3d4"
-          className="w-full bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2 text-white outline-none focus:border-[var(--accent)]"
+          className="w-full bg-surface border border-input-bg rounded px-3 py-2 text-white outline-none focus:border-accent"
           autoFocus
         />
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
-          <button onClick={onJoin} disabled={!code.trim() || joining} className="px-6 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 rounded text-sm font-medium text-white">{joining ? "Entrando..." : "Entrar"}</button>
+          <button onClick={onJoin} disabled={!code.trim() || joining} className="px-6 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 rounded text-sm font-medium text-white">{joining ? "Entrando..." : "Entrar"}</button>
         </div>
       </div>
     </ModalShell>

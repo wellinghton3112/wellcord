@@ -50,12 +50,12 @@ export function LinkEmbed({ url }: { url: string }) {
   const hostname = (() => { try { return new URL(url).hostname; } catch { return url; } })();
 
   return (
-    <div className="mt-1.5 max-w-md rounded-lg border border-[#4A4D53] bg-[var(--surface)] overflow-hidden group">
+    <div className="mt-1.5 max-w-md rounded-lg border border-[#4A4D53] bg-surface overflow-hidden group">
       {data.image && (
         <button
           type="button"
           onClick={() => openLightbox([data.image!], 0)}
-          className="h-36 w-full overflow-hidden bg-[var(--input-bg)] block cursor-pointer"
+          className="h-36 w-full overflow-hidden bg-input-bg block cursor-pointer"
         >
           <img
             src={data.image}
@@ -65,7 +65,7 @@ export function LinkEmbed({ url }: { url: string }) {
           />
         </button>
       )}
-      <a href={url} target="_blank" rel="noreferrer" className="block px-3 py-2 hover:bg-[var(--surface-hover)] transition-colors">
+      <a href={url} target="_blank" rel="noreferrer" className="block px-3 py-2 hover:bg-surface-hover transition-colors">
         {data.siteName && (
           <div className="flex items-center gap-1.5 mb-1">
             {data.favicon ? (

@@ -45,7 +45,7 @@ export function ReactionBar({ list, toggle }: { list: Reaction[] | undefined; to
           key={r.emoji}
           onClick={() => toggle(r.emoji)}
           title={r.mine ? "Remover minha reação" : "Reagir também"}
-          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${r.mine ? "bg-[var(--accent)]/30 border-[var(--accent)] text-white" : "bg-[var(--surface)] border-[#4A4D53] text-zinc-300 hover:border-zinc-400"}`}
+          className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${r.mine ? "bg-accent/30 border-accent text-white" : "bg-surface border-[#4A4D53] text-zinc-300 hover:border-zinc-400"}`}
         >
           <span>{r.emoji}</span><span className="font-semibold">{r.count}</span>
         </button>
@@ -74,14 +74,14 @@ export function EmojiPicker({ messageId, toggle, onClose }: { messageId: string;
     : EMOJI_CATEGORIES[selectedCategory].emojis;
 
   return (
-    <div className="mt-1 bg-[var(--surface)] border border-[#4A4D53] rounded-xl shadow-xl w-72 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="mt-1 bg-surface border border-[#4A4D53] rounded-xl shadow-xl w-72 overflow-hidden" onClick={(e) => e.stopPropagation()}>
       {/* Search */}
       <div className="p-2 border-b border-[#4A4D53]">
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Buscar emoji..."
-          className="w-full bg-[var(--input-bg)] rounded-md px-3 py-1.5 text-sm outline-none text-zinc-200 placeholder:text-zinc-400"
+          className="w-full bg-input-bg rounded-md px-3 py-1.5 text-sm outline-none text-zinc-200 placeholder:text-zinc-400"
           autoFocus
         />
       </div>
@@ -93,7 +93,7 @@ export function EmojiPicker({ messageId, toggle, onClose }: { messageId: string;
             <button
               key={cat.name}
               onClick={() => setSelectedCategory(i)}
-              className={`px-2 py-1 rounded text-[10px] font-medium whitespace-nowrap transition-colors ${selectedCategory === i ? "bg-[var(--accent)]/20 text-[var(--accent)]" : "text-zinc-400 hover:text-zinc-300"}`}
+              className={`px-2 py-1 rounded text-[10px] font-medium whitespace-nowrap transition-colors ${selectedCategory === i ? "bg-accent/20 text-accent" : "text-zinc-400 hover:text-zinc-300"}`}
             >
               {cat.name}
             </button>
@@ -107,7 +107,7 @@ export function EmojiPicker({ messageId, toggle, onClose }: { messageId: string;
           <button
             key={`${e}-${i}`}
             onClick={() => { toggle(messageId, e); onClose(); }}
-            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-[var(--surface-active)] rounded transition-colors"
+            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-surface-active rounded transition-colors"
           >
             {e}
           </button>
@@ -121,7 +121,7 @@ export function EmojiPicker({ messageId, toggle, onClose }: { messageId: string;
             <button key={e} onClick={() => { toggle(messageId, e); onClose(); }} className="text-lg hover:scale-125 transition-transform p-0.5">{e}</button>
           ))}
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-[var(--surface-hover)] rounded"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
+        <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
       </div>
     </div>
   );
@@ -133,9 +133,9 @@ export function QuoteBlock({ user, content, targetId, scrollToMsg }: { user?: st
     <button
       onClick={() => scrollToMsg(targetId)}
       title="Ir para a mensagem original"
-      className="mb-1 flex items-stretch gap-2 text-left bg-[var(--surface)]/70 hover:bg-[var(--surface)] rounded px-2 py-1 max-w-full transition-colors"
+      className="mb-1 flex items-stretch gap-2 text-left bg-surface/70 hover:bg-surface rounded px-2 py-1 max-w-full transition-colors"
     >
-      <span className="w-1 rounded-full bg-[var(--accent)] shrink-0" />
+      <span className="w-1 rounded-full bg-accent shrink-0" />
       <span className="min-w-0">
         <span className="block text-xs font-semibold text-[#B5BAC1] truncate">{user || "mensagem"}</span>
         <span className="block text-xs text-zinc-400 truncate">{content || "(apagada)"}</span>
@@ -147,13 +147,13 @@ export function QuoteBlock({ user, content, targetId, scrollToMsg }: { user?: st
 export function ReplyPreview({ target, clear }: { target: ReplyTarget | null; clear: () => void }) {
   if (!target) return null;
   return (
-    <div className="mb-2 flex items-stretch gap-2 bg-[var(--surface)] rounded px-2 py-1.5">
-      <span className="w-1 rounded-full bg-[var(--accent)] shrink-0" />
+    <div className="mb-2 flex items-stretch gap-2 bg-surface rounded px-2 py-1.5">
+      <span className="w-1 rounded-full bg-accent shrink-0" />
       <span className="flex-1 min-w-0">
         <span className="block text-xs text-zinc-400">Respondendo a <span className="font-semibold text-zinc-200">{target.user}</span></span>
         <span className="block text-xs text-zinc-400 truncate">{target.content}</span>
       </span>
-      <button onClick={clear} className="p-1 hover:bg-[var(--surface-hover)] rounded self-start" title="Cancelar resposta"><X className="w-4 h-4 text-zinc-400" /></button>
+      <button onClick={clear} className="p-1 hover:bg-surface-hover rounded self-start" title="Cancelar resposta"><X className="w-4 h-4 text-zinc-400" /></button>
     </div>
   );
 }
@@ -173,14 +173,14 @@ export function AttachmentBlock({ url, name, type }: { url?: string | null; name
   }
   if (isAudio) {
     return (
-      <div className="mt-1 max-w-sm rounded-lg border border-[#4A4D53] bg-[var(--surface)] px-3 py-2">
+      <div className="mt-1 max-w-sm rounded-lg border border-[#4A4D53] bg-surface px-3 py-2">
         <div className="mb-1 truncate text-xs text-zinc-300">{name || "áudio"}</div>
         <audio controls preload="metadata" src={url} className="w-full min-w-60" />
       </div>
     );
   }
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-2 bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[#4A4D53] rounded-lg px-3 py-2 max-w-sm transition-colors">
+    <a href={url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-2 bg-surface hover:bg-surface-hover border border-[#4A4D53] rounded-lg px-3 py-2 max-w-sm transition-colors">
       <FileText className="w-5 h-5 text-zinc-400 shrink-0" />
       <span className="flex-1 min-w-0 text-sm text-zinc-200 truncate">{name || "arquivo"}</span>
       <Download className="w-4 h-4 text-zinc-400 shrink-0" />
@@ -224,7 +224,7 @@ export function MentionBox({ value, candidates, apply, focusRef, userId }: {
     .slice(0, 5);
   if (list.length === 0) return null;
   return (
-    <div className="mb-2 w-64 bg-[var(--surface)] border border-[#4A4D53] rounded-lg shadow-xl overflow-hidden">
+    <div className="mb-2 w-64 bg-surface border border-[#4A4D53] rounded-lg shadow-xl overflow-hidden">
       {list.map((c) => (
         <button
           key={c.id}
@@ -232,9 +232,9 @@ export function MentionBox({ value, candidates, apply, focusRef, userId }: {
             apply(value.slice(0, value.length - m[0].length) + `@${c.username} `);
             setTimeout(() => focusRef.current?.focus(), 0);
           }}
-          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--surface-hover)] text-left"
+          className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover text-left"
         >
-          <Avatar src={c.avatar} name={c.username} className="w-6 h-6 rounded-full bg-[var(--accent)] text-xs" />
+          <Avatar src={c.avatar} name={c.username} className="w-6 h-6 rounded-full bg-accent text-xs" />
           <span className="text-sm text-zinc-200 truncate">{c.username}</span>
         </button>
       ))}
@@ -247,7 +247,7 @@ export function mentionize(text: string) {
   if (parts.length === 1) return text;
   return parts.map((p, i) =>
     /^@[A-Za-z0-9_.-]+$/.test(p)
-      ? <span key={i} className="bg-[var(--accent)]/40 text-white rounded px-0.5">{p}</span>
+      ? <span key={i} className="bg-accent/40 text-white rounded px-0.5">{p}</span>
       : <span key={i}>{p}</span>
   );
 }
@@ -261,7 +261,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
 
   if (grouped) {
     return (
-      <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-0.5 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[var(--accent)]/10 border-l-2 border-[var(--accent)]" : ""}`}>
+      <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-0.5 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-accent/10 border-l-2 border-accent" : ""}`}>
         <div className="w-10 shrink-0 flex items-center justify-center">
           <span className="text-[10px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp?.slice(0, 5)}</span>
         </div>
@@ -274,7 +274,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
           {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
         </div>
         {editingId !== msg.id && (
-          <div className="hidden group-hover:flex items-center gap-1 self-start bg-[var(--background)] border border-[var(--border)] rounded-lg p-1 shadow-lg">
+          <div className="hidden group-hover:flex items-center gap-1 self-start bg-background border border-border rounded-lg p-1 shadow-lg">
             <button onClick={() => { onReply({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
             <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
             {canPinMsg(msg.user_id) && (
@@ -299,14 +299,14 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
   }
 
   return (
-    <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[var(--accent)]/10 border-l-2 border-[var(--accent)]" : ""}`}>
+    <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-accent/10 border-l-2 border-accent" : ""}`}>
       <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="shrink-0 mt-1 rounded-full" title="Ver perfil">
         <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${displayColor}33` }}><Avatar src={displayAvatar} name={displayName} className="w-10 h-10 rounded-full text-lg" /></span>
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
           <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: displayColor }}>{displayName}</button>
-          {isWebhook && <span className="text-[10px] px-1 py-0.5 rounded bg-[var(--accent)] text-white font-medium leading-none">BOT</span>}
+          {isWebhook && <span className="text-[10px] px-1 py-0.5 rounded bg-accent text-white font-medium leading-none">BOT</span>}
           <span className="text-xs text-zinc-400">{msg.timestamp}</span>
           {(msg as any).edited_at && <span className="text-[10px] text-zinc-400">(editado)</span>}
           {pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}
@@ -319,7 +319,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
         {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
       </div>
       {editingId !== msg.id && (
-        <div className="hidden group-hover:flex items-center gap-1 self-start bg-[var(--background)] border border-[var(--border)] rounded-lg p-1 shadow-lg">
+        <div className="hidden group-hover:flex items-center gap-1 self-start bg-background border border-border rounded-lg p-1 shadow-lg">
           <button onClick={() => { onReply({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
           <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
           {canPinMsg(msg.user_id) && (

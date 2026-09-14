@@ -17,16 +17,16 @@ export default function PinsModal({ channelName, pins, onJump, onUnpin, canManag
 
   return (
     <ModalShell onClose={onClose} maxWidth="max-w-lg">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <h2 className="text-lg font-bold flex items-center gap-2"><Pin className="w-5 h-5 text-[#F0B132]" /> Fixados em #{channelName}</h2>
-        <span className="text-xs text-zinc-400 bg-[var(--surface)] px-2 py-1 rounded-full">{pins.length}</span>
+        <span className="text-xs text-zinc-400 bg-surface px-2 py-1 rounded-full">{pins.length}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto max-h-[50vh] p-4 space-y-2">
         {sorted.map((p) => (
-          <div key={p.message_id} className="bg-[var(--surface)] rounded-xl p-3 hover:bg-[var(--surface-hover)] transition-colors group">
+          <div key={p.message_id} className="bg-surface rounded-xl p-3 hover:bg-surface-hover transition-colors group">
             <div className="flex items-center gap-3 mb-1.5">
-              <div className="w-8 h-8 rounded-full bg-[var(--accent)]/20 flex items-center justify-center text-sm font-bold text-[var(--accent)]">
+              <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-sm font-bold text-accent">
                 {(p.username || "?")[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -38,7 +38,7 @@ export default function PinsModal({ channelName, pins, onJump, onUnpin, canManag
             </div>
             <p className="text-sm text-zinc-300 break-words pl-11 line-clamp-3">{p.content || "(anexo)"}</p>
             <div className="flex justify-end gap-2 mt-2 pl-11">
-              <button onClick={() => onJump(p.message_id)} className="text-xs text-[var(--accent)] hover:underline opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={() => onJump(p.message_id)} className="text-xs text-accent hover:underline opacity-0 group-hover:opacity-100 transition-opacity">
                 Ir para mensagem
               </button>
               {canManage && (

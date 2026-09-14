@@ -74,9 +74,9 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
 
   return (
     <ModalShell onClose={onClose} maxWidth="max-w-lg">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <h2 className="text-xl font-bold">Configurações</h2>
-        <button onClick={onClose} className="p-1 hover:bg-[var(--surface-hover)] rounded"><X className="w-5 h-5 text-zinc-400" /></button>
+        <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded"><X className="w-5 h-5 text-zinc-400" /></button>
       </div>
 
       <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
@@ -94,8 +94,8 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
                 onClick={() => update({ theme: value })}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
                   local.theme === value
-                    ? "border-[var(--accent)] text-[var(--accent)]"
-                    : "bg-[var(--surface)] border-[var(--border)] text-zinc-400 hover:bg-[var(--surface-hover)]"
+                    ? "border-accent text-accent"
+                    : "bg-surface border-border text-zinc-400 hover:bg-surface-hover"
                 }`}
               >
                 <Icon className="w-6 h-6" />
@@ -156,16 +156,16 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
           <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wide mb-3">Atalhos de teclado</h3>
           <div className="space-y-2">
             {shortcuts.map((s) => (
-              <div key={s.keys} className="flex items-center justify-between py-2 px-3 rounded-lg bg-[var(--surface)]">
+              <div key={s.keys} className="flex items-center justify-between py-2 px-3 rounded-lg bg-surface">
                 <span className="text-sm text-zinc-300">{s.desc}</span>
-                <kbd className="px-2 py-1 rounded bg-[var(--input-bg)] border border-[var(--border)] text-xs text-zinc-400 font-mono">{s.keys}</kbd>
+                <kbd className="px-2 py-1 rounded bg-input-bg border border-border text-xs text-zinc-400 font-mono">{s.keys}</kbd>
               </div>
             ))}
           </div>
         </section>
 
         {/* Info */}
-        <section className="text-center text-xs text-zinc-600 pt-2 border-t border-[var(--border)]">
+        <section className="text-center text-xs text-zinc-600 pt-2 border-t border-border">
           WellCORD • BETA 0.1.96 • Feito com Next.js + Supabase
         </section>
       </div>
@@ -175,7 +175,7 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
 
 function ToggleRow({ icon: Icon, label, desc, checked, onChange }: { icon: any; label: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface)]">
+    <div className="flex items-center justify-between p-3 rounded-lg bg-surface">
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5 text-zinc-400" />
         <div>
@@ -185,7 +185,7 @@ function ToggleRow({ icon: Icon, label, desc, checked, onChange }: { icon: any; 
       </div>
       <button
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full transition-colors ${checked ? "bg-[var(--accent)]" : "bg-zinc-600"}`}
+        className={`relative w-10 h-6 rounded-full transition-colors ${checked ? "bg-accent" : "bg-zinc-600"}`}
       >
         <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "left-5" : "left-1"}`} />
       </button>

@@ -163,14 +163,14 @@ export default function ChatArea(props: Props) {
     if (!pending) return null;
     const isImage = (pending.type || "").startsWith("image/");
     return (
-      <div className="mb-2 flex items-center gap-2 bg-[var(--surface)] rounded-lg p-2 w-fit max-w-full">
+      <div className="mb-2 flex items-center gap-2 bg-surface rounded-lg p-2 w-fit max-w-full">
         {isImage ? (
           <img src={pending.url} alt={pending.name} className="h-14 w-14 rounded object-cover" />
         ) : (
           <AttachmentBlock url={pending.url} name={pending.name} type={pending.type} />
         )}
         <span className="text-xs text-zinc-300 truncate max-w-48">{pending.name}</span>
-        <button onClick={clear} className="p-1 hover:bg-[var(--surface-hover)] rounded shrink-0" title="Remover anexo"><X className="w-4 h-4 text-zinc-400" /></button>
+        <button onClick={clear} className="p-1 hover:bg-surface-hover rounded shrink-0" title="Remover anexo"><X className="w-4 h-4 text-zinc-400" /></button>
       </div>
     );
   }, []);
@@ -183,14 +183,14 @@ export default function ChatArea(props: Props) {
         onChange={(e) => search.runSearch(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") search.stepMatch(e.shiftKey ? -1 : 1); if (e.key === "Escape") search.runSearch(""); }}
         placeholder={placeholder}
-        className="bg-[var(--surface)] rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-[var(--accent)] placeholder:text-zinc-400 text-zinc-200"
+        className="bg-surface rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-zinc-400 text-zinc-200"
       />
       {search.q && (
         <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[11px] text-zinc-400">
           {search.matchIds.length > 0 ? `${(search.matchIdx % search.matchIds.length) + 1}/${search.matchIds.length}` : "0"}
-          <button onClick={() => search.stepMatch(-1)} className="p-0.5 hover:bg-[var(--surface-hover)] rounded" title="Anterior (Shift+Enter)"><ChevronUp className="w-3.5 h-3.5" /></button>
-          <button onClick={() => search.stepMatch(1)} className="p-0.5 hover:bg-[var(--surface-hover)] rounded" title="Próximo (Enter)"><ChevronDown className="w-3.5 h-3.5" /></button>
-          <button onClick={() => search.runSearch("")} className="p-0.5 hover:bg-[var(--surface-hover)] rounded" title="Limpar (Esc)"><X className="w-3.5 h-3.5" /></button>
+          <button onClick={() => search.stepMatch(-1)} className="p-0.5 hover:bg-surface-hover rounded" title="Anterior (Shift+Enter)"><ChevronUp className="w-3.5 h-3.5" /></button>
+          <button onClick={() => search.stepMatch(1)} className="p-0.5 hover:bg-surface-hover rounded" title="Próximo (Enter)"><ChevronDown className="w-3.5 h-3.5" /></button>
+          <button onClick={() => search.runSearch("")} className="p-0.5 hover:bg-surface-hover rounded" title="Limpar (Esc)"><X className="w-3.5 h-3.5" /></button>
         </span>
       )}
     </div>
@@ -206,7 +206,7 @@ export default function ChatArea(props: Props) {
     const total = poll.totalVotes;
     const time = new Date(poll.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return (
-      <div key={`poll-${poll.id}`} id={`poll-${poll.id}`} className="my-1 ml-14 mr-2 max-w-md rounded-lg bg-[var(--surface)] p-2.5 scroll-mt-20">
+      <div key={`poll-${poll.id}`} id={`poll-${poll.id}`} className="my-1 ml-14 mr-2 max-w-md rounded-lg bg-surface p-2.5 scroll-mt-20">
         <div className="text-[14px] font-medium text-[#DBDEE1] break-words">{poll.question}</div>
         <div className="mt-1.5">
           {poll.options.map((o) => {
@@ -217,7 +217,7 @@ export default function ChatArea(props: Props) {
                   onClick={() => onToggleVote(poll.id, o.id)}
                   className="w-full flex items-center gap-2 py-1 text-left group/opt"
                 >
-                  <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${o.mine ? "bg-[var(--accent)] border-[var(--accent)]" : "border-zinc-500 group-hover/opt:border-zinc-300"}`}>
+                  <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${o.mine ? "bg-accent border-accent" : "border-zinc-500 group-hover/opt:border-zinc-300"}`}>
                     {o.mine && <Check className="w-3 h-3 text-white" />}
                   </span>
                   <span className="flex-1 truncate text-[13px] text-zinc-200">{o.label}</span>
@@ -230,8 +230,8 @@ export default function ChatArea(props: Props) {
                     <span className="ml-1 text-[11px] text-zinc-400 font-semibold w-4 text-right">{o.votes}</span>
                   </span>
                 </button>
-                <div className="ml-6 h-1 rounded-full bg-[var(--input-bg)] overflow-hidden">
-                  <div className="h-full rounded-full bg-[var(--accent)] transition-all" style={{ width: `${pct}%` }} />
+                <div className="ml-6 h-1 rounded-full bg-input-bg overflow-hidden">
+                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
                 </div>
               </div>
             );
@@ -250,7 +250,7 @@ export default function ChatArea(props: Props) {
 
   return (
     <div
-      className="flex-1 flex flex-col bg-[var(--background)] min-w-0 relative"
+      className="flex-1 flex flex-col bg-background min-w-0 relative"
       onDragOver={dropZone.onDragOver}
       onDragEnter={dropZone.onDragEnter}
       onDragLeave={dropZone.onDragLeave}
@@ -260,10 +260,10 @@ export default function ChatArea(props: Props) {
       {viewMode === "dm" ? (
         <>
           <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-            <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-[var(--surface)] hover:bg-[var(--surface-active)] rounded-lg"><Menu className="w-5 h-5" /></button>
+            <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-surface hover:bg-surface-active rounded-lg"><Menu className="w-5 h-5" /></button>
             {selectedDM ? (
               <>
-                <Avatar src={dmOther?.avatar} name={dmOther?.username} className="w-8 h-8 rounded-full bg-[var(--accent)] text-sm" />
+                <Avatar src={dmOther?.avatar} name={dmOther?.username} className="w-8 h-8 rounded-full bg-accent text-sm" />
                 <span className="font-bold">{dmOther?.username || "DM"}</span>
                 <span className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dmOther?.id) ? "bg-[#23A559]" : "bg-zinc-500"}`} />
               </>
@@ -327,7 +327,7 @@ export default function ChatArea(props: Props) {
             {dmScroll.showJumpToBottom && (
               <button
                 onClick={dmScroll.jumpToBottom}
-                className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium shadow-lg transition-all animate-in fade-in slide-in-from-bottom-2"
+                className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-accent hover:bg-accent-hover text-white text-sm font-medium shadow-lg transition-all animate-in fade-in slide-in-from-bottom-2"
               >
                 <ArrowDown className="w-4 h-4" />
                 Voltar ao final
@@ -345,10 +345,10 @@ export default function ChatArea(props: Props) {
               {pendingPreview(pendingDmFile, uploadingDm, onClearDmFile)}
               <MentionBox value={dmInput} candidates={dmMentionCandidates} apply={setDmInput} focusRef={dmInputRef} userId={userId} />
               <input ref={dmFileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachDmFile(f); e.target.value = ""; }} />
-              <div className="bg-[var(--surface)] rounded-lg flex items-center gap-2 px-3 py-2">
+              <div className="bg-surface rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => dmFileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
                 <input ref={dmInputRef} value={dmInput} onChange={(e) => setDmInput(e.target.value)} onBlur={onBlurDM} onKeyDown={(e) => e.key === "Enter" && handleDMSend()} placeholder={`Mensagem para @${dmOther?.username || ""}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
-                <button onClick={handleDMSend} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
+                <button onClick={handleDMSend} className="bg-accent hover:bg-accent-hover text-white p-1.5 rounded-full"><Send className="w-4 h-4" /></button>
               </div>
             </div>
           )}
@@ -356,7 +356,7 @@ export default function ChatArea(props: Props) {
       ) : (
         <>
           <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
-            <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-[var(--surface)] hover:bg-[var(--surface-active)] rounded-lg"><Menu className="w-5 h-5" /></button>
+            <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-surface hover:bg-surface-active rounded-lg"><Menu className="w-5 h-5" /></button>
             <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo{currentChannel?.slow_mode_seconds ? ` • Slow mode: ${currentChannel.slow_mode_seconds}s` : ""}</span>
@@ -386,7 +386,7 @@ export default function ChatArea(props: Props) {
               </div>
             ) : (
               <>
-                <div className="py-12 border-b border-[var(--border)] mb-4 text-center">
+                <div className="py-12 border-b border-border mb-4 text-center">
                   <div className="w-20 h-20 rounded-full bg-[#41434A] flex items-center justify-center mx-auto mb-4">
                     <Hash className="w-10 h-10 text-zinc-300" />
                   </div>
@@ -441,7 +441,7 @@ export default function ChatArea(props: Props) {
             {channelScroll.showJumpToBottom && (
               <button
                 onClick={channelScroll.jumpToBottom}
-                className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white text-sm font-medium shadow-lg transition-all animate-in fade-in slide-in-from-bottom-2"
+                className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-accent hover:bg-accent-hover text-white text-sm font-medium shadow-lg transition-all animate-in fade-in slide-in-from-bottom-2"
               >
                 <ArrowDown className="w-4 h-4" />
                 Voltar ao final
@@ -459,9 +459,9 @@ export default function ChatArea(props: Props) {
               {pendingPreview(pendingFile, uploading, onClearFile)}
               <MentionBox value={input} candidates={mentionCandidates} apply={setInput} focusRef={channelInputRef} userId={userId} />
               {showSlashMenu && (
-                <div className="bg-[var(--surface)] border border-[var(--input-bg)] rounded-lg shadow-xl mb-1 overflow-hidden max-h-60 overflow-y-auto">
+                <div className="bg-surface border border-input-bg rounded-lg shadow-xl mb-1 overflow-hidden max-h-60 overflow-y-auto">
                   {slashSuggestions.map((cmd, i) => (
-                    <button key={cmd.name} onMouseDown={(e) => { e.preventDefault(); setInput(`/${cmd.name} `); setCmdIdx(0); }} className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${i === cmdIdx ? "bg-[var(--accent)] text-white" : "text-zinc-300 hover:bg-[var(--surface-hover)]"}`}>
+                    <button key={cmd.name} onMouseDown={(e) => { e.preventDefault(); setInput(`/${cmd.name} `); setCmdIdx(0); }} className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${i === cmdIdx ? "bg-accent text-white" : "text-zinc-300 hover:bg-surface-hover"}`}>
                       <span className="font-mono font-bold text-xs w-16 shrink-0">/{cmd.name}</span>
                       <span className={`text-xs ${i === cmdIdx ? "text-white/70" : "text-zinc-400"}`}>{cmd.description}</span>
                     </button>
@@ -469,7 +469,7 @@ export default function ChatArea(props: Props) {
                 </div>
               )}
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
-              <div className="bg-[var(--surface)] rounded-lg flex items-center gap-2 px-3 py-2">
+              <div className="bg-surface rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
                 <button onClick={() => useModalStore.getState().openModal("showPollModal")} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-500 shrink-0 text-zinc-400 hover:text-[#383A40]" title="Criar enquete"><BarChart3 className="w-4 h-4" /></button>
                 <input ref={channelInputRef} value={input} onChange={(e) => { setInput(e.target.value); setCmdIdx(0); }} onBlur={onBlurChannel} onKeyDown={(e) => {
@@ -486,7 +486,7 @@ export default function ChatArea(props: Props) {
                 }} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
-                  <button onClick={handleSend} className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>
+                  <button onClick={handleSend} className="bg-accent hover:bg-accent-hover text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>
                 </div>
               </div>
               <p className="text-xs text-zinc-400 mt-2 hidden md:block">Enter para enviar • Realtime ativo • Compartilhe a URL com seus amigos</p>

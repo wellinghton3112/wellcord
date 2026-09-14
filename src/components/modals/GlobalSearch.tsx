@@ -80,7 +80,7 @@ export default function GlobalSearch({ supabase, servers, onJump, onClose }: Pro
   return (
     <ModalShell onClose={onClose} maxWidth="max-w-xl">
       <div className="p-4">
-        <div className="flex items-center gap-3 bg-[var(--input-bg)] rounded-lg px-3 py-2">
+        <div className="flex items-center gap-3 bg-input-bg rounded-lg px-3 py-2">
           <Search className="w-5 h-5 text-zinc-400 shrink-0" />
           <input
             ref={inputRef}
@@ -91,7 +91,7 @@ export default function GlobalSearch({ supabase, servers, onJump, onClose }: Pro
             className="flex-1 bg-transparent outline-none text-zinc-100 placeholder:text-zinc-400"
           />
           {query && (
-            <button onClick={() => setQuery("")} className="p-1 hover:bg-[var(--surface-hover)] rounded">
+            <button onClick={() => setQuery("")} className="p-1 hover:bg-surface-hover rounded">
               <X className="w-4 h-4 text-zinc-400" />
             </button>
           )}
@@ -111,7 +111,7 @@ export default function GlobalSearch({ supabase, servers, onJump, onClose }: Pro
                   key={r.id}
                   onClick={() => handleSelect(r)}
                   className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors ${
-                    i === selectedIdx ? "bg-[var(--accent)]/15 border border-[var(--accent)]/30" : "hover:bg-[var(--surface)]"
+                    i === selectedIdx ? "bg-accent/15 border border-accent/30" : "hover:bg-surface"
                   }`}
                 >
                   <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">

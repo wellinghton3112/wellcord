@@ -44,36 +44,36 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
-      <div className="w-full max-w-[480px] bg-[var(--background)] rounded-lg overflow-hidden shadow-2xl border border-[#232428]">
-        <div className="bg-[var(--accent)] h-2" />
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="w-full max-w-[480px] bg-background rounded-lg overflow-hidden shadow-2xl border border-[#232428]">
+        <div className="bg-accent h-2" />
         <div className="p-8">
           <h1 className="text-2xl font-bold text-white text-center">Boas-vindas ao WellCORD!</h1>
           <p className="text-zinc-400 text-center text-sm mt-1">O Discord dos seus amigos — agora com login seguro</p>
 
-          <div className="flex bg-[var(--surface)] rounded-full p-1 mt-6">
-            <button onClick={() => setMode("login")} className={`flex-1 py-1.5 rounded-full text-sm font-medium ${mode === "login" ? "bg-[var(--surface-active)] text-white" : "text-zinc-400"}`}>Entrar</button>
-            <button onClick={() => setMode("register")} className={`flex-1 py-1.5 rounded-full text-sm font-medium ${mode === "register" ? "bg-[var(--surface-active)] text-white" : "text-zinc-400"}`}>Registrar</button>
+          <div className="flex bg-surface rounded-full p-1 mt-6">
+            <button onClick={() => setMode("login")} className={`flex-1 py-1.5 rounded-full text-sm font-medium ${mode === "login" ? "bg-surface-active text-white" : "text-zinc-400"}`}>Entrar</button>
+            <button onClick={() => setMode("register")} className={`flex-1 py-1.5 rounded-full text-sm font-medium ${mode === "register" ? "bg-surface-active text-white" : "text-zinc-400"}`}>Registrar</button>
           </div>
 
           <form onSubmit={handle} className="mt-6 space-y-4">
             {mode === "register" && (
               <div>
                 <label className="text-xs font-bold text-zinc-300 uppercase">Nome de usuário *</label>
-                <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ex: wellington" className="w-full mt-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2.5 text-white outline-none focus:border-[var(--accent)]" required />
+                <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="ex: wellington" className="w-full mt-1 bg-surface border border-input-bg rounded px-3 py-2.5 text-white outline-none focus:border-accent" required />
               </div>
             )}
             <div>
               <label className="text-xs font-bold text-zinc-300 uppercase">Email *</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full mt-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2.5 text-white outline-none focus:border-[var(--accent)]" required />
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="voce@email.com" className="w-full mt-1 bg-surface border border-input-bg rounded px-3 py-2.5 text-white outline-none focus:border-accent" required />
             </div>
             <div>
               <label className="text-xs font-bold text-zinc-300 uppercase">Senha *</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full mt-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2.5 text-white outline-none focus:border-[var(--accent)]" required />
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full mt-1 bg-surface border border-input-bg rounded px-3 py-2.5 text-white outline-none focus:border-accent" required />
               <p className="text-xs text-zinc-400 mt-1">Mínimo 6 caracteres</p>
             </div>
             {error && <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded p-2">{error}</p>}
-            <button type="submit" disabled={loading} className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white font-medium py-2.5 rounded transition-colors">
+            <button type="submit" disabled={loading} className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 text-white font-medium py-2.5 rounded transition-colors">
               {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Criar conta"}
             </button>
           </form>

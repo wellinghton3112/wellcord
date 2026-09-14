@@ -69,9 +69,9 @@ export function BookmarksModal({ bookmarks, onRemove, onClose }: Props) {
 
   return (
     <ModalShell onClose={onClose} maxWidth="max-w-lg">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-border">
         <h2 className="text-xl font-bold flex items-center gap-2"><Bookmark className="w-5 h-5 text-yellow-400" /> Mensagens Favoritas</h2>
-        <button onClick={onClose} className="p-1 hover:bg-[var(--surface-hover)] rounded"><X className="w-5 h-5 text-zinc-400" /></button>
+        <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded"><X className="w-5 h-5 text-zinc-400" /></button>
       </div>
       <div className="p-4 max-h-[60vh] overflow-y-auto space-y-2">
         {bookmarks.length === 0 ? (
@@ -81,7 +81,7 @@ export function BookmarksModal({ bookmarks, onRemove, onClose }: Props) {
             <p className="text-xs text-zinc-600 mt-1">Clique no ícone de bookmark em qualquer mensagem</p>
           </div>
         ) : bookmarks.map((b) => (
-          <div key={b.id} className="bg-[var(--surface)] rounded-lg p-3 group hover:bg-[var(--surface-hover)] transition-colors">
+          <div key={b.id} className="bg-surface rounded-lg p-3 group hover:bg-surface-hover transition-colors">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-white">{b.username}</span>
@@ -89,7 +89,7 @@ export function BookmarksModal({ bookmarks, onRemove, onClose }: Props) {
                 <span className="text-[10px] text-zinc-600">{new Date(b.createdAt).toLocaleDateString("pt-BR")}</span>
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => { setSelectedChannel(b.channelId); setViewMode("server"); onClose(); }} className="p-1 hover:bg-[var(--surface)] rounded" title="Ir para o canal"><ExternalLink className="w-3.5 h-3.5 text-zinc-400" /></button>
+                <button onClick={() => { setSelectedChannel(b.channelId); setViewMode("server"); onClose(); }} className="p-1 hover:bg-surface rounded" title="Ir para o canal"><ExternalLink className="w-3.5 h-3.5 text-zinc-400" /></button>
                 <button onClick={() => onRemove(b.id)} className="p-1 hover:bg-[#DA373C]/20 rounded" title="Remover"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
               </div>
             </div>

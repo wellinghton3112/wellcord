@@ -34,9 +34,9 @@ export const ChatDMMessage = React.memo(function ChatDMMessage({ msg, userId, us
   const otherAvatar = dmConversations.find((d) => d.id === selectedDM)?.participants.find((p) => p.id === msg.sender_id)?.avatar || "👤";
 
   return (
-    <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[var(--accent)]/10 border-l-2 border-[var(--accent)]" : ""}`}>
+    <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-accent/10 border-l-2 border-accent" : ""}`}>
       <button onClick={() => onViewProfile(msg.sender_id)} className="shrink-0 mt-0.5" title="Ver perfil">
-        <Avatar src={isMine ? (userAvatar || "😎") : otherAvatar} name={msg.username} className="w-8 h-8 rounded-full bg-[var(--accent)] text-sm" />
+        <Avatar src={isMine ? (userAvatar || "😎") : otherAvatar} name={msg.username} className="w-8 h-8 rounded-full bg-accent text-sm" />
       </button>
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2"><button onClick={() => onViewProfile(msg.sender_id)} className="font-medium text-sm hover:underline" style={{ color: isMine ? "var(--accent)" : "#FEE75C" }}>{msg.username}</button><span className="text-xs text-zinc-400">{new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
@@ -48,7 +48,7 @@ export const ChatDMMessage = React.memo(function ChatDMMessage({ msg, userId, us
         {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
       </div>
       {editingId !== msg.id && (
-        <div className="hidden group-hover:flex items-center gap-1 self-start bg-[var(--background)] border border-[var(--border)] rounded-lg p-1 shadow-lg">
+        <div className="hidden group-hover:flex items-center gap-1 self-start bg-background border border-border rounded-lg p-1 shadow-lg">
           <button onClick={() => { onReply({ id: msg.id, user: msg.username, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
           <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
           {isMine && (

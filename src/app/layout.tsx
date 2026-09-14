@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="h-full bg-[var(--background)] text-zinc-100 antialiased overflow-hidden">
+      <body className="h-full bg-background text-zinc-100 antialiased overflow-hidden">
         <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>

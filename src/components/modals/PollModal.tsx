@@ -39,7 +39,7 @@ export default function PollModal({ onClose, onCreate }: Props) {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Pergunta: onde almoçar?"
-          className="w-full bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2 text-white outline-none focus:border-[var(--accent)]"
+          className="w-full bg-surface border border-input-bg rounded px-3 py-2 text-white outline-none focus:border-accent"
           autoFocus
         />
         <div className="mt-3 space-y-2">
@@ -49,7 +49,7 @@ export default function PollModal({ onClose, onCreate }: Props) {
                 value={o}
                 onChange={(e) => setOpt(i, e.target.value)}
                 placeholder={`Opção ${i + 1}`}
-                className="flex-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2 text-white text-sm outline-none focus:border-[var(--accent)] min-w-0"
+                className="flex-1 bg-surface border border-input-bg rounded px-3 py-2 text-white text-sm outline-none focus:border-accent min-w-0"
               />
               {options.length > 2 && (
                 <button onClick={() => delOpt(i)} className="p-1.5 hover:bg-[#DA373C] rounded shrink-0" title="Remover opção">
@@ -60,13 +60,13 @@ export default function PollModal({ onClose, onCreate }: Props) {
           ))}
         </div>
         {options.length < 8 && (
-          <button onClick={addOpt} className="mt-2 flex items-center gap-1 text-xs text-[var(--accent)] hover:underline">
+          <button onClick={addOpt} className="mt-2 flex items-center gap-1 text-xs text-accent hover:underline">
             <Plus className="w-3.5 h-3.5" /> Adicionar opção
           </button>
         )}
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
-          <button onClick={create} disabled={!valid || creating} className="px-6 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 rounded text-sm font-medium text-white">
+          <button onClick={create} disabled={!valid || creating} className="px-6 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 rounded text-sm font-medium text-white">
             {creating ? "Criando..." : "Criar enquete"}
           </button>
         </div>
