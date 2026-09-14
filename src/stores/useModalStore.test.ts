@@ -11,7 +11,7 @@ describe("useModalStore", () => {
       showPinsModal: false,
       showPollModal: false,
       showStatusMenu: false,
-      showEditServerModal: false,
+      showCreateServerModal: false,
       showWebhooksModal: false,
     });
   });
@@ -25,7 +25,7 @@ describe("useModalStore", () => {
     expect(state.showPinsModal).toBe(false);
     expect(state.showPollModal).toBe(false);
     expect(state.showStatusMenu).toBe(false);
-    expect(state.showEditServerModal).toBe(false);
+    expect(state.showCreateServerModal).toBe(false);
     expect(state.showWebhooksModal).toBe(false);
   });
 

@@ -5,9 +5,9 @@ describe("useAppStore", () => {
   beforeEach(() => {
     useAppStore.setState({
       viewMode: "server",
-      selectedServer: null,
-      selectedChannel: null,
-      selectedDM: null,
+      selectedServer: undefined,
+      selectedChannel: undefined,
+      selectedDM: undefined,
       servers: [],
       showMobileSidebar: false,
       connected: false,
@@ -17,9 +17,9 @@ describe("useAppStore", () => {
   it("has default state", () => {
     const state = useAppStore.getState();
     expect(state.viewMode).toBe("server");
-    expect(state.selectedServer).toBeNull();
-    expect(state.selectedChannel).toBeNull();
-    expect(state.selectedDM).toBeNull();
+    expect(state.selectedServer).toBeUndefined();
+    expect(state.selectedChannel).toBeUndefined();
+    expect(state.selectedDM).toBeUndefined();
     expect(state.showMobileSidebar).toBe(false);
   });
 
