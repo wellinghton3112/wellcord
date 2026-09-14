@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import { Pencil, Trash2, Smile, Reply } from "lucide-react";
 import type { DMMessage, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
@@ -25,7 +26,7 @@ type ChatDMMessageProps = {
   setPickFor: (id: string | null) => void;
 };
 
-export function ChatDMMessage({ msg, userId, userAvatar, selectedDM, dmConversations, dmReactions, editingId, pickFor, searchQuery, highlight, onEdit, onDelete, onReply, onToggleReaction, onViewProfile, scrollToMsg, EditBox, setPickFor }: ChatDMMessageProps) {
+export const ChatDMMessage = React.memo(function ChatDMMessage({ msg, userId, userAvatar, selectedDM, dmConversations, dmReactions, editingId, pickFor, searchQuery, highlight, onEdit, onDelete, onReply, onToggleReaction, onViewProfile, scrollToMsg, EditBox, setPickFor }: ChatDMMessageProps) {
   const isMine = msg.sender_id === userId;
   const otherAvatar = dmConversations.find((d) => d.id === selectedDM)?.participants.find((p) => p.id === msg.sender_id)?.avatar || "👤";
 
@@ -56,4 +57,4 @@ export function ChatDMMessage({ msg, userId, userAvatar, selectedDM, dmConversat
       )}
     </div>
   );
-}
+});

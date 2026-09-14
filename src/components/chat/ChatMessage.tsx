@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Download } from "lucide-react";
 import type { Message, Reaction, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
@@ -187,7 +188,7 @@ export function mentionize(text: string) {
   );
 }
 
-export function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedIds, reactions, editingId, pickFor, searchQuery, highlight, mentionize: mentionizeFn, canPinMsg, onEdit, onDelete, onReply, onToggleReaction, onTogglePin, onViewProfile, scrollToMsg, EditBox, setPickFor }: ChatMessageProps) {
+export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedIds, reactions, editingId, pickFor, searchQuery, highlight, mentionize: mentionizeFn, canPinMsg, onEdit, onDelete, onReply, onToggleReaction, onTogglePin, onViewProfile, scrollToMsg, EditBox, setPickFor }: ChatMessageProps) {
   const isWebhook = !!(msg as any).metadata?.webhook_id;
   const webhookName = (msg as any).metadata?.webhook_name;
   const displayName = isWebhook ? webhookName || msg.user : msg.user;
@@ -236,4 +237,4 @@ export function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedI
       )}
     </div>
   );
-}
+});

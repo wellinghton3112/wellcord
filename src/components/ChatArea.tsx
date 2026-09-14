@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
@@ -126,7 +126,7 @@ export default function ChatArea(props: Props) {
     return () => clearTimeout(t);
   }, [search.activeMatchId]);
 
-  const pendingPreview = (pending: PendingFile | null, isUploading: boolean, clear: () => void) => {
+  const pendingPreview = useCallback((pending: PendingFile | null, isUploading: boolean, clear: () => void) => {
     if (isUploading) {
       return (
         <div className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
@@ -147,9 +147,9 @@ export default function ChatArea(props: Props) {
         <button onClick={clear} className="p-1 hover:bg-[#35373C] rounded shrink-0" title="Remover anexo"><X className="w-4 h-4 text-zinc-400" /></button>
       </div>
     );
-  };
+  }, []);
 
-  const searchBox = (placeholder: string) => (
+  const searchBox = useCallback((placeholder: string) => (
     <div className="relative hidden md:block">
       <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
       <input
@@ -168,14 +168,14 @@ export default function ChatArea(props: Props) {
         </span>
       )}
     </div>
-  );
+  ), [search.q, search.matchIds, search.matchIdx, search.runSearch, search.stepMatch]);
 
-  const feed: ({ kind: "msg"; at: string; msg: Message } | { kind: "poll"; at: string; poll: Poll })[] = [
+  const feed = useMemo(() => [
     ...channelMessages.map((msg) => ({ kind: "msg" as const, at: msg.created_at || "", msg })),
     ...polls.map((poll) => ({ kind: "poll" as const, at: poll.created_at, poll })),
-  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
+  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)), [channelMessages, polls]);
 
-  const renderPoll = (poll: Poll) => {
+  const renderPoll = useCallback((poll: Poll) => {
     const total = poll.totalVotes;
     const time = new Date(poll.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return (
@@ -219,7 +219,7 @@ export default function ChatArea(props: Props) {
         </div>
       </div>
     );
-  };
+  }, [polls, userId, isOwner, onToggleVote, onDeletePoll]);
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
