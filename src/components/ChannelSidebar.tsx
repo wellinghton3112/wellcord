@@ -43,6 +43,7 @@ type Props = {
   deleteChannel: (id: string, name: string) => void;
   setNewDMUsername: (v: string) => void;
   openEditServer: (s: Server) => void;
+  onOpenSettings: () => void;
 };
 
 // Coluna de canais/DMs + painel do usuário. Usa stores para estado global.
@@ -52,7 +53,7 @@ export default function ChannelSidebar(props: Props) {
     friendsList, incomingRequests, outgoingRequests, sendingFriend, activeVoice,
     onSignOut, onViewProfile, onLeaveServer, onAddFriend, onAcceptFriend, onRejectFriend,
     onCancelFriend, onRemoveFriend, onFriendDM, onJoinVoice, deleteServer, createChannel,
-    deleteChannel, setNewDMUsername, openEditServer,
+    deleteChannel, setNewDMUsername, openEditServer, onOpenSettings,
   } = props;
 
   // Stores
@@ -355,7 +356,7 @@ export default function ChannelSidebar(props: Props) {
           <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
         </div>
         <span className="text-[8px] font-mono bg-[#1E1F22] px-1 py-0.5 rounded text-zinc-500 shrink-0">{APP_VERSION}</span>
-        <button onClick={() => useModalStore.getState().openModal("showUsernameModal")} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
+        <button onClick={onOpenSettings} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
         <button onClick={onSignOut} className="p-1 hover:bg-[#DA373C] rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
         {showStatusMenu && (
           <div className="absolute bottom-full left-2 mb-2 w-52 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">

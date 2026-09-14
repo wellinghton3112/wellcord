@@ -31,6 +31,7 @@ type ChatMessageProps = {
   scrollToMsg: (id: string | null | undefined) => void;
   EditBox: React.FC<{ save: (id: string, content: string) => void }>;
   setPickFor: (id: string | null) => void;
+  grouped?: boolean;
 };
 
 export function ReactionBar({ list, toggle }: { list: Reaction[] | undefined; toggle: (emoji: string) => void }) {
@@ -193,12 +194,50 @@ export function mentionize(text: string) {
   );
 }
 
-export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedIds, reactions, editingId, pickFor, searchQuery, highlight, mentionize: mentionizeFn, canPinMsg, onEdit, onDelete, onReply, onToggleReaction, onTogglePin, onViewProfile, scrollToMsg, EditBox, setPickFor }: ChatMessageProps) {
+export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedIds, reactions, editingId, pickFor, searchQuery, highlight, mentionize: mentionizeFn, canPinMsg, onEdit, onDelete, onReply, onToggleReaction, onTogglePin, onViewProfile, scrollToMsg, EditBox, setPickFor, grouped }: ChatMessageProps) {
   const isWebhook = !!(msg as any).metadata?.webhook_id;
   const webhookName = (msg as any).metadata?.webhook_name;
   const displayName = isWebhook ? webhookName || msg.user : msg.user;
   const displayAvatar = (msg as any).metadata?.webhook_avatar || msg.avatar;
   const displayColor = isWebhook ? "#5865F2" : msg.color;
+
+  if (grouped) {
+    return (
+      <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-0.5 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
+        <div className="w-10 shrink-0 flex items-center justify-center">
+          <span className="text-[10px] text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">{msg.timestamp?.slice(0, 5)}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <QuoteBlock user={msg.reply_user} content={msg.reply_content} targetId={msg.reply_to} scrollToMsg={scrollToMsg} />
+          {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{searchQuery ? highlight(msg.content) : <MarkdownText text={msg.content} mentionize={mentionizeFn} />}</p>}
+          {editingId !== msg.id && !msg.file_url && extractUrls(msg.content).slice(0, 3).map((url) => <LinkEmbed key={url} url={url} />)}
+          {editingId !== msg.id && <AttachmentBlock url={msg.file_url} name={msg.file_name} type={msg.file_type} />}
+          {editingId !== msg.id && <ReactionBar list={reactions[msg.id]} toggle={(e) => onToggleReaction(msg.id, e)} />}
+          {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
+        </div>
+        {editingId !== msg.id && (
+          <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
+            <button onClick={() => { onReply({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+            <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
+            {canPinMsg(msg.user_id) && (
+              <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
+            )}
+            {msg.user_id && msg.user_id === userId ? (
+              <>
+                <button onClick={() => onEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
+                <button onClick={() => onDelete(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
+              </>
+            ) : (isOwner || canModerateMessages) ? (
+              <>
+                <button onClick={() => onEdit(msg.id, msg.content)} title="Editar (moderação)"><Pencil className="w-4 h-4 text-amber-400 hover:text-white" /></button>
+                <button onClick={() => onDelete(msg.id)} title="Excluir (moderação)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
+              </>
+            ) : null}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>

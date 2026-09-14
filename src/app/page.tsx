@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Menu, Users, Bell, X } from "lucide-react";
 import { createClient } from "@/lib/supabase";
 import { APP_VERSION } from "@/lib/version";
@@ -25,6 +25,9 @@ import { useActiveNow } from "@/hooks/useActiveNow";
 import { useServerManager } from "@/hooks/useServerManager";
 import { useRoles } from "@/hooks/useRoles";
 import Toaster from "@/components/Toaster";
+import SettingsModal from "@/components/modals/SettingsModal";
+import GlobalSearch from "@/components/modals/GlobalSearch";
+import type { SystemMessageData } from "@/components/chat";
 import { toast as uiToast } from "@/lib/ui";
 import { VoiceProvider } from "@/context/VoiceContext";
 import { ImageLightbox } from "@/components/ImageLightbox";
@@ -74,7 +77,21 @@ export default function DiscordClone() {
   const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
   const roles = useRoles(supabase, currentServer?.id);
   const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
-  const { pins, pinnedIds, canPin, togglePin } = usePins(supabase, user, selectedChannel, isOwner);
+  const { pins, pinnedIds, canPin, togglePin: rawTogglePin } = usePins(supabase, user, selectedChannel, isOwner);
+  const togglePin = useCallback((msgId: string) => {
+    const isPinned = pinnedIds.has(msgId);
+    rawTogglePin(msgId);
+    const msg = channelMessages.find((m) => m.id === msgId);
+    if (msg) {
+      setSystemMessages((prev) => [...prev, {
+        id: `pin-${msgId}-${Date.now()}`,
+        type: "pin",
+        username: username || "Usuário",
+        target: isPinned ? `desfixou a mensagem de ${msg.user}` : `fixou a mensagem de ${msg.user}`,
+        timestamp: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+      }]);
+    }
+  }, [pinnedIds, rawTogglePin, channelMessages, username]);
   const { polls, createPoll, toggleVote, deletePoll } = usePolls(supabase, user, username, selectedChannel);
 
   const jumpToMessage = async (id: string) => {
@@ -137,6 +154,10 @@ export default function DiscordClone() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { channelUnread } = useChannelUnread(supabase, user, selectedChannel, viewMode);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsState, setSettingsState] = useState({ theme: "dark" as "dark" | "light" | "system", notifications: true, sounds: true, compactMode: false });
+  const [systemMessages, setSystemMessages] = useState<SystemMessageData[]>([]);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const unreadByServer: Record<string, number> = {};
   for (const s of servers) {
     const total = s.channels.reduce((acc, c) => acc + (channelUnread[c.id] || 0), 0);
@@ -188,6 +209,18 @@ export default function DiscordClone() {
       if (event === "SIGNED_OUT" || !session) router.push("/login");
     });
     return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // Ctrl+K abre busca global
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setShowGlobalSearch((v) => !v);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
   }, []);
 
   // Convite via link (?server=ID): seleciona após a lista carregar
@@ -344,6 +377,7 @@ export default function DiscordClone() {
         onViewProfile={openProfile}
         onLeaveServer={() => leaveServer(user?.id)}
         channelUnread={channelUnread}
+        onOpenSettings={() => setShowSettings(true)}
       />
 
       <ChatArea
@@ -356,6 +390,7 @@ export default function DiscordClone() {
         currentChannel={currentChannel}
         serverName={currentServer?.name}
         channelMessages={channelMessages}
+        systemMessages={systemMessages}
         input={input}
         setInput={typeChannel}
         handleSend={sendChannel}
@@ -537,7 +572,7 @@ export default function DiscordClone() {
       )}
       {viewProfile && (
         <ProfileCard
-          profile={viewProfile}
+          profile={{ ...viewProfile, roles: roles.getUserRoles(viewProfile.id).map((r) => ({ name: r.name, color: r.color })) }}
           status={profileStatus(viewProfile.id)}
           isSelf={viewProfile.id === user?.id}
           onClose={() => setViewProfile(null)}
@@ -575,6 +610,32 @@ export default function DiscordClone() {
           channelId={selectedChannel}
           serverId={currentServer.id}
           onClose={() => closeModal("showWebhooksModal")}
+        />
+      )}
+      {showSettings && (
+        <SettingsModal
+          settings={settingsState}
+          onChange={setSettingsState}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
+      {showGlobalSearch && (
+        <GlobalSearch
+          supabase={supabase}
+          servers={servers}
+          onJump={(serverId, channelId, messageId) => {
+            setViewMode("server");
+            setSelectedServer(serverId);
+            setSelectedChannel(channelId);
+            setTimeout(() => {
+              for (let i = 0; i < 5; i++) {
+                if (document.getElementById(`msg-${messageId}`)) break;
+                loadOlder();
+              }
+              setTimeout(() => document.getElementById(`msg-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+            }, 200);
+          }}
+          onClose={() => setShowGlobalSearch(false)}
         />
       )}
       <Toaster />

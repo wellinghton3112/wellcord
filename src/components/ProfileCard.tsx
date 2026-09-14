@@ -12,6 +12,7 @@ export type CardProfile = {
   bio?: string;
   status_text?: string;
   created_at?: string;
+  roles?: { name: string; color: string }[];
 };
 
 type Props = {
@@ -85,6 +86,19 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
               </div>
             ) : (
               <p className="text-xs text-zinc-600 italic">Sem bio por enquanto.</p>
+            )}
+            {profile.roles && profile.roles.length > 0 && (
+              <div>
+                <div className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Cargos</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.roles.map((r, i) => (
+                    <span key={i} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border" style={{ borderColor: r.color + "40", backgroundColor: r.color + "15", color: r.color }}>
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: r.color }} />
+                      {r.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
             <div className="flex items-center gap-2 text-xs text-zinc-400">
               <span className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />

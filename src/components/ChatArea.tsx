@@ -17,7 +17,8 @@ import { useProfileStore } from "@/stores/useProfileStore";
 import { useChatSearch } from "@/hooks/chat/useChatSearch";
 import { useChatScroll } from "@/hooks/chat/useChatScroll";
 import { useMessageEdit } from "@/hooks/chat/useMessageEdit";
-import { ChatMessage, ChatDMMessage, ReplyPreview, TypingBar, MentionBox, mentionize, AttachmentBlock } from "@/components/chat";
+import { ChatMessage, ChatDMMessage, ReplyPreview, TypingBar, MentionBox, mentionize, AttachmentBlock, SystemMessage } from "@/components/chat";
+import type { SystemMessageData } from "@/components/chat";
 import { useDropZone } from "@/hooks/chat/useDropZone";
 import { DropOverlay } from "@/components/DropOverlay";
 import { MAX_FILE_MB } from "@/lib/chat-types";
@@ -32,6 +33,7 @@ type Props = {
   currentChannel?: Channel;
   serverName?: string;
   channelMessages: Message[];
+  systemMessages?: SystemMessageData[];
   input: string;
   setInput: (v: string) => void;
   handleSend: () => void;
@@ -82,7 +84,7 @@ type Props = {
 export default function ChatArea(props: Props) {
   const {
     dmConversations, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers,
-    currentChannel, serverName, channelMessages, input, setInput, handleSend,
+    currentChannel, serverName, channelMessages, systemMessages = [], input, setInput, handleSend,
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
@@ -189,7 +191,8 @@ export default function ChatArea(props: Props) {
   const feed = useMemo(() => [
     ...channelMessages.map((msg) => ({ kind: "msg" as const, at: msg.created_at || "", msg })),
     ...polls.map((poll) => ({ kind: "poll" as const, at: poll.created_at, poll })),
-  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)), [channelMessages, polls]);
+    ...systemMessages.map((sys) => ({ kind: "system" as const, at: sys.timestamp, sys })),
+  ].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)), [channelMessages, polls, systemMessages]);
 
   const renderPoll = useCallback((poll: Poll) => {
     const total = poll.totalVotes;
@@ -391,11 +394,15 @@ export default function ChatArea(props: Props) {
                     </div>
                   )}
                 </div>
-                {feed.map((item) =>
-                  item.kind === "poll" ? renderPoll(item.poll) : (
+                {feed.map((item, idx) => {
+                  const prev = idx > 0 ? feed[idx - 1] : null;
+                  const isGrouped = item.kind === "msg" && prev?.kind === "msg" && prev.msg.user_id === item.msg.user_id && (item.msg.created_at || "").slice(0, 10) === (prev.msg.created_at || "").slice(0, 10);
+                  return item.kind === "poll" ? renderPoll(item.poll) :
+                    item.kind === "system" ? <SystemMessage key={`sys-${item.sys.id}`} data={item.sys} /> : (
                     <ChatMessage
                       key={item.msg.id}
                       msg={item.msg}
+                      grouped={isGrouped}
                       userId={userId}
                       isOwner={isOwner}
                       canModerateMessages={canModerateMessages}
@@ -417,8 +424,8 @@ export default function ChatArea(props: Props) {
                       EditBox={channelEdit.EditBox}
                       setPickFor={setPickFor}
                     />
-                  )
-                )}
+                  );
+                })}
               </>
             )}
             {channelScroll.showJumpToBottom && (
