@@ -11,9 +11,9 @@ type Settings = {
   accentColor: string;
 };
 
-const DEFAULT: Settings = { theme: "dark", notifications: true, sounds: true, compactMode: false, accentColor: "#5865F2" };
+const DEFAULT: Settings = { theme: "dark", notifications: true, sounds: true, compactMode: false, accentColor: "var(--accent)" };
 
-const ACCENT_PRESETS = ["#5865F2", "#ED4245", "#FEE75C", "#57F287", "#EB459E", "#F47B67", "#E9A040", "#3BA55C"];
+const ACCENT_PRESETS = ["var(--accent)", "#ED4245", "#FEE75C", "#57F287", "#EB459E", "#F47B67", "#E9A040", "#3BA55C"];
 
 function loadSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT;
@@ -74,9 +74,9 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
 
   return (
     <ModalShell onClose={onClose} maxWidth="max-w-lg">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-[#3F4147]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)]">
         <h2 className="text-xl font-bold">Configurações</h2>
-        <button onClick={onClose} className="p-1 hover:bg-[#35373C] rounded"><X className="w-5 h-5 text-zinc-400" /></button>
+        <button onClick={onClose} className="p-1 hover:bg-[var(--surface-hover)] rounded"><X className="w-5 h-5 text-zinc-400" /></button>
       </div>
 
       <div className="p-6 space-y-8 max-h-[70vh] overflow-y-auto">
@@ -95,7 +95,7 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
                   local.theme === value
                     ? "border-[var(--accent)] text-[var(--accent)]"
-                    : "bg-[#2B2D31] border-[#3F4147] text-zinc-400 hover:bg-[#35373C]"
+                    : "bg-[var(--surface)] border-[var(--border)] text-zinc-400 hover:bg-[var(--surface-hover)]"
                 }`}
               >
                 <Icon className="w-6 h-6" />
@@ -156,16 +156,16 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
           <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wide mb-3">Atalhos de teclado</h3>
           <div className="space-y-2">
             {shortcuts.map((s) => (
-              <div key={s.keys} className="flex items-center justify-between py-2 px-3 rounded-lg bg-[#2B2D31]">
+              <div key={s.keys} className="flex items-center justify-between py-2 px-3 rounded-lg bg-[var(--surface)]">
                 <span className="text-sm text-zinc-300">{s.desc}</span>
-                <kbd className="px-2 py-1 rounded bg-[#1E1F22] border border-[#3F4147] text-xs text-zinc-400 font-mono">{s.keys}</kbd>
+                <kbd className="px-2 py-1 rounded bg-[var(--input-bg)] border border-[var(--border)] text-xs text-zinc-400 font-mono">{s.keys}</kbd>
               </div>
             ))}
           </div>
         </section>
 
         {/* Info */}
-        <section className="text-center text-xs text-zinc-600 pt-2 border-t border-[#3F4147]">
+        <section className="text-center text-xs text-zinc-600 pt-2 border-t border-[var(--border)]">
           WellCORD • BETA 0.1.96 • Feito com Next.js + Supabase
         </section>
       </div>
@@ -175,12 +175,12 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
 
 function ToggleRow({ icon: Icon, label, desc, checked, onChange }: { icon: any; label: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-[#2B2D31]">
+    <div className="flex items-center justify-between p-3 rounded-lg bg-[var(--surface)]">
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5 text-zinc-400" />
         <div>
           <p className="text-sm text-zinc-200">{label}</p>
-          <p className="text-xs text-zinc-500">{desc}</p>
+          <p className="text-xs text-zinc-400">{desc}</p>
         </div>
       </div>
       <button

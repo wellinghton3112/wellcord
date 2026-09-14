@@ -21,7 +21,7 @@ export default function ScreenPickerModal({ sources, onPick, onClose }: Props) {
           <button
             key={s.id}
             onClick={() => onPick(s.id)}
-            className="group rounded-lg overflow-hidden border-2 border-transparent hover:border-[#5865F2] bg-[#2B2D31] text-left transition"
+            className="group rounded-lg overflow-hidden border-2 border-transparent hover:border-[var(--accent)] bg-[var(--surface)] text-left transition"
             title={s.name}
           >
             <div className="aspect-video bg-black flex items-center justify-center overflow-hidden">
@@ -41,10 +41,10 @@ export default function ScreenPickerModal({ sources, onPick, onClose }: Props) {
   );
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[80] p-4">
-      <div className="bg-[#313338] rounded-xl w-full max-w-2xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+      <div className="bg-[var(--background)] rounded-xl w-full max-w-2xl p-5 shadow-2xl max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-white">Compartilhar tela</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-[#404249] rounded-full"><X className="w-5 h-5 text-zinc-400" /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-[var(--surface-active)] rounded-full"><X className="w-5 h-5 text-zinc-400" /></button>
         </div>
         {sources === null ? (
           <div className="flex items-center justify-center gap-2 py-10 text-sm text-zinc-400">

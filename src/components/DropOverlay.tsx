@@ -4,8 +4,8 @@ import { Upload } from "lucide-react";
 export function DropOverlay({ visible }: { visible: boolean }) {
   if (!visible) return null;
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#5865F2]/15 backdrop-blur-sm border-2 border-dashed border-[#5865F2] rounded-lg pointer-events-none">
-      <div className="flex flex-col items-center gap-3 text-[#5865F2]">
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--accent)]/15 backdrop-blur-sm border-2 border-dashed border-[var(--accent)] rounded-lg pointer-events-none">
+      <div className="flex flex-col items-center gap-3 text-[var(--accent)]">
         <Upload className="w-12 h-12 animate-bounce" />
         <span className="text-lg font-bold">Solte o arquivo aqui</span>
         <span className="text-sm text-zinc-400">Imagens, áudios e documentos</span>

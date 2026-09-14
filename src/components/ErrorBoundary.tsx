@@ -26,8 +26,8 @@ export default class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return this.props.fallback || (
-        <div className="min-h-screen bg-[#313338] flex items-center justify-center p-4">
-          <div className="bg-[#2B2D31] rounded-lg p-8 max-w-md w-full text-center shadow-2xl">
+        <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
+          <div className="bg-[var(--surface)] rounded-lg p-8 max-w-md w-full text-center shadow-2xl">
             <div className="text-4xl mb-4">💥</div>
             <h2 className="text-xl font-bold text-white mb-2">Algo deu errado</h2>
             <p className="text-zinc-400 text-sm mb-4">
@@ -38,7 +38,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             </p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] rounded text-sm font-medium text-white"
+              className="px-6 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded text-sm font-medium text-white"
             >
               Recarregar
             </button>

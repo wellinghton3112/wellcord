@@ -27,7 +27,7 @@ type Props = {
 // Card de perfil estilo Discord: banner, avatar + status, recado, bio e ações.
 export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, onSendDM }: Props) {
   const [copied, setCopied] = useState(false);
-  const color = profile.color || "#5865F2";
+  const color = profile.color || "var(--accent)";
   const statusColor = (statusConfig as any)[status]?.color || "bg-zinc-500";
   const statusLabel = (statusConfig as any)[status]?.label || "Offline";
   const shortId = profile.id.slice(0, 8);
@@ -63,7 +63,7 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
         <div className="bg-[#232428] px-4 pb-4">
           <div className="flex items-end gap-3 -mt-10 mb-2">
             <div className="relative shrink-0">
-              <Avatar src={profile.avatar} name={profile.username} className="w-20 h-20 rounded-full border-[6px] border-[#232428] bg-[#5865F2] text-3xl" />
+              <Avatar src={profile.avatar} name={profile.username} className="w-20 h-20 rounded-full border-[6px] border-[#232428] bg-[var(--accent)] text-3xl" />
               <span className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-[#232428] ${statusColor}`} title={statusLabel} />
             </div>
             {profile.status_text ? (
@@ -104,7 +104,7 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
               <span className={`w-2.5 h-2.5 rounded-full ${statusColor}`} />
               <span>{statusLabel}</span>
               {profile.created_at && (
-                <span className="ml-auto text-zinc-500">
+                <span className="ml-auto text-zinc-400">
                   Membro desde {new Date(profile.created_at).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}
                 </span>
               )}

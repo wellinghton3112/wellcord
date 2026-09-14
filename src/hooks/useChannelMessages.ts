@@ -9,7 +9,7 @@ import { parseSlashCommand, SLASH_COMMANDS } from "@/lib/slash-commands";
 
 const PAGE = 100;
 
-const USER_COLORS = ["#5865F2","#EB459E","#57F287","#FEE75C","#ED4245","#F47B67","#E8A12F","#45DDC0","#9B59B6","#3498DB"];
+const USER_COLORS = ["var(--accent)","#EB459E","#57F287","#FEE75C","#ED4245","#F47B67","#E8A12F","#45DDC0","#9B59B6","#3498DB"];
 function userColor(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
@@ -87,7 +87,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
         const r = payload.new;
         setMessages((prev) => {
           if (prev.some((m) => m.id === r.id)) return prev;
-          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "#5865F2", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, mentions: r.mentions || [], file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
+          return [...prev, { id: r.id, user: r.username, user_id: r.user_id, avatar: r.avatar || "😎", color: r.color || "var(--accent)", content: r.content, timestamp: formatTime(r.created_at), channelId: r.channel_id, created_at: r.created_at, reply_to: r.reply_to || null, reply_user: r.reply_user || null, reply_content: r.reply_content || null, mentions: r.mentions || [], file_url: r.file_url || null, file_name: r.file_name || null, file_type: r.file_type || null }];
         });
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload: any) => {

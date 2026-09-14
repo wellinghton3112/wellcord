@@ -50,12 +50,12 @@ export function LinkEmbed({ url }: { url: string }) {
   const hostname = (() => { try { return new URL(url).hostname; } catch { return url; } })();
 
   return (
-    <div className="mt-1.5 max-w-md rounded-lg border border-[#4A4D53] bg-[#2B2D31] overflow-hidden group">
+    <div className="mt-1.5 max-w-md rounded-lg border border-[#4A4D53] bg-[var(--surface)] overflow-hidden group">
       {data.image && (
         <button
           type="button"
           onClick={() => openLightbox([data.image!], 0)}
-          className="h-36 w-full overflow-hidden bg-[#1E1F22] block cursor-pointer"
+          className="h-36 w-full overflow-hidden bg-[var(--input-bg)] block cursor-pointer"
         >
           <img
             src={data.image}
@@ -65,15 +65,15 @@ export function LinkEmbed({ url }: { url: string }) {
           />
         </button>
       )}
-      <a href={url} target="_blank" rel="noreferrer" className="block px-3 py-2 hover:bg-[#35373C] transition-colors">
+      <a href={url} target="_blank" rel="noreferrer" className="block px-3 py-2 hover:bg-[var(--surface-hover)] transition-colors">
         {data.siteName && (
           <div className="flex items-center gap-1.5 mb-1">
             {data.favicon ? (
               <img src={data.favicon} alt="" className="w-3.5 h-3.5 rounded-sm" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
             ) : (
-              <Globe className="w-3.5 h-3.5 text-zinc-500" />
+              <Globe className="w-3.5 h-3.5 text-zinc-400" />
             )}
-            <span className="text-[11px] text-zinc-500 truncate">{data.siteName}</span>
+            <span className="text-[11px] text-zinc-400 truncate">{data.siteName}</span>
           </div>
         )}
         {data.title && (
@@ -82,7 +82,7 @@ export function LinkEmbed({ url }: { url: string }) {
         {data.description && (
           <div className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{data.description}</div>
         )}
-        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-zinc-500">
+        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-zinc-400">
           <ExternalLink className="w-3 h-3" />
           <span className="truncate">{hostname}</span>
         </div>

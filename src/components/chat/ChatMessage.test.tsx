@@ -86,7 +86,7 @@ describe("mentionize", () => {
     const result = mentionize("Hello @alice world") as any[];
     expect(result.length).toBe(3);
     expect(result[0].props.children).toBe("Hello ");
-    expect(result[1].props.className).toContain("bg-[#5865F2]/40");
+    expect(result[1].props.className).toContain("bg-[var(--accent)]/40");
     expect(result[1].props.children).toBe("@alice");
     expect(result[2].props.children).toBe(" world");
   });

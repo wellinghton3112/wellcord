@@ -101,18 +101,18 @@ export function MarkdownText({ text, className, mentionize }: { text: string; cl
           case "italic":
             return <em key={i} className="italic">{t.content}</em>;
           case "strikethrough":
-            return <del key={i} className="line-through text-zinc-500">{t.content}</del>;
+            return <del key={i} className="line-through text-zinc-400">{t.content}</del>;
           case "code":
             return (
-              <code key={i} className="px-1.5 py-0.5 rounded bg-[#2B2D31] text-[#E9967A] text-[13px] font-mono border border-[#4A4D53]">
+              <code key={i} className="px-1.5 py-0.5 rounded bg-[var(--surface)] text-[#E9967A] text-[13px] font-mono border border-[#4A4D53]">
                 {t.content}
               </code>
             );
           case "codeblock":
             return (
-              <pre key={i} className="my-1 rounded-lg bg-[#1E1F22] border border-[#4A4D53] overflow-x-auto">
+              <pre key={i} className="my-1 rounded-lg bg-[var(--input-bg)] border border-[#4A4D53] overflow-x-auto">
                 {t.lang && (
-                  <div className="px-3 py-1 text-[10px] text-zinc-500 border-b border-[#4A4D53] font-mono">{t.lang}</div>
+                  <div className="px-3 py-1 text-[10px] text-zinc-400 border-b border-[#4A4D53] font-mono">{t.lang}</div>
                 )}
                 <code className="block px-3 py-2 text-[13px] font-mono text-zinc-200 whitespace-pre">{t.content}</code>
               </pre>

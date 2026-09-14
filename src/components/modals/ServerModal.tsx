@@ -30,26 +30,26 @@ export default function ServerModal(props: Props) {
         <div className="space-y-4">
           <div>
             <label className="text-xs font-bold text-zinc-300 uppercase">Nome *</label>
-            <input value={newServerName} onChange={(e) => setNewServerName(e.target.value)} placeholder="ex: Casa dos Amigos" className="w-full mt-1 bg-[#2B2D31] border border-[#1E1F22] rounded px-3 py-2 text-white outline-none focus:border-[#5865F2]" autoFocus />
+            <input value={newServerName} onChange={(e) => setNewServerName(e.target.value)} placeholder="ex: Casa dos Amigos" className="w-full mt-1 bg-[var(--surface)] border border-[var(--input-bg)] rounded px-3 py-2 text-white outline-none focus:border-[var(--accent)]" autoFocus />
           </div>
           <div>
             <label className="text-xs font-bold text-zinc-300 uppercase">Ícone</label>
             <div className="grid grid-cols-8 gap-2 mt-2">
               {ICONS.map((ic) => (
-                <button key={ic} onClick={() => { setNewServerIcon(ic); setNewServerImage(null); setNewServerPreview(""); }} className={`w-9 h-9 rounded flex items-center justify-center text-lg border ${newServerIcon === ic && !newServerImage ? "bg-[#5865F2] border-[#5865F2]" : "bg-[#2B2D31] border-[#1E1F22] hover:bg-[#404249]"}`}>{ic}</button>
+                <button key={ic} onClick={() => { setNewServerIcon(ic); setNewServerImage(null); setNewServerPreview(""); }} className={`w-9 h-9 rounded flex items-center justify-center text-lg border ${newServerIcon === ic && !newServerImage ? "bg-[var(--accent)] border-[var(--accent)]" : "bg-[var(--surface)] border-[var(--input-bg)] hover:bg-[var(--surface-active)]"}`}>{ic}</button>
               ))}
             </div>
           </div>
           <div>
             <label className="text-xs font-bold text-zinc-300 uppercase">Ou imagem do computador</label>
-            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewServerImage(f); if (f) setNewServerPreview(URL.createObjectURL(f)); else setNewServerPreview(editingServer?.image_url || ""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-[#404249] file:text-white hover:file:bg-[#4A4D53]" />
+            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewServerImage(f); if (f) setNewServerPreview(URL.createObjectURL(f)); else setNewServerPreview(editingServer?.image_url || ""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-[var(--surface-active)] file:text-white hover:file:bg-[#4A4D53]" />
             {newServerPreview && <img src={newServerPreview} alt="preview" className="w-16 h-16 rounded-2xl object-cover mt-2 border border-[#404249]" />}
             {newServerPreview && <button onClick={() => { setNewServerImage(null); setNewServerPreview(""); }} className="text-xs text-red-400 hover:underline ml-2">Remover imagem</button>}
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
-          <button onClick={onSave} disabled={!newServerName.trim() || creatingServer} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingServer ? "Salvando..." : editingServer ? "Salvar" : "Criar"}</button>
+          <button onClick={onSave} disabled={!newServerName.trim() || creatingServer} className="px-6 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingServer ? "Salvando..." : editingServer ? "Salvar" : "Criar"}</button>
         </div>
       </div>
     </ModalShell>

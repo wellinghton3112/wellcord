@@ -33,26 +33,26 @@ const COLORS: Record<string, string> = {
   join: "text-[#23A559]",
   leave: "text-[#DA373C]",
   pin: "text-[#F0B132]",
-  channel_create: "text-[#5865F2]",
-  role_assign: "text-[#5865F2]",
+  channel_create: "text-[var(--accent)]",
+  role_assign: "text-[var(--accent)]",
   kick: "text-[#DA373C]",
   ban: "text-[#DA373C]",
 };
 
 export function SystemMessage({ data }: { data: SystemMessageData }) {
   const Icon = ICONS[data.type] || Settings;
-  const color = COLORS[data.type] || "text-zinc-500";
+  const color = COLORS[data.type] || "text-zinc-400";
   const label = LABELS[data.type] || "realizou uma ação";
 
   return (
     <div className="flex items-center gap-3 px-4 py-1.5 text-sm text-zinc-400 group">
-      <div className={`w-10 h-10 rounded-full bg-[#2B2D31] flex items-center justify-center shrink-0 ${color}`}>
+      <div className={`w-10 h-10 rounded-full bg-[var(--surface)] flex items-center justify-center shrink-0 ${color}`}>
         <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
         <span className="text-zinc-200 font-medium">{data.username}</span>
         {" "}
-        <span className="text-zinc-500">{label}</span>
+        <span className="text-zinc-400">{label}</span>
         {data.target && (
           <>
             {" "}

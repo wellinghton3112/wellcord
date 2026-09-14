@@ -29,13 +29,13 @@ export default function JoinPage() {
   }, [code, router]);
 
   return (
-    <div className="min-h-screen bg-[#313338] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#2B2D31] rounded-lg p-8 text-center shadow-2xl">
+    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-[var(--surface)] rounded-lg p-8 text-center shadow-2xl">
         <h1 className="text-xl font-bold text-white">Convite WellCORD</h1>
         <p className="text-sm text-zinc-400 mt-2 font-mono">wellcord.vercel.app/join/{code}</p>
         <p className="text-sm text-zinc-300 mt-4">{status}</p>
         {status.startsWith("Faça login") && (
-          <button onClick={() => router.push("/login")} className="mt-4 px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] rounded text-sm font-medium text-white">Ir para login</button>
+          <button onClick={() => router.push("/login")} className="mt-4 px-6 py-2 bg-[#5865F2] hover:bg-[var(--accent-hover)] rounded text-sm font-medium text-white">Ir para login</button>
         )}
       </div>
     </div>

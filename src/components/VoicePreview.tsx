@@ -60,10 +60,10 @@ export default function VoicePreview({ channelId }: Props) {
         <span>{duration}</span>
       </div>
       {peers.map((p) => (
-        <div key={p.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-[#35373C]">
+        <div key={p.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-[var(--surface-hover)]">
           <Avatar src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.username)}`} name={p.username} className="w-5 h-5 rounded-full bg-[#41434A]" />
           <span className="text-xs text-zinc-300 truncate">{p.username}</span>
-          <span className="ml-auto text-[10px] text-zinc-500">🔊</span>
+          <span className="ml-auto text-[10px] text-zinc-400">🔊</span>
         </div>
       ))}
     </div>
