@@ -3,21 +3,22 @@ import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
-  Search, Inbox, HelpCircle, Plus, MoreHorizontal, Pencil, Trash2, X, Reply,
-  ChevronUp, ChevronDown, FileText, Download, Loader2, BarChart3, Check,
+  Search, Inbox, HelpCircle, Plus, ChevronUp, ChevronDown, Loader2, BarChart3, X, Check,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, Poll, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
 import { useVoice } from "@/context/VoiceContext";
 import Avatar from "@/components/Avatar";
-import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
 import { useAppStore } from "@/stores/useAppStore";
 import { useModalStore } from "@/stores/useModalStore";
 import { useProfileStore } from "@/stores/useProfileStore";
+import { useChatSearch } from "@/hooks/chat/useChatSearch";
+import { useChatScroll } from "@/hooks/chat/useChatScroll";
+import { useMessageEdit } from "@/hooks/chat/useMessageEdit";
+import { ChatMessage, ChatDMMessage, ReplyPreview, TypingBar, MentionBox, mentionize, AttachmentBlock } from "@/components/chat";
 
 type Props = {
-  // Dados dos hooks (não estão nas stores)
   dmConversations: DMConversation[];
   dmMessages: DMMessage[];
   dmInput: string;
@@ -74,7 +75,6 @@ type Props = {
   onDeletePoll: (pollId: string) => void;
 };
 
-// Área principal de chat (DM ou canal). Usa stores para estado global.
 export default function ChatArea(props: Props) {
   const {
     dmConversations, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers,
@@ -91,209 +91,42 @@ export default function ChatArea(props: Props) {
     polls, onToggleVote, onDeletePoll,
   } = props;
 
-  // Stores
   const { viewMode, setShowMobileSidebar, selectedDM, selectedChannel } = useAppStore();
   const { username, avatar: userAvatar, status } = useProfileStore();
   const userId = useProfileStore((s) => s.user?.id);
-
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState("");
+
   const [pickFor, setPickFor] = useState<string | null>(null);
 
-  const startEdit = (id: string, content: string) => { setEditingId(id); setEditDraft(content); };
-  const cancelEdit = () => { setEditingId(null); setEditDraft(""); };
-  const saveEdit = (save: (id: string, content: string) => void) => {
-    if (editingId && editDraft.trim()) save(editingId, editDraft.trim());
-    cancelEdit();
-  };
+  const channelSearch = useChatSearch({ messages: channelMessages, selectedDM, selectedChannel, viewMode });
+  const dmSearch = useChatSearch({ messages: dmMessages, selectedDM, selectedChannel, viewMode });
+  const search = viewMode === "dm" ? dmSearch : channelSearch;
 
-  const editBox = (save: (id: string, content: string) => void) => (
-    <div className="mt-1 flex items-center gap-2">
-      <input
-        value={editDraft}
-        onChange={(e) => setEditDraft(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") saveEdit(save); if (e.key === "Escape") cancelEdit(); }}
-        className="flex-1 bg-[#2B2D31] rounded px-2 py-1 text-[15px] outline-none focus:ring-1 focus:ring-[#5865F2] min-w-0"
-        autoFocus
-      />
-      <button onClick={() => saveEdit(save)} className="text-xs text-[#5865F2] hover:underline shrink-0">Salvar</button>
-      <button onClick={cancelEdit} className="p-1 hover:bg-[#2B2D31] rounded shrink-0"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
-    </div>
-  );
+  const channelScroll = useChatScroll({ messages: channelMessages, hasMore, loadingOlder, onLoadOlder, selectedKey: selectedChannel || "" });
+  const dmScroll = useChatScroll({ messages: dmMessages, hasMore: dmHasMore, loadingOlder: dmLoadingOlder, onLoadOlder: onLoadOlderDM, selectedKey: selectedDM || "" });
+  const scroll = viewMode === "dm" ? dmScroll : channelScroll;
 
-  const reactionBar = (
-    list: { emoji: string; count: number; mine: boolean }[] | undefined,
-    toggle: (emoji: string) => void,
-  ) => {
-    if (!list || list.length === 0) return null;
-    return (
-      <div className="mt-1 flex flex-wrap gap-1">
-        {list.map((r) => (
-          <button
-            key={r.emoji}
-            onClick={() => toggle(r.emoji)}
-            title={r.mine ? "Remover minha reação" : "Reagir também"}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs border transition-colors ${r.mine ? "bg-[#5865F2]/30 border-[#5865F2] text-white" : "bg-[#2B2D31] border-[#4A4D53] text-zinc-300 hover:border-zinc-400"}`}
-          >
-            <span>{r.emoji}</span><span className="font-semibold">{r.count}</span>
-          </button>
-        ))}
-      </div>
-    );
-  };
+  const channelEdit = useMessageEdit();
+  const dmEdit = useMessageEdit();
+  const edit = viewMode === "dm" ? dmEdit : channelEdit;
 
-  const emojiPicker = (messageId: string, toggle: (id: string, emoji: string) => void) => (
-    <div className="mt-1 flex items-center gap-1 bg-[#2B2D31] border border-[#4A4D53] rounded-lg p-1.5 w-fit shadow-lg">
-      {QUICK_EMOJIS.map((e) => (
-        <button
-          key={e}
-          onClick={() => { toggle(messageId, e); setPickFor(null); }}
-          className="text-lg hover:scale-125 transition-transform p-0.5"
-        >
-          {e}
-        </button>
-      ))}
-      <button onClick={() => setPickFor(null)} className="p-1 hover:bg-[#35373C] rounded"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
-    </div>
-  );
+  const { status: voiceStatus } = useVoice();
+  const inVoiceView = viewMode === "server" && currentChannel?.type === "voice";
+  const voiceActiveId = voiceStatus.joined && voiceStatus.channelId ? voiceStatus.channelId : null;
+  const vcChannelId = inVoiceView ? selectedChannel : (voiceActiveId || selectedChannel);
 
-  const scrollToMsg = (id: string | null | undefined) => {
-    if (!id) return;
-    document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  };
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dmFileInputRef = useRef<HTMLInputElement>(null);
+  const channelInputRef = useRef<HTMLInputElement>(null);
+  const dmInputRef = useRef<HTMLInputElement>(null);
 
-  // Busca no texto das mensagens carregadas (canal ou DM atual)
-  const [search, setSearch] = useState("");
-  const [matchIdx, setMatchIdx] = useState(0);
-
-  const searchPool = viewMode === "dm" ? dmMessages : channelMessages;
-  const q = search.trim().toLowerCase();
-  const matchIds = q
-    ? searchPool.filter((m: any) => (m.content || "").toLowerCase().includes(q)).map((m: any) => m.id)
-    : [];
-  const activeMatchId = matchIds.length > 0 ? matchIds[matchIdx % matchIds.length] : null;
-
-  const runSearch = (v: string) => { setSearch(v); setMatchIdx(0); };
-  const stepMatch = (dir: 1 | -1) => {
-    if (matchIds.length === 0) return;
-    setMatchIdx((i) => (i + dir + matchIds.length) % matchIds.length);
-  };
-
-  // Ao trocar de conversa/canal, limpa a busca
-  useEffect(() => { setSearch(""); setMatchIdx(0); }, [selectedDM, selectedChannel, viewMode]);
-
-  // Rola até o resultado ativo
   useEffect(() => {
-    if (activeMatchId) {
-      const t = setTimeout(() => scrollToMsg(activeMatchId), 50);
-      return () => clearTimeout(t);
-    }
-  }, [activeMatchId]);
+    if (!search.activeMatchId) return;
+    const t = setTimeout(() => scroll.scrollToMsg(search.activeMatchId), 50);
+    return () => clearTimeout(t);
+  }, [search.activeMatchId]);
 
-  const highlight = (text: string) => {
-    if (!q) return text;
-    const out: React.ReactNode[] = [];
-    const lower = text.toLowerCase();
-    let i = 0, k = 0;
-    while (true) {
-      const j = lower.indexOf(q, i);
-      if (j < 0) { out.push(text.slice(i)); break; }
-      if (j > i) out.push(text.slice(i, j));
-      out.push(<mark key={k++} className="bg-[#F0B132] text-black rounded-sm px-0.5">{text.slice(j, j + q.length)}</mark>);
-      i = j + q.length;
-    }
-    return out;
-  };
-
-  const searchBox = (placeholder: string) => (
-    <div className="relative hidden md:block">
-      <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
-      <input
-        value={search}
-        onChange={(e) => runSearch(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") stepMatch(e.shiftKey ? -1 : 1); if (e.key === "Escape") runSearch(""); }}
-        placeholder={placeholder}
-        className="bg-[#2B2D31] rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-[#5865F2] placeholder:text-zinc-500 text-zinc-200"
-      />
-      {q && (
-        <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[11px] text-zinc-400">
-          {matchIds.length > 0 ? `${(matchIdx % matchIds.length) + 1}/${matchIds.length}` : "0"}
-          <button onClick={() => stepMatch(-1)} className="p-0.5 hover:bg-[#35373C] rounded" title="Anterior (Shift+Enter)"><ChevronUp className="w-3.5 h-3.5" /></button>
-          <button onClick={() => stepMatch(1)} className="p-0.5 hover:bg-[#35373C] rounded" title="Próximo (Enter)"><ChevronDown className="w-3.5 h-3.5" /></button>
-          <button onClick={() => runSearch("")} className="p-0.5 hover:bg-[#35373C] rounded" title="Limpar (Esc)"><X className="w-3.5 h-3.5" /></button>
-        </span>
-      )}
-    </div>
-  );
-
-  const quoteBlock = (user: string | null | undefined, content: string | null | undefined, targetId: string | null | undefined) => {
-    if (!user && !content) return null;
-    return (
-      <button
-        onClick={() => scrollToMsg(targetId)}
-        title="Ir para a mensagem original"
-        className="mb-1 flex items-stretch gap-2 text-left bg-[#2B2D31]/70 hover:bg-[#2B2D31] rounded px-2 py-1 max-w-full transition-colors"
-      >
-        <span className="w-1 rounded-full bg-[#5865F2] shrink-0" />
-        <span className="min-w-0">
-          <span className="block text-xs font-semibold text-[#B5BAC1] truncate">{user || "mensagem"}</span>
-          <span className="block text-xs text-zinc-400 truncate">{content || "(apagada)"}</span>
-        </span>
-      </button>
-    );
-  };
-
-  const replyPreview = (
-    target: ReplyTarget | null,
-    clear: () => void,
-  ) => {    if (!target) return null;
-    return (
-      <div className="mb-2 flex items-stretch gap-2 bg-[#2B2D31] rounded px-2 py-1.5">
-        <span className="w-1 rounded-full bg-[#5865F2] shrink-0" />
-        <span className="flex-1 min-w-0">
-          <span className="block text-xs text-zinc-400">Respondendo a <span className="font-semibold text-zinc-200">{target.user}</span></span>
-          <span className="block text-xs text-zinc-500 truncate">{target.content}</span>
-        </span>
-        <button onClick={clear} className="p-1 hover:bg-[#35373C] rounded self-start" title="Cancelar resposta"><X className="w-4 h-4 text-zinc-400" /></button>
-      </div>
-    );
-  };
-
-  const attachmentBlock = (url: string | null | undefined, name: string | null | undefined, type: string | null | undefined) => {
-    if (!url) return null;
-    const kind = (type || "").toLowerCase();
-    const isImage = kind.startsWith("image/");
-    const isAudio = kind.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|opus|flac|aac)$/i.test(name || "");
-    if (isImage) {
-      return (
-        <a href={url} target="_blank" rel="noreferrer" className="mt-1 block max-w-sm">
-          <img src={url} alt={name || "anexo"} className="max-h-64 rounded-lg object-cover border border-[#4A4D53] hover:brightness-110 transition" />
-        </a>
-      );
-    }
-    if (isAudio) {
-      return (
-        <div className="mt-1 max-w-sm rounded-lg border border-[#4A4D53] bg-[#2B2D31] px-3 py-2">
-          <div className="mb-1 truncate text-xs text-zinc-300">{name || "áudio"}</div>
-          <audio controls preload="metadata" src={url} className="w-full min-w-60" />
-        </div>
-      );
-    }
-    return (
-      <a href={url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-2 bg-[#2B2D31] hover:bg-[#35373C] border border-[#4A4D53] rounded-lg px-3 py-2 max-w-sm transition-colors">
-        <FileText className="w-5 h-5 text-zinc-400 shrink-0" />
-        <span className="flex-1 min-w-0 text-sm text-zinc-200 truncate">{name || "arquivo"}</span>
-        <Download className="w-4 h-4 text-zinc-400 shrink-0" />
-      </a>
-    );
-  };
-
-  const pendingPreview = (
-    pending: PendingFile | null,
-    isUploading: boolean,
-    clear: () => void,
-  ) => {
+  const pendingPreview = (pending: PendingFile | null, isUploading: boolean, clear: () => void) => {
     if (isUploading) {
       return (
         <div className="mb-2 flex items-center gap-2 text-xs text-zinc-400">
@@ -308,7 +141,7 @@ export default function ChatArea(props: Props) {
         {isImage ? (
           <img src={pending.url} alt={pending.name} className="h-14 w-14 rounded object-cover" />
         ) : (
-          <FileText className="w-6 h-6 text-zinc-400 shrink-0" />
+          <AttachmentBlock url={pending.url} name={pending.name} type={pending.type} />
         )}
         <span className="text-xs text-zinc-300 truncate max-w-48">{pending.name}</span>
         <button onClick={clear} className="p-1 hover:bg-[#35373C] rounded shrink-0" title="Remover anexo"><X className="w-4 h-4 text-zinc-400" /></button>
@@ -316,153 +149,27 @@ export default function ChatArea(props: Props) {
     );
   };
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const dmFileInputRef = useRef<HTMLInputElement>(null);
-  const channelInputRef = useRef<HTMLInputElement>(null);
-  const dmInputRef = useRef<HTMLInputElement>(null);
-
-  // Voz persistente: UMA instância. Visível só na tela da própria chamada;
-  // escondida (display:none) ela mantém áudio/presença ao navegar.
-  const { status: voiceStatus } = useVoice();
-  const inVoiceView = viewMode === "server" && currentChannel?.type === "voice";
-  const voiceActiveId = voiceStatus.joined && voiceStatus.channelId ? voiceStatus.channelId : null;
-  const vcChannelId = inVoiceView ? selectedChannel : (voiceActiveId || selectedChannel);
-
-  // Scroll inteligente: topo carrega histórico (preserva posição),
-  // novas mensagens descem sozinhas só se já estou no fim
-  const listRef = useRef<HTMLDivElement>(null);
-  const dmListRef = useRef<HTMLDivElement>(null);
-  const nearBottom = useRef(true);
-  const dmNearBottom = useRef(true);
-  const holding = useRef(false);
-  const dmHolding = useRef(false);
-  const prevLastId = useRef<string | null>(null);
-  const prevDmLastId = useRef<string | null>(null);
-
-  const trackScroll = (
-    el: HTMLDivElement | null,
-    nearRef: React.MutableRefObject<boolean>,
-    holdRef: React.MutableRefObject<boolean>,
-    hasMoreFlag: boolean,
-    loadingFlag: boolean,
-    load: () => Promise<number>,
-  ) => {
-    if (!el || holdRef.current || loadingFlag) return;
-    nearRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (el.scrollTop < 200 && hasMoreFlag) {
-      holdRef.current = true;
-      const h0 = el.scrollHeight;
-      load().then(() => {
-        requestAnimationFrame(() => {
-          const e2 = el;
-          if (e2) e2.scrollTop = e2.scrollHeight - h0;
-          holdRef.current = false;
-        });
-      }).catch(() => { holdRef.current = false; });
-    }
-  };
-
-  useEffect(() => {
-    const last = channelMessages[channelMessages.length - 1]?.id || null;
-    const changed = last !== prevLastId.current;
-    prevLastId.current = last;
-    if (!changed || holding.current) return;
-    if (nearBottom.current) {
-      const el = listRef.current;
-      if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-    }
-  }, [channelMessages]);
-
-  useEffect(() => {
-    const last = dmMessages[dmMessages.length - 1]?.id || null;
-    const changed = last !== prevDmLastId.current;
-    prevDmLastId.current = last;
-    if (!changed || holding.current) return;
-    if (dmNearBottom.current) {
-      const el = dmListRef.current;
-      if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-    }
-  }, [dmMessages]);
-
-  // Troca de conversa: volta pro fim
-  useEffect(() => {
-    nearBottom.current = true;
-    prevLastId.current = null;
-    const el = listRef.current;
-    if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-  }, [selectedChannel]);
-  useEffect(() => {
-    dmNearBottom.current = true;
-    prevDmLastId.current = null;
-    const el = dmListRef.current;
-    if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
-  }, [selectedDM]);
-
-  // Autocomplete de @menções no fim do texto
-  const mentionBox = (
-    value: string,
-    candidates: { id: string; username: string; avatar?: string }[],
-    apply: (v: string) => void,
-    focusRef: RefObject<HTMLInputElement | null>,
-  ) => {
-    const m = value.match(/@([A-Za-z0-9_.-]*)$/);
-    if (!m) return null;
-    const frag = m[1].toLowerCase();
-    const list = candidates
-      .filter((c) => c.username.toLowerCase().includes(frag) && c.id !== userId)
-      .slice(0, 5);
-    if (list.length === 0) return null;
-    return (
-      <div className="mb-2 w-64 bg-[#2B2D31] border border-[#4A4D53] rounded-lg shadow-xl overflow-hidden">
-        {list.map((c) => (
-          <button
-            key={c.id}
-            onClick={() => {
-              apply(value.slice(0, value.length - m[0].length) + `@${c.username} `);
-              setTimeout(() => focusRef.current?.focus(), 0);
-            }}
-            className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-[#35373C] text-left"
-          >
-            <Avatar src={c.avatar} name={c.username} className="w-6 h-6 rounded-full bg-[#5865F2] text-xs" />
-            <span className="text-sm text-zinc-200 truncate">{c.username}</span>
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  const mentionize = (text: string) => {
-    const parts = text.split(/(@[A-Za-z0-9_.-]+)/g);
-    if (parts.length === 1) return text;
-    return parts.map((p, i) =>
-      /^@[A-Za-z0-9_.-]+$/.test(p)
-        ? <span key={i} className="bg-[#5865F2]/40 text-white rounded px-0.5">{p}</span>
-        : <span key={i}>{p}</span>
-    );
-  };
-
-  const typingBar = (users: TypingUser[]) => {
-    if (users.length === 0) return <div className="h-5" />;
-    const names = users.slice(0, 3).map((u) => u.username);
-    const label =
-      users.length === 1
-        ? `${names[0]} está digitando`
-        : users.length <= 3
-          ? `${names.join(", ")} estão digitando`
-          : `${names.join(", ")} e mais ${users.length - 3} estão digitando`;
-    return (
-      <div className="h-5 flex items-center gap-1.5 text-xs text-zinc-400 px-1">
-        <span className="flex gap-0.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-          <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+  const searchBox = (placeholder: string) => (
+    <div className="relative hidden md:block">
+      <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
+      <input
+        value={search.search}
+        onChange={(e) => search.runSearch(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") search.stepMatch(e.shiftKey ? -1 : 1); if (e.key === "Escape") search.runSearch(""); }}
+        placeholder={placeholder}
+        className="bg-[#2B2D31] rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-[#5865F2] placeholder:text-zinc-500 text-zinc-200"
+      />
+      {search.q && (
+        <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[11px] text-zinc-400">
+          {search.matchIds.length > 0 ? `${(search.matchIdx % search.matchIds.length) + 1}/${search.matchIds.length}` : "0"}
+          <button onClick={() => search.stepMatch(-1)} className="p-0.5 hover:bg-[#35373C] rounded" title="Anterior (Shift+Enter)"><ChevronUp className="w-3.5 h-3.5" /></button>
+          <button onClick={() => search.stepMatch(1)} className="p-0.5 hover:bg-[#35373C] rounded" title="Próximo (Enter)"><ChevronDown className="w-3.5 h-3.5" /></button>
+          <button onClick={() => search.runSearch("")} className="p-0.5 hover:bg-[#35373C] rounded" title="Limpar (Esc)"><X className="w-3.5 h-3.5" /></button>
         </span>
-        <span className="truncate">{label}...</span>
-      </div>
-    );
-  };
+      )}
+    </div>
+  );
 
-  // Feed cronológico: mensagens + enquetes intercaladas
   const feed: ({ kind: "msg"; at: string; msg: Message } | { kind: "poll"; at: string; poll: Poll })[] = [
     ...channelMessages.map((msg) => ({ kind: "msg" as const, at: msg.created_at || "", msg })),
     ...polls.map((poll) => ({ kind: "poll" as const, at: poll.created_at, poll })),
@@ -514,56 +221,6 @@ export default function ChatArea(props: Props) {
     );
   };
 
-  const renderChannelMessage = (msg: Message) => {
-    const isWebhook = !!(msg as any).metadata?.webhook_id;
-    const webhookName = (msg as any).metadata?.webhook_name;
-    const displayName = isWebhook ? webhookName || msg.user : msg.user;
-    const displayAvatar = (msg as any).metadata?.webhook_avatar || msg.avatar;
-    const displayColor = isWebhook ? "#5865F2" : msg.color;
-    return (
-    <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-      <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="shrink-0 mt-1 rounded-full" title="Ver perfil">
-        <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${displayColor}33` }}><Avatar src={displayAvatar} name={displayName} className="w-10 h-10 rounded-full text-lg" /></span>
-      </button>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: displayColor }}>{displayName}</button>
-          {isWebhook && <span className="text-[10px] px-1 py-0.5 rounded bg-[#5865F2] text-white font-medium leading-none">BOT</span>}
-          <span className="text-xs text-zinc-400">{msg.timestamp}</span>
-          {(msg as any).edited_at && <span className="text-[10px] text-zinc-500">(editado)</span>}
-          {pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}
-        </div>
-        {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
-        {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
-        {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
-        {editingId !== msg.id && reactionBar(reactions[msg.id], (e) => onToggleReaction(msg.id, e))}
-        {pickFor === msg.id && emojiPicker(msg.id, onToggleReaction)}
-      </div>
-      {editingId !== msg.id && (
-        <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
-          <button onClick={() => { setReplyTo({ id: msg.id, user: msg.user, content: msg.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-          <button onClick={() => setPickFor(pickFor === msg.id ? null : msg.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
-          {canPinMsg(msg.user_id) && (
-            <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
-          )}
-          {msg.user_id && msg.user_id === userId ? (
-            <>
-              <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-              <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
-            </>
-          ) : (isOwner || canModerateMessages) ? (
-            <>
-              <button onClick={() => startEdit(msg.id, msg.content)} title="Editar (moderação)"><Pencil className="w-4 h-4 text-amber-400 hover:text-white" /></button>
-              <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>
-            </>
-          ) : null}
-          <MoreHorizontal className="w-4 h-4" />
-        </div>
-      )}
-    </div>
-    );
-  };
-
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
       {viewMode === "dm" ? (
@@ -585,8 +242,8 @@ export default function ChatArea(props: Props) {
             </div>
           </div>
           <div
-            ref={dmListRef}
-            onScroll={(e) => trackScroll(e.currentTarget, dmNearBottom, dmHolding, dmHasMore, dmLoadingOlder, onLoadOlderDM)}
+            ref={dmScroll.listRef}
+            onScroll={(e) => dmScroll.trackScroll(e.currentTarget)}
             className="flex-1 overflow-y-auto p-4 space-y-1"
           >
             {dmLoadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
@@ -602,44 +259,40 @@ export default function ChatArea(props: Props) {
               </div>
             ) : (
               dmMessages.map((m) => (
-                <div key={m.id} id={`msg-${m.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${m.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
-                  <button onClick={() => onViewProfile(m.sender_id)} className="shrink-0 mt-0.5" title="Ver perfil">
-                    <Avatar src={m.sender_id === userId ? (userAvatar || "😎") : (dmConversations.find((d) => d.id === selectedDM)?.participants.find((p) => p.id === m.sender_id)?.avatar || "👤")} name={m.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
-                  </button>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-baseline gap-2"><button onClick={() => onViewProfile(m.sender_id)} className="font-medium text-sm hover:underline" style={{ color: m.sender_id === userId ? "#5865F2" : "#FEE75C" }}>{m.username}</button><span className="text-xs text-zinc-500">{new Date(m.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
-                    {quoteBlock(m.reply_user, m.reply_content, m.reply_to)}
-                    {editingId === m.id ? editBox(onEditDM) : <p className="text-[15px] text-[#DBDEE1] break-words">{q ? highlight(m.content) : mentionize(m.content)}</p>}
-                    {editingId !== m.id && attachmentBlock(m.file_url, m.file_name, m.file_type)}
-                    {editingId !== m.id && reactionBar(dmReactions[m.id], (e) => onToggleDMReaction(m.id, e))}
-                    {pickFor === m.id && emojiPicker(m.id, onToggleDMReaction)}
-                  </div>
-                  {editingId !== m.id && (
-                    <div className="hidden group-hover:flex items-center gap-1 self-start bg-[#313338] border border-[#3F4147] rounded-lg p-1 shadow-lg">
-                      <button onClick={() => { setDmReplyTo({ id: m.id, user: m.username, content: m.content }); setPickFor(null); }} title="Responder"><Reply className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-                      <button onClick={() => setPickFor(pickFor === m.id ? null : m.id)} title="Reagir"><Smile className="w-4 h-4 text-zinc-400 hover:text-yellow-300" /></button>
-                      {m.sender_id === userId && (
-                        <>
-                          <button onClick={() => startEdit(m.id, m.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
-                          <button onClick={() => onDeleteDM(m.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ChatDMMessage
+                  key={m.id}
+                  msg={m}
+                  userId={userId}
+                  userAvatar={userAvatar || undefined}
+                  selectedDM={selectedDM}
+                  dmConversations={dmConversations}
+                  dmReactions={dmReactions}
+                  editingId={dmEdit.editingId}
+                  pickFor={pickFor}
+                  searchQuery={search.q}
+                  highlight={search.highlight}
+                  onEdit={onEditDM}
+                  onDelete={onDeleteDM}
+                  onReply={setDmReplyTo}
+                  onToggleReaction={onToggleDMReaction}
+                  onViewProfile={onViewProfile}
+                  scrollToMsg={dmScroll.scrollToMsg}
+                  EditBox={dmEdit.EditBox}
+                  setPickFor={setPickFor}
+                />
               ))
             )}
           </div>
           {selectedDM && (
             <div className="px-4 pt-1 shrink-0">
-              {typingBar(typingDM)}
+              <TypingBar users={typingDM} />
             </div>
           )}
           {selectedDM && (
             <div className="p-4 pt-1 shrink-0">
-              {replyPreview(dmReplyTo, () => setDmReplyTo(null))}
+              <ReplyPreview target={dmReplyTo} clear={() => setDmReplyTo(null)} />
               {pendingPreview(pendingDmFile, uploadingDm, onClearDmFile)}
-              {mentionBox(dmInput, dmMentionCandidates, setDmInput, dmInputRef)}
+              <MentionBox value={dmInput} candidates={dmMentionCandidates} apply={setDmInput} focusRef={dmInputRef} userId={userId} />
               <input ref={dmFileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachDmFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => dmFileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
@@ -663,8 +316,8 @@ export default function ChatArea(props: Props) {
               </div>
           </div>
           <div
-            ref={listRef}
-            onScroll={(e) => trackScroll(e.currentTarget, nearBottom, holding, hasMore, loadingOlder, onLoadOlder)}
+            ref={channelScroll.listRef}
+            onScroll={(e) => channelScroll.trackScroll(e.currentTarget)}
             className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col"
           >
             {loadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
@@ -688,21 +341,46 @@ export default function ChatArea(props: Props) {
                   {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
                 </div>
                 {feed.map((item) =>
-                  item.kind === "poll" ? renderPoll(item.poll) : renderChannelMessage(item.msg)
+                  item.kind === "poll" ? renderPoll(item.poll) : (
+                    <ChatMessage
+                      key={item.msg.id}
+                      msg={item.msg}
+                      userId={userId}
+                      isOwner={isOwner}
+                      canModerateMessages={canModerateMessages}
+                      pinnedIds={pinnedIds}
+                      reactions={reactions}
+                      editingId={channelEdit.editingId}
+                      pickFor={pickFor}
+                      searchQuery={search.q}
+                      highlight={search.highlight}
+                      mentionize={mentionize}
+                      canPinMsg={canPinMsg}
+                      onEdit={channelEdit.startEdit}
+                      onDelete={onDeleteMessage}
+                      onReply={setReplyTo}
+                      onToggleReaction={onToggleReaction}
+                      onTogglePin={onTogglePin}
+                      onViewProfile={onViewProfile}
+                      scrollToMsg={channelScroll.scrollToMsg}
+                      EditBox={channelEdit.EditBox}
+                      setPickFor={setPickFor}
+                    />
+                  )
                 )}
               </>
             )}
           </div>
           {currentChannel?.type === "text" && (
             <div className="px-4 pt-1 shrink-0">
-              {typingBar(typingChannel)}
+              <TypingBar users={typingChannel} />
             </div>
           )}
           {currentChannel?.type === "text" && (
             <div className="p-4 pt-1 shrink-0">
-              {replyPreview(replyTo, () => setReplyTo(null))}
+              <ReplyPreview target={replyTo} clear={() => setReplyTo(null)} />
               {pendingPreview(pendingFile, uploading, onClearFile)}
-              {mentionBox(input, mentionCandidates, setInput, channelInputRef)}
+              <MentionBox value={input} candidates={mentionCandidates} apply={setInput} focusRef={channelInputRef} userId={userId} />
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
