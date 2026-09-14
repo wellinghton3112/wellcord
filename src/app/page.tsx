@@ -18,7 +18,7 @@ import PinsModal from "@/components/modals/PinsModal";
 import PollModal from "@/components/modals/PollModal";
 import RolesModal from "@/components/modals/RolesModal";
 import WebhooksModal from "@/components/modals/WebhooksModal";
-import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
+import ProfileCard from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useFriends } from "@/hooks/useFriends";
 import { useActiveNow } from "@/hooks/useActiveNow";
@@ -39,18 +39,22 @@ import { useNotify } from "@/hooks/useNotify";
 import { useChannelUnread } from "@/hooks/useChannelUnread";
 import { usePins } from "@/hooks/usePins";
 import { usePolls } from "@/hooks/usePolls";
+import { useAppStore } from "@/stores/useAppStore";
+import { useModalStore } from "@/stores/useModalStore";
+import { useProfileStore } from "@/stores/useProfileStore";
 
 export default function DiscordClone() {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
-  const { user, username, setUsername, avatar, setAvatar, bio, setBio, statusText, setStatusText } = useAuth(supabase);
-  const {
-    servers,
-    selectedServer, setSelectedServer,
-    selectedChannel, setSelectedChannel,
-    currentServer, currentChannel,
-    loading, connected, reload,
-  } = useServers(supabase, user);
+
+  // Stores
+  const { viewMode, setViewMode, servers, selectedServer, setSelectedServer, selectedChannel, setSelectedChannel, selectedDM, setSelectedDM, showMobileSidebar, setShowMobileSidebar, showMobileMembers, setShowMobileMembers, connected } = useAppStore();
+  const { showCreateServerModal, showCreateChannelModal, editingServer, showNewDMModal, showJoinModal, joinCode, setJoinCode, joining, setJoining, showUsernameModal, viewProfile, setViewProfile, showMembersModal, showRolesModal, showWebhooksModal, showPinsModal, showPollModal, showStatusMenu, setShowStatusMenu, openCreateServer, openEditServer, closeModal } = useModalStore();
+  const { user, username, setUsername, avatar, setAvatar, avatarFile, setAvatarFile, avatarRemoved, setAvatarRemoved, bio, setBio, statusText, setStatusText, status, setStatus } = useProfileStore();
+
+  // Hooks
+  const { servers: hookServers, selectedServer: hookSelectedServer, setSelectedServer: hookSetSelectedServer, selectedChannel: hookSelectedChannel, setSelectedChannel: hookSetSelectedChannel, currentServer, currentChannel, loading, connected: hookConnected, reload } = useServers(supabase, user);
+
   const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile, hasMore, loadingOlder, loadOlder } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id, avatar);
   const chTyping = useTyping(supabase, user, username, selectedChannel ? `ch-${selectedChannel}` : null);
 
@@ -66,19 +70,14 @@ export default function DiscordClone() {
   };
   const friends = useFriends(supabase, user);
   const { active } = useActiveNow(supabase, user, friends.friends.map((f) => f.user_id));
-  const [showMembersModal, setShowMembersModal] = useState(false);
   const serverMgr = useServerManager(supabase, currentServer?.id, currentServer?.owner_id);
   const roles = useRoles(supabase, currentServer?.id);
   const isOwner = !currentServer?.owner_id || currentServer?.owner_id === user?.id;
   const { pins, pinnedIds, canPin, togglePin } = usePins(supabase, user, selectedChannel, isOwner);
-  const [showPinsModal, setShowPinsModal] = useState(false);
   const { polls, createPoll, toggleVote, deletePoll } = usePolls(supabase, user, username, selectedChannel);
-  const [showPollModal, setShowPollModal] = useState(false);
-  const [showRolesModal, setShowRolesModal] = useState(false);
-  const [showWebhooksModal, setShowWebhooksModal] = useState(false);
 
   const jumpToMessage = async (id: string) => {
-    setShowPinsModal(false);
+    closeModal("showPinsModal");
     for (let i = 0; i < 5; i++) {
       if (document.getElementById(`msg-${id}`)) break;
       const got = await loadOlder();
@@ -87,36 +86,28 @@ export default function DiscordClone() {
     }
     setTimeout(() => document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
   };
-  const [showJoinModal, setShowJoinModal] = useState(false);
-  const [joinCode, setJoinCode] = useState("");
-  const [joining, setJoining] = useState(false);
+
   const pendingServer = useRef<string | null>(null);
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [showCreateChannelModal, setShowCreateChannelModal] = useState(false);
-  const [showCreateServerModal, setShowCreateServerModal] = useState(false);
   const {
     newChannelName, setNewChannelName, newChannelType, setNewChannelType,
     newChannelIcon, setNewChannelIcon, newChannelImage, setNewChannelImage,
     newChannelPreview, setNewChannelPreview, creatingChannel,
     newServerName, setNewServerName, newServerIcon, setNewServerIcon,
     newServerImage, setNewServerImage, newServerPreview, setNewServerPreview,
-    creatingServer, editingServer,
-    openCreateServer, openEditServer, handleServerSave,
+    creatingServer,
+    handleServerSave,
     deleteServer, leaveServer, deleteChannel, createChannel, handleCreateChannel,
-  } = useServerActions(supabase, user?.id, servers, currentServer, selectedChannel, setSelectedServer, setSelectedChannel, setShowCreateServerModal, setShowCreateChannelModal);
-  const { status, setStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username, avatar);
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<"server" | "dm">("server");
-  const [showNewDMModal, setShowNewDMModal] = useState(false);
+  } = useServerActions(supabase, user?.id, servers, currentServer, selectedChannel, hookSetSelectedServer, hookSetSelectedChannel, (v) => useModalStore.getState().openModal("showCreateServerModal"), (v) => useModalStore.getState().openModal("showCreateChannelModal"));
+  const { status: presenceStatus, setStatus: setPresenceStatus, onlineMembers, allProfiles } = usePresence(supabase, user, username, avatar);
   const {
-    dmConversations, selectedDM, setSelectedDM,
+    dmConversations,
     dmMessages, dmInput, setDmInput, handleDMSend, editDMMessage, deleteDMMessage,
     dmReactions, toggleDMReaction, unread,
     dmReplyTo, setDmReplyTo,
     pendingDmFile, setPendingDmFile, uploadingDm, attachDmFile,
     dmHasMore, dmLoadingOlder, loadOlderDM,
     newDMUsername, setNewDMUsername, creatingDM, createDM, startDMWith,
-  } = useDMs(supabase, user, username, viewMode, setViewMode, setShowNewDMModal);
+  } = useDMs(supabase, user, username);
   const dmTyping = useTyping(supabase, user, username, selectedDM ? `dm-${selectedDM}` : null);
 
   const sendDM = () => { dmTyping.notifyStop(); handleDMSend(); };
@@ -163,8 +154,6 @@ export default function DiscordClone() {
     }
     dismiss();
   };
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
-  const [showMobileMembers, setShowMobileMembers] = useState(false);
 
   // Se veio do email com ?code=..., troca por sessão
   useEffect(() => {
@@ -177,8 +166,6 @@ export default function DiscordClone() {
       });
     }
   }, []);
-
-  // Scroll automático mora no ChatArea (só desce se já estou no fim)
 
   // Convite via link (?server=ID): seleciona após a lista carregar
   useEffect(() => {
@@ -195,7 +182,7 @@ export default function DiscordClone() {
 
   const openInviteModal = () => {
     if (!currentServer) return;
-    setShowMembersModal(true);
+    useModalStore.getState().openModal("showMembersModal");
   };
 
   const joinWithCode = async () => {
@@ -204,7 +191,7 @@ export default function DiscordClone() {
     const sid = await redeemInvite(joinCode);
     setJoining(false);
     if (sid) {
-      setShowJoinModal(false);
+      closeModal("showJoinModal");
       setJoinCode("");
       pendingServer.current = sid;
       setViewMode("server");
@@ -214,10 +201,7 @@ export default function DiscordClone() {
 
   useEffect(() => { setShowMobileSidebar(false); }, [selectedChannel, selectedDM]);
 
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarRemoved, setAvatarRemoved] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [viewProfile, setViewProfile] = useState<CardProfile | null>(null);
 
   const openProfile = async (id: string) => {
     const { data } = await supabase.from("profiles").select("id, username, avatar, color, bio, status_text, created_at").eq("id", id).single();
@@ -261,7 +245,7 @@ export default function DiscordClone() {
       setAvatar(avatarUrl || "😎");
       setAvatarFile(null);
       setAvatarRemoved(false);
-      setShowUsernameModal(false);
+      closeModal("showUsernameModal");
     } catch (e: any) {
       uiToast("Erro ao salvar perfil: " + (e?.message || e));
     } finally {
@@ -305,19 +289,13 @@ export default function DiscordClone() {
         onSelectServer={(server) => { setViewMode("server"); setSelectedServer(server.id); setSelectedChannel(server.channels[0]?.id || ""); setShowMobileSidebar(false); }}
         onEditServer={openEditServer}
         onAddServer={openCreateServer}
-        onJoinServer={() => setShowJoinModal(true)}
+        onJoinServer={() => useModalStore.getState().openModal("showJoinModal")}
         unreadByServer={unreadByServer}
         unreadDMCount={Object.values(unread).reduce((a, b) => a + b, 0)}
       />
 
       <ChannelSidebar
-        showMobileSidebar={showMobileSidebar}
-        setShowMobileSidebar={setShowMobileSidebar}
-        viewMode={viewMode}
         dmConversations={dmConversations}
-        selectedDM={selectedDM}
-        setSelectedDM={setSelectedDM}
-        setViewModeDM={() => setViewMode("dm")}
         friendsList={friends.friends}
         incomingRequests={friends.incoming}
         outgoingRequests={friends.outgoing}
@@ -333,52 +311,31 @@ export default function DiscordClone() {
         unreadDMs={unread}
         onlineMembers={onlineMembers}
         setNewDMUsername={setNewDMUsername}
-        setShowNewDMModal={setShowNewDMModal}
         currentServer={currentServer}
         userId={user?.id}
-        selectedChannel={selectedChannel}
-        setSelectedChannel={setSelectedChannel}
-        connected={connected}
         openEditServer={openEditServer}
         deleteServer={deleteServer}
         createChannel={createChannel}
         deleteChannel={deleteChannel}
-        username={username}
-        status={status}
-        setStatus={setStatus}
-        showStatusMenu={showStatusMenu}
-        setShowStatusMenu={setShowStatusMenu}
-        setShowUsernameModal={setShowUsernameModal}
         onSignOut={signOut}
-        userAvatar={avatar}
         onViewProfile={openProfile}
-        onOpenMembers={() => setShowMembersModal(true)}
-        onOpenRoles={() => setShowRolesModal(true)}
-        onOpenWebhooks={() => setShowWebhooksModal(true)}
         onLeaveServer={() => leaveServer(user?.id)}
         channelUnread={channelUnread}
       />
 
       <ChatArea
-        viewMode={viewMode}
-        setShowMobileSidebar={setShowMobileSidebar}
         dmConversations={dmConversations}
-        selectedDM={selectedDM}
         dmMessages={dmMessages}
         dmInput={dmInput}
         setDmInput={typeDM}
         handleDMSend={sendDM}
         onlineMembers={onlineMembers}
-        userId={user?.id}
         currentChannel={currentChannel}
-        selectedChannel={selectedChannel}
         serverName={currentServer?.name}
         channelMessages={channelMessages}
         input={input}
         setInput={typeChannel}
         handleSend={sendChannel}
-        username={username}
-        status={status}
         onEditMessage={editMessage}
         onDeleteMessage={deleteMessage}
         onEditDM={editDMMessage}
@@ -406,7 +363,6 @@ export default function DiscordClone() {
         onBlurDM={dmTyping.notifyStop}
         mentionCandidates={allProfiles}
         dmMentionCandidates={dmConversations.find((d) => d.id === selectedDM)?.participants || []}
-        userAvatar={avatar}
         onViewProfile={openProfile}
         hasMore={hasMore}
         loadingOlder={loadingOlder}
@@ -417,20 +373,18 @@ export default function DiscordClone() {
         pinnedIds={pinnedIds}
         canPinMsg={canPin}
         onTogglePin={togglePin}
-        onOpenPins={() => setShowPinsModal(true)}
         isOwner={isOwner}
         canModerateMessages={isOwner || roles.hasPermission(user?.id || "", "manage_messages")}
         polls={polls}
         onToggleVote={toggleVote}
         onDeletePoll={deletePoll}
-        onOpenPollModal={() => setShowPollModal(true)}
       />
 
       <MembersSidebar
         showMobileMembers={showMobileMembers}
         onlineMembers={onlineMembers}
         allProfiles={allProfiles}
-        status={status}
+        status={presenceStatus}
         onViewProfile={openProfile}
         canKick={(uid) => isOwner || roles.hasPermission(user?.id || "", "kick")}
         canBan={(uid) => isOwner || roles.hasPermission(user?.id || "", "ban")}
@@ -458,7 +412,7 @@ export default function DiscordClone() {
           statusText={statusText}
           setStatusText={setStatusText}
           saving={savingProfile}
-          onClose={() => { setShowUsernameModal(false); setAvatarFile(null); setAvatarRemoved(false); }}
+          onClose={() => { closeModal("showUsernameModal"); setAvatarFile(null); setAvatarRemoved(false); }}
           onSave={saveProfile}
         />
       )}
@@ -475,7 +429,7 @@ export default function DiscordClone() {
           newServerPreview={newServerPreview}
           setNewServerPreview={setNewServerPreview}
           creatingServer={creatingServer}
-          onClose={() => setShowCreateServerModal(false)}
+          onClose={() => closeModal("showCreateServerModal")}
           onSave={handleServerSave}
         />
       )}
@@ -485,7 +439,7 @@ export default function DiscordClone() {
           newDMUsername={newDMUsername}
           setNewDMUsername={setNewDMUsername}
           creatingDM={creatingDM}
-          onClose={() => setShowNewDMModal(false)}
+          onClose={() => closeModal("showNewDMModal")}
           onCreate={createDM}
         />
       )}
@@ -504,7 +458,7 @@ export default function DiscordClone() {
           newChannelPreview={newChannelPreview}
           setNewChannelPreview={setNewChannelPreview}
           creatingChannel={creatingChannel}
-          onClose={() => setShowCreateChannelModal(false)}
+          onClose={() => closeModal("showCreateChannelModal")}
           onCreate={handleCreateChannel}
         />
       )}
@@ -523,7 +477,7 @@ export default function DiscordClone() {
           onCreateInvite={(maxUses, expiresHours) => serverMgr.createInvite(user?.id, maxUses, expiresHours)}
           onAssignRole={(uid, rid) => roles.assignRole(uid, rid)}
           onRemoveRole={(uid, rid) => roles.removeRole(uid, rid)}
-          onClose={() => setShowMembersModal(false)}
+          onClose={() => closeModal("showMembersModal")}
         />
       )}
 
@@ -532,7 +486,7 @@ export default function DiscordClone() {
           code={joinCode}
           setCode={setJoinCode}
           joining={joining}
-          onClose={() => setShowJoinModal(false)}
+          onClose={() => closeModal("showJoinModal")}
           onJoin={joinWithCode}
         />
       )}
@@ -564,7 +518,7 @@ export default function DiscordClone() {
           status={profileStatus(viewProfile.id)}
           isSelf={viewProfile.id === user?.id}
           onClose={() => setViewProfile(null)}
-          onEdit={() => { setViewProfile(null); setShowUsernameModal(true); }}
+          onEdit={() => { setViewProfile(null); useModalStore.getState().openModal("showUsernameModal"); }}
           onSendDM={dmFromCard}
         />
       )}
@@ -575,12 +529,12 @@ export default function DiscordClone() {
           onJump={jumpToMessage}
           onUnpin={togglePin}
           canManage={isOwner}
-          onClose={() => setShowPinsModal(false)}
+          onClose={() => closeModal("showPinsModal")}
         />
       )}
       {showPollModal && (
         <PollModal
-          onClose={() => setShowPollModal(false)}
+          onClose={() => closeModal("showPollModal")}
           onCreate={createPoll}
         />
       )}
@@ -590,14 +544,14 @@ export default function DiscordClone() {
           onCreateRole={roles.createRole}
           onUpdateRole={roles.updateRole}
           onDeleteRole={roles.deleteRole}
-          onClose={() => setShowRolesModal(false)}
+          onClose={() => closeModal("showRolesModal")}
         />
       )}
       {showWebhooksModal && currentServer && selectedChannel && (
         <WebhooksModal
           channelId={selectedChannel}
           serverId={currentServer.id}
-          onClose={() => setShowWebhooksModal(false)}
+          onClose={() => closeModal("showWebhooksModal")}
         />
       )}
       <Toaster />

@@ -1,15 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Server } from "@/lib/chat-types";
+import { useAppStore } from "@/stores/useAppStore";
 
 // Servidores + canais: carga inicial, seleção e realtime.
-// Extraído de page.tsx sem mudança de comportamento.
+// Usa useAppStore para compartilhar estado com outros componentes.
 export function useServers(supabase: any, user: any) {
-  const [servers, setServers] = useState<Server[]>([]);
-  const [selectedServer, setSelectedServer] = useState<string>("");
-  const [selectedChannel, setSelectedChannel] = useState<string>("");
+  const { servers, setServers, selectedServer, setSelectedServer, selectedChannel, setSelectedChannel, setConnected: setStoreConnected } = useAppStore();
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const reload = () => setReloadKey((k) => k + 1);
 
@@ -27,7 +25,7 @@ export function useServers(supabase: any, user: any) {
       if (!srvData || srvData.length === 0) {
         setServers([]);
         setLoading(false);
-        setConnected(true);
+        setStoreConnected(true);
         return;
       }
       // buscar canais
@@ -46,7 +44,7 @@ export function useServers(supabase: any, user: any) {
         setSelectedChannel(mapped[0].channels[0]?.id || "");
       }
       setLoading(false);
-      setConnected(true);
+      setStoreConnected(true);
     }
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,6 +96,6 @@ export function useServers(supabase: any, user: any) {
     selectedServer, setSelectedServer,
     selectedChannel, setSelectedChannel,
     currentServer, currentChannel,
-    loading, connected, reload,
+    loading, connected: useAppStore.getState().connected, reload,
   };
 }

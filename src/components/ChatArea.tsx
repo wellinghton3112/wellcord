@@ -12,29 +12,24 @@ import { useVoice } from "@/context/VoiceContext";
 import Avatar from "@/components/Avatar";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 import VoiceChannel from "@/components/VoiceChannel";
+import { useAppStore } from "@/stores/useAppStore";
+import { useModalStore } from "@/stores/useModalStore";
+import { useProfileStore } from "@/stores/useProfileStore";
 
 type Props = {
-  viewMode: "server" | "dm";
-  setShowMobileSidebar: (v: boolean) => void;
-  // DM
+  // Dados dos hooks (não estão nas stores)
   dmConversations: DMConversation[];
-  selectedDM: string | null;
   dmMessages: DMMessage[];
   dmInput: string;
   setDmInput: (v: string) => void;
   handleDMSend: () => void;
   onlineMembers: PresenceUser[];
-  userId?: string;
-  // Servidor
   currentChannel?: Channel;
-  selectedChannel: string;
   serverName?: string;
   channelMessages: Message[];
   input: string;
   setInput: (v: string) => void;
   handleSend: () => void;
-  username: string;
-  status: string;
   onEditMessage: (id: string, content: string) => void;
   onDeleteMessage: (id: string) => void;
   onEditDM: (id: string, content: string) => void;
@@ -62,7 +57,6 @@ type Props = {
   onBlurDM: () => void;
   mentionCandidates: { id: string; username: string; avatar?: string }[];
   dmMentionCandidates: { id: string; username: string; avatar?: string }[];
-  userAvatar?: string | null;
   onViewProfile: (id: string) => void;
   hasMore: boolean;
   loadingOlder: boolean;
@@ -73,32 +67,35 @@ type Props = {
   pinnedIds: Set<string>;
   canPinMsg: (userId?: string | null) => boolean;
   onTogglePin: (id: string) => void;
-  onOpenPins: () => void;
   isOwner: boolean;
   canModerateMessages?: boolean;
   polls: Poll[];
   onToggleVote: (pollId: string, optionId: string) => void;
   onDeletePoll: (pollId: string) => void;
-  onOpenPollModal: () => void;
 };
 
-// Área principal de chat (DM ou canal). Extraído de page.tsx sem mudança visual.
+// Área principal de chat (DM ou canal). Usa stores para estado global.
 export default function ChatArea(props: Props) {
   const {
-    viewMode, setShowMobileSidebar,
-    dmConversations, selectedDM, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers, userId,
-    currentChannel, selectedChannel, serverName, channelMessages, input, setInput, handleSend, username, status,
+    dmConversations, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers,
+    currentChannel, serverName, channelMessages, input, setInput, handleSend,
     onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
     pendingFile, uploading, onAttachFile, onClearFile,
     pendingDmFile, uploadingDm, onAttachDmFile, onClearDmFile,
     typingChannel, typingDM, onBlurChannel, onBlurDM,
-    mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
+    mentionCandidates, dmMentionCandidates, onViewProfile,
     hasMore, loadingOlder, onLoadOlder, dmHasMore, dmLoadingOlder, onLoadOlderDM,
-    pinnedIds, canPinMsg, onTogglePin, onOpenPins, isOwner, canModerateMessages,
-    polls, onToggleVote, onDeletePoll, onOpenPollModal,
+    pinnedIds, canPinMsg, onTogglePin, isOwner, canModerateMessages,
+    polls, onToggleVote, onDeletePoll,
   } = props;
+
+  // Stores
+  const { viewMode, setShowMobileSidebar, selectedDM, selectedChannel } = useAppStore();
+  const { username, avatar: userAvatar, status } = useProfileStore();
+  const userId = useProfileStore((s) => s.user?.id);
+
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
@@ -660,7 +657,7 @@ export default function ChatArea(props: Props) {
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo</span>
               <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={onOpenPins} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
+                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={() => useModalStore.getState().openModal("showPinsModal")} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
                 {searchBox("Buscar")}
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
               </div>
@@ -709,7 +706,7 @@ export default function ChatArea(props: Props) {
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
-                <button onClick={onOpenPollModal} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-500 shrink-0 text-zinc-400 hover:text-[#383A40]" title="Criar enquete"><BarChart3 className="w-4 h-4" /></button>
+                <button onClick={() => useModalStore.getState().openModal("showPollModal")} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-500 shrink-0 text-zinc-400 hover:text-[#383A40]" title="Criar enquete"><BarChart3 className="w-4 h-4" /></button>
                 <input ref={channelInputRef} value={input} onChange={(e) => setInput(e.target.value)} onBlur={onBlurChannel} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />

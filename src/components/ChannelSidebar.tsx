@@ -10,70 +10,55 @@ import { useVoice } from "@/context/VoiceContext";
 import { loadPtt, savePtt, eventToAccelerator, type PttConfig } from "@/lib/ptt";
 import type { Friend, FriendRequest } from "@/hooks/useFriends";
 import type { ActiveVoice } from "@/hooks/useActiveNow";
+import { useAppStore } from "@/stores/useAppStore";
+import { useModalStore } from "@/stores/useModalStore";
+import { useProfileStore } from "@/stores/useProfileStore";
 
 type Props = {
-  showMobileSidebar: boolean;
-  setShowMobileSidebar: (v: boolean) => void;
-  viewMode: "server" | "dm";
-  // DM
+  // Dados dos hooks (não estão nas stores)
   dmConversations: DMConversation[];
-  selectedDM: string | null;
-  setSelectedDM: (id: string) => void;
   unreadDMs?: Record<string, number>;
   onlineMembers: PresenceUser[];
-  setNewDMUsername: (v: string) => void;
-  setShowNewDMModal: (v: boolean) => void;
-  // Servidor
   currentServer?: Server;
   userId?: string;
-  selectedChannel: string;
-  setSelectedChannel: (id: string) => void;
-  connected: boolean;
-  openEditServer: (s: Server) => void;
-  deleteServer: () => void;
-  createChannel: () => void;
-  deleteChannel: (id: string, name: string) => void;
-  // Painel usuário
-  username: string;
-  userAvatar?: string | null;
-  status: keyof typeof statusConfig;
-  setStatus: (s: "online" | "idle" | "dnd" | "invisible") => void;
-  showStatusMenu: boolean;
-  setShowStatusMenu: (v: boolean) => void;
-  setShowUsernameModal: (v: boolean) => void;
-  onSignOut: () => void;
-  onViewProfile: (id: string) => void;
-  onOpenMembers: () => void;
-  onOpenRoles: () => void;
-  onOpenWebhooks: () => void;
-  onLeaveServer: () => void;
   channelUnread?: Record<string, number>;
-  setViewModeDM: () => void;
-  // Amigos (aba dentro das DMs)
   friendsList: Friend[];
   incomingRequests: FriendRequest[];
   outgoingRequests: FriendRequest[];
   sendingFriend: boolean;
+  activeVoice: ActiveVoice[];
+  // Callbacks
+  onSignOut: () => void;
+  onViewProfile: (id: string) => void;
+  onLeaveServer: () => void;
   onAddFriend: (username: string) => Promise<boolean>;
   onAcceptFriend: (id: string) => void;
   onRejectFriend: (id: string) => void;
   onCancelFriend: (id: string) => void;
   onRemoveFriend: (id: string, username: string) => void;
   onFriendDM: (id: string) => void;
-  activeVoice: ActiveVoice[];
   onJoinVoice: (serverId: string, channelId: string) => void;
+  deleteServer: () => void;
+  createChannel: () => void;
+  deleteChannel: (id: string, name: string) => void;
+  setNewDMUsername: (v: string) => void;
+  openEditServer: (s: Server) => void;
 };
 
-// Coluna de canais/DMs + painel do usuário. Extraído de page.tsx sem mudança visual.
+// Coluna de canais/DMs + painel do usuário. Usa stores para estado global.
 export default function ChannelSidebar(props: Props) {
   const {
-    showMobileSidebar, setShowMobileSidebar, viewMode,
-    dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
-    currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onOpenRoles, onOpenWebhooks, onLeaveServer, channelUnread, setViewModeDM,
-    friendsList, incomingRequests, outgoingRequests, sendingFriend, onAddFriend, onAcceptFriend, onRejectFriend, onCancelFriend, onRemoveFriend, onFriendDM,
-    activeVoice, onJoinVoice,
+    dmConversations, unreadDMs, onlineMembers, currentServer, userId, channelUnread,
+    friendsList, incomingRequests, outgoingRequests, sendingFriend, activeVoice,
+    onSignOut, onViewProfile, onLeaveServer, onAddFriend, onAcceptFriend, onRejectFriend,
+    onCancelFriend, onRemoveFriend, onFriendDM, onJoinVoice, deleteServer, createChannel,
+    deleteChannel, setNewDMUsername, openEditServer,
   } = props;
+
+  // Stores
+  const { showMobileSidebar, setShowMobileSidebar, viewMode, setViewMode, selectedDM, setSelectedDM, selectedChannel, setSelectedChannel, connected } = useAppStore();
+  const { showStatusMenu, setShowStatusMenu } = useModalStore();
+  const { username, avatar: userAvatar, status, setStatus } = useProfileStore();
 
   const [sideTab, setSideTab] = useState<"dms" | "friends">("dms");
   const [dmSearch, setDmSearch] = useState("");
@@ -159,7 +144,7 @@ export default function ChannelSidebar(props: Props) {
               Amigos
               {incomingRequests.length > 0 && <span className="min-w-4 h-4 px-1 rounded-full bg-[#DA373C] text-white text-[10px] font-bold inline-flex items-center justify-center">{incomingRequests.length > 9 ? "9+" : incomingRequests.length}</span>}
             </button>
-            <button onClick={() => setShowNewDMModal(true)} className="w-7 h-7 rounded bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center shrink-0" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
+            <button onClick={() => useModalStore.getState().openModal("showNewDMModal")} className="w-7 h-7 rounded bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center shrink-0" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
           </div>
           {sideTab === "dms" ? (
           <>
@@ -173,7 +158,7 @@ export default function ChannelSidebar(props: Props) {
             {filteredDMs.length === 0 ? (
               <p className="text-xs text-zinc-500 px-2">{dmSearch ? "Nenhuma DM encontrada." : "Nenhuma DM ainda. Clique + para iniciar."}</p>
             ) : filteredDMs.map((dm) => (
-              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewModeDM(); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewMode("dm"); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">
                   <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
                 </span>
@@ -191,7 +176,7 @@ export default function ChannelSidebar(props: Props) {
               <p className="text-xs font-bold text-zinc-300">Amigos Online — {onlineMembers.length}</p>
               <div className="mt-2 space-y-1">
                   {onlineMembers.slice(0, 5).map((m) => (
-                    <button key={m.id} onClick={() => { setNewDMUsername(m.username); setShowNewDMModal(true); }} className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[#35373C] text-left">
+                    <button key={m.id} onClick={() => { setNewDMUsername(m.username); useModalStore.getState().openModal("showNewDMModal"); }} className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-[#35373C] text-left">
                       <Avatar src={m.avatar} name={m.username} className="w-6 h-6 rounded-full bg-[#41434A] text-xs" />
                       <span className="text-xs text-zinc-300 truncate">{m.username}</span>
                       <Plus className="w-3 h-3 ml-auto text-zinc-500" />
@@ -300,9 +285,9 @@ export default function ChannelSidebar(props: Props) {
             </div>
               <div className="flex items-center gap-1">
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
-                {currentServer && <button onClick={onOpenMembers} className="p-1 hover:bg-[#404249] rounded" title="Membros e convites"><Users className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
-                {currentServer && canManage && <button onClick={onOpenRoles} className="p-1 hover:bg-[#404249] rounded" title="Cargos e permissões"><Shield className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
-                {currentServer && canManage && <button onClick={onOpenWebhooks} className="p-1 hover:bg-[#404249] rounded" title="Webhooks"><Webhook className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
+                {currentServer && <button onClick={() => useModalStore.getState().openModal("showMembersModal")} className="p-1 hover:bg-[#404249] rounded" title="Membros e convites"><Users className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
+                {currentServer && canManage && <button onClick={() => useModalStore.getState().openModal("showRolesModal")} className="p-1 hover:bg-[#404249] rounded" title="Cargos e permissões"><Shield className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
+                {currentServer && canManage && <button onClick={() => useModalStore.getState().openModal("showWebhooksModal")} className="p-1 hover:bg-[#404249] rounded" title="Webhooks"><Webhook className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
                 {currentServer && !canManage && <button onClick={onLeaveServer} className="p-1 hover:bg-[#404249] rounded" title="Sair do servidor"><DoorOpen className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
@@ -364,7 +349,7 @@ export default function ChannelSidebar(props: Props) {
           <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
         </div>
         <span className="text-[8px] font-mono bg-[#1E1F22] px-1 py-0.5 rounded text-zinc-500 shrink-0">{APP_VERSION}</span>
-        <button onClick={() => setShowUsernameModal(true)} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
+        <button onClick={() => useModalStore.getState().openModal("showUsernameModal")} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
         <button onClick={onSignOut} className="p-1 hover:bg-[#DA373C] rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
         {showStatusMenu && (
           <div className="absolute bottom-full left-2 mb-2 w-52 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">

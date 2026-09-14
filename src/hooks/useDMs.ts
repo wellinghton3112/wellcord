@@ -5,21 +5,20 @@ import { extractMentions, sendNotify } from "@/lib/notify";
 import { groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { toast, confirmDialog } from "@/lib/ui";
 import { logger } from "@/lib/logger";
+import { useAppStore } from "@/stores/useAppStore";
+import { useModalStore } from "@/stores/useModalStore";
 
 const PAGE = 100;
 
 // DMs: conversas, mensagens com batch de profiles, envio e criação.
-// Extraído de page.tsx sem mudança de comportamento.
+// Usa useAppStore e useModalStore para compartilhar estado.
 export function useDMs(
   supabase: any,
   user: any,
   username: string,
-  viewMode: "server" | "dm",
-  setViewMode: (m: "server" | "dm") => void,
-  setShowNewDMModal: (v: boolean) => void,
 ) {
+  const { viewMode, setViewMode, selectedDM, setSelectedDM } = useAppStore();
   const [dmConversations, setDmConversations] = useState<DMConversation[]>([]);
-  const [selectedDM, setSelectedDM] = useState<string | null>(null);
   const [dmMessages, setDmMessages] = useState<DMMessage[]>([]);
   const [dmInput, setDmInput] = useState("");
   const [dmReplyTo, setDmReplyTo] = useState<ReplyTarget | null>(null);
@@ -36,7 +35,7 @@ export function useDMs(
   // Refs para usar estado atual dentro de subscriptions estáveis
   const convIdsRef = useRef<Set<string>>(new Set());
   const selectedDMRef = useRef<string | null>(null);
-  const modeRef = useRef(viewMode);
+  const modeRef = useRef<"server" | "dm">(viewMode);
   convIdsRef.current = new Set(dmConversations.map((c) => c.id));
   selectedDMRef.current = selectedDM;
   modeRef.current = viewMode;
@@ -316,7 +315,7 @@ export function useDMs(
     if (!prof) { toast("Usuário não encontrado"); setCreatingDM(false); return; }
     if (prof.id === user.id) { toast("Não pode criar DM consigo mesmo"); setCreatingDM(false); return; }
     await openWithId(prof.id);
-    setShowNewDMModal(false);
+    useModalStore.getState().closeModal("showNewDMModal");
     setCreatingDM(false);
   };
 

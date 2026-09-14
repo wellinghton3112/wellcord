@@ -1,12 +1,17 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { Mic, MicOff, PhoneOff, Headphones, Volume2, Video, VideoOff, Monitor, MonitorOff, Maximize2, X, Waves, Eye, EyeOff } from "lucide-react";
 import { useVoice } from "@/context/VoiceContext";
-import { buildIceServers, hasTurnConfigured } from "@/lib/ice";
-import { tuneVideoSender, videoBitrateFor, VIDEO_BITRATE, SCREEN_QUALITIES, qualityLabel, qualityDims, getVideoStats, type ScreenQuality, type CodecMode } from "@/lib/video";
+import { hasTurnConfigured } from "@/lib/ice";
+import { SCREEN_QUALITIES, qualityLabel, qualityDims, VIDEO_BITRATE, type ScreenQuality, type CodecMode } from "@/lib/video";
 import Avatar from "@/components/Avatar";
 import ScreenPickerModal from "@/components/modals/ScreenPickerModal";
+import { useWebRTC } from "@/hooks/voice/useWebRTC";
+import { useScreenShare } from "@/hooks/voice/useScreenShare";
+import { useNoiseSuppression } from "@/hooks/voice/useNoiseSuppression";
+import { useSpeakingDetection } from "@/hooks/voice/useSpeakingDetection";
+import { useVideoQuality } from "@/hooks/voice/useVideoQuality";
 
 type Props = {
   channelId: string;
@@ -32,70 +37,92 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const [deafened, setDeafened] = useState(false);
   const [peers, setPeers] = useState<Peer[]>([]);
   const [error, setError] = useState("");
-  const [speaking, setSpeaking] = useState<Record<string, boolean>>({});
   const [cameraOn, setCameraOn] = useState(false);
-  const [screenOn, setScreenOn] = useState(false);
-  // Qualidade da transmissão de tela (downscale via applyConstraints, ao vivo)
-  const [screenQuality, setScreenQuality] = useState<ScreenQuality>("auto");
-  const screenQualityRef = useRef<ScreenQuality>("auto");
-  // Seletor próprio (.exe); no navegador usa o picker do OS
-  const [showScreenPicker, setShowScreenPicker] = useState(false);
-  const [screenSources, setScreenSources] = useState<{ id: string; name: string; screen: boolean; thumbnail: string | null }[] | null>(null);
-  // Acabou de escolher no picker: pula reabrir e vai direto ao getDisplayMedia
-  // (o main usa a fonte escolhida uma vez)
-  const pickedRef = useRef(false);
-  // Codec: sharp (VP9 nítido, CPU) x smooth (H264 hardware, fluido)
-  const [codecMode, setCodecMode] = useState<CodecMode>("sharp");
-  const codecModeRef = useRef<CodecMode>("sharp");
-  const [sendStats, setSendStats] = useState("");
-  const statsPrevRef = useRef<{ bytes: number; ts: number } | null>(null);
-  const [peerQuality, setPeerQuality] = useState<Record<string, { fps: number; bytes: number; limitation?: string }>>({});
-  const peerQualityPrevRef = useRef<Map<string, { bytes: number; ts: number }>>(new Map());
-  // Supressão de ruído RNNoise (ML local). Ligada por padrão; cai p/ navegador se falhar.
-  const [denoise, setDenoise] = useState(true);
-  const [denoiseActive, setDenoiseActive] = useState(false);
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [expanded, setExpanded] = useState<string | null>(null);
-  // Streams que optei por não visualizar (áudio continua)
   const [hiddenVideo, setHiddenVideo] = useState<Record<string, boolean>>({});
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  const [sessionChannel, setSessionChannel] = useState<string | null>(null);
+
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const expandedRef = useRef<HTMLDivElement>(null);
-  const remoteVideosRef = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const rawStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analysersRef = useRef<Map<string, AnalyserNode>>(new Map());
-  const prevSpeakingRef = useRef<Record<string, boolean>>({});
-  const cleanedUpRef = useRef(false);
-  const speakingLoopRef = useRef(false);
-
-  const localStreamRef = useRef<MediaStream | null>(null);
-  const joiningRef = useRef(false);
-  const mutedRef = useRef(false);
-  const [sessionChannel, setSessionChannel] = useState<string | null>(null);
-  // Mic cru (sempre guardado p/ poder ligar/desligar o denoise ao vivo)
-  const rawStreamRef = useRef<MediaStream | null>(null);
-  const denoiseRef = useRef<{ stop: () => void } | null>(null);
-  const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const remoteAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
   const channelRef = useRef<any>(null);
   const leaveRef = useRef<() => void>(() => {});
-  // Canal da SESSÃO ativa (pode diferir do canal em tela — a chamada sobrevive à navegação)
   const sessionChannelRef = useRef<string | null>(null);
-  // ID estável por montagem: gerado uma vez (sem regenerar ao trocar username — evita peers fantasmas).
-  // O nome de exibição vem do payload de presença, não do prefixo do ID.
   const myIdRef = useRef<string>("");
+  const joiningRef = useRef(false);
+  const mutedRef = useRef(false);
+  const cleanedUpRef = useRef(false);
+
+  const {
+    speaking,
+    setupAnalyser: setupSpeakingAnalyser,
+    startSpeakingLoop,
+    stopSpeakingLoop,
+  } = useSpeakingDetection();
+
+  const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const renegotiateRef = useRef<() => Promise<void>>(async () => {});
+
+  const webrtc = useWebRTC({
+    myIdRef,
+    localStreamRef,
+    screenOn: false,
+    screenQualityRef: { current: "auto" } as React.MutableRefObject<any>,
+    codecModeRef: { current: "sharp" } as React.MutableRefObject<any>,
+    channelRef,
+    remoteAudiosRef: useRef(new Map<string, HTMLAudioElement>()),
+    remoteVideosRef: useRef(new Map<string, HTMLVideoElement>()),
+    analysersRef,
+    prevSpeakingRef: useRef<Record<string, boolean>>({}),
+    audioContextRef,
+    deafened,
+    setError,
+    setPeers,
+    setRemoteStreams,
+    setupAnalyser: setupSpeakingAnalyser,
+    channelId,
+    setParticipants,
+    peersRef,
+  });
+
+  const { createPeer, renegotiate, swapAudioTrack, cleanupPeers } = webrtc;
+  renegotiateRef.current = renegotiate;
+
+  const screenShare = useScreenShare({
+    localStreamRef,
+    peersRef,
+    localVideoRef,
+    renegotiate: useCallback(async () => renegotiateRef.current(), []),
+    setError,
+  });
+
+  const { peerQuality } = useVideoQuality({
+    screenOn: screenShare.screenOn,
+    joined,
+    peers,
+    peersRef,
+    localStreamRef,
+  });
+
+  const { denoise, denoiseActive, toggleDenoise: toggleDenoiseHook, initDenoise, cleanupDenoise } = useNoiseSuppression({
+    localStreamRef,
+    rawStreamRef,
+    swapAudioTrack,
+  });
 
   useEffect(() => {
     if (!myIdRef.current) myIdRef.current = `${username}-${Math.random().toString(36).slice(2, 7)}`;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Retorno local (quadrinho): sincroniza APÓS o <video> montar.
-  // Atribuir srcObject no toggle falha porque o elemento ainda não existe.
   useEffect(() => {
     const v = localVideoRef.current;
     if (!v) return;
-    if (cameraOn || screenOn) {
+    if (cameraOn || screenShare.screenOn) {
       const vt = localStreamRef.current?.getVideoTracks()[0];
       if (vt && (v.srcObject as MediaStream | null)?.getVideoTracks()[0] !== vt) {
         v.srcObject = new MediaStream([vt]);
@@ -104,10 +131,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     } else {
       if (v.srcObject) v.srcObject = null;
     }
-  }, [cameraOn, screenOn, joined]);
+  }, [cameraOn, screenShare.screenOn, joined]);
 
-  // Expandido: liga o <video> ao stream atual (remoto ou local) por efeito,
-  // não por ref-callback — garante attach mesmo quando o stream chega depois.
   useEffect(() => {
     if (!expanded) return;
     const v = expandedVideoRef.current;
@@ -119,69 +144,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       v.srcObject = src;
       v.play().catch(() => {});
     }
-  }, [expanded, remoteStreams, cameraOn, screenOn]);
+  }, [expanded, remoteStreams, cameraOn, screenShare.screenOn]);
 
-  // Leitura real do envio (1/s) enquanto transmite tela
-  useEffect(() => {
-    if (!screenOn) { setSendStats(""); statsPrevRef.current = null; return; }
-    const iv = setInterval(async () => {
-      try {
-        const track = localStreamRef.current?.getVideoTracks()[0];
-        if (!track) return;
-        // Find the peer connection that actually has this video sender
-        let targetPc: RTCPeerConnection | undefined;
-        for (const pc of peersRef.current.values()) {
-          if (pc.getSenders().some((s) => s.track?.kind === "video")) {
-            targetPc = pc;
-            break;
-          }
-        }
-        if (!targetPc) return;
-        const s = await getVideoStats(targetPc, track);
-        if (!s) return;
-        const prev = statsPrevRef.current;
-        statsPrevRef.current = { bytes: s.bytesSent, ts: s.ts };
-        let mbps = "";
-        if (prev && s.ts > prev.ts && s.bytesSent >= prev.bytes) {
-          mbps = (((s.bytesSent - prev.bytes) * 8) / ((s.ts - prev.ts) / 1000) / 1e6).toFixed(1);
-        }
-        setSendStats(`${s.width}x${s.height} @ ${s.fps}fps${mbps ? ` • ${mbps} Mbps` : ""}${s.limitation && s.limitation !== "?" ? ` • limite: ${s.limitation}` : ""}`);
-      } catch {}
-    }, 1000);
-    return () => clearInterval(iv);
-  }, [screenOn]);
-
-  // Stats de qualidade por peer (2/s)
-  useEffect(() => {
-    if (!joined || peers.length === 0) { setPeerQuality({}); return; }
-    const iv = setInterval(async () => {
-      const next: Record<string, { fps: number; bytes: number; limitation?: string }> = {};
-      for (const [peerId, pc] of peersRef.current) {
-        try {
-          const stats = await pc.getStats();
-          stats.forEach((report: any) => {
-            if (report.type === "inbound-rtp" && report.kind === "video") {
-              const prev = peerQualityPrevRef.current.get(peerId);
-              const now = { bytes: report.bytesReceived || 0, ts: report.timestamp };
-              peerQualityPrevRef.current.set(peerId, now);
-              let fps = report.framesPerSecond || 0;
-              let limitation = report.qualityLimitationReason || undefined;
-              if (prev && now.ts > prev.ts && now.bytes >= prev.bytes) {
-                const mbps = ((now.bytes - prev.bytes) * 8 / ((now.ts - prev.ts) / 1000) / 1e6);
-                next[peerId] = { fps, bytes: Math.round(mbps * 100) / 100, limitation };
-              } else {
-                next[peerId] = { fps, bytes: 0, limitation };
-              }
-            }
-          });
-        } catch {}
-      }
-      setPeerQuality(next);
-    }, 2000);
-    return () => clearInterval(iv);
-  }, [joined, peers.length]);
-
-  // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
   const maybeEndCall = (cid?: string | null) => {
     const target = cid || sessionChannelRef.current || channelId;
     supabase
@@ -196,33 +160,22 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const cleanup = () => {
     if (cleanedUpRef.current) return;
     cleanedUpRef.current = true;
-    speakingLoopRef.current = false;
-    if (denoiseRef.current) { try { denoiseRef.current.stop(); } catch {} denoiseRef.current = null; }
-    setDenoiseActive(false);
+    stopSpeakingLoop();
+    cleanupDenoise();
     if (rawStreamRef.current) {
       rawStreamRef.current.getTracks().forEach((t) => t.stop());
       rawStreamRef.current = null;
     }
-    // Unsubscribes channel FIRST to stop presence events before closing PCs
     if (channelRef.current) {
       try { supabase.removeChannel(channelRef.current); } catch {}
       channelRef.current = null;
     }
-    peersRef.current.forEach((pc) => pc.close());
-    peersRef.current.clear();
-    remoteAudiosRef.current.forEach((a) => a.remove());
-    remoteAudiosRef.current.clear();
-    remoteVideosRef.current.forEach((v) => v.remove());
-    remoteVideosRef.current.clear();
-    analysersRef.current.clear();
-    prevSpeakingRef.current = {};
-    if (audioContextRef.current) { try { audioContextRef.current.close(); } catch {} audioContextRef.current = null; }
+    cleanupPeers();
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    setSpeaking({});
     setRemoteStreams({});
     setParticipants(sessionChannelRef.current || channelId, []);
   };
@@ -237,26 +190,10 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     cleanup();
   };
 
-  const setupAnalyser = (id: string, stream: MediaStream) => {
-    try {
-      if (!audioContextRef.current) audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const ctx = audioContextRef.current;
-      if (ctx.state === "suspended") ctx.resume();
-      const source = ctx.createMediaStreamSource(stream);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analysersRef.current.set(id, analyser);
-    } catch {}
-  };
-
   useEffect(() => {
     return () => { cleanupAndLeave(); cleanedUpRef.current = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Só desconecta se ficar sem internet ou fechar o app, NÃO quando ficar invisível
-  // (efeito posicionado após `leave` — usa a função já declarada)
   useEffect(() => {
     const handleOffline = () => {
       if (joined) {
@@ -266,15 +203,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     };
     const handleBeforeUnload = () => {
       if (!joined) return;
-      // Close peer connections immediately so remote peers don't wait 30s+ for ICE timeout
-      peersRef.current.forEach((pc) => { try { pc.close(); } catch {} });
-      peersRef.current.clear();
-      remoteAudiosRef.current.forEach((a) => a.remove());
-      remoteAudiosRef.current.clear();
-      // sendBeacon can't do DELETE with auth headers, so we rely on
-      // Supabase's heartbeat timeout to clean up the session row.
-      // The DB cleanup is best-effort anyway — the local cleanup above
-      // ensures remote peers see the departure quickly via presence.
+      cleanupPeers();
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -283,109 +212,6 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [joined, channelId, supabase]);
-
-  const createPeer = (peerId: string, isInitiator: boolean) => {
-    if (peersRef.current.has(peerId)) return peersRef.current.get(peerId)!;
-    const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
-    peersRef.current.set(peerId, pc);
-
-    // Sempre adiciona tracks locais (áudio + vídeo/tela) — necessário tanto
-    // para quem inicia quanto para quem responde, senão o novo peer não recebe tela.
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach((track) => {
-        try {
-          pc.addTrack(track, localStreamRef.current!);
-        } catch {}
-        if (track.kind === "video") {
-          tuneVideoSender(pc, track, { screen: screenOn, maxBitrate: videoBitrateFor(screenQualityRef.current) }).catch(() => {});
-        }
-      });
-    }
-
-    pc.onicecandidate = (e) => {
-      if (e.candidate && channelRef.current) {
-        channelRef.current.send({
-          type: "broadcast",
-          event: "ice",
-          payload: { from: myIdRef.current, to: peerId, candidate: e.candidate },
-        });
-      }
-    };
-
-    pc.ontrack = (e) => {
-      if (e.track.kind === "audio") {
-        let audio = remoteAudiosRef.current.get(peerId);
-        if (!audio) {
-          audio = document.createElement("audio");
-          (audio as any).playsInline = true;
-          document.body.appendChild(audio);
-          remoteAudiosRef.current.set(peerId, audio);
-        }
-        audio.srcObject = e.streams[0];
-        audio.muted = deafened;
-        audio.play().catch(() => {
-          setError("Clique em qualquer lugar para ativar o áudio");
-        });
-        setupAnalyser(peerId, e.streams[0]);
-      }
-      if (e.track.kind === "video") {
-        setRemoteStreams((prev) => ({ ...prev, [peerId]: e.streams[0] }));
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "connected") {
-        // Diagnóstico (F12): host = direto, srflx = via STUN, relay = via TURN
-        pc.getStats().then((stats) => {
-          stats.forEach((r: any) => {
-            if (r.type === "candidate-pair" && (r.state === "succeeded" || r.nominated)) {
-              const local = (stats as any).get?.(r.localCandidateId);
-              console.log(`[voz] peer ${peerId} conectado via ${local?.candidateType || "?"}`);
-            }
-          });
-        }).catch(() => {});
-        return;
-      }
-      if (pc.connectionState === "failed") {
-        // 1ª falha: tenta ICE restart (troca de rede, NAT). Só remove o peer se falhar de novo.
-        const retries = Number((pc as any).__iceRestarts || 0);
-        if (retries < 1) {
-          (pc as any).__iceRestarts = retries + 1;
-          pc.restartIce();
-          if (peersRef.current.has(peerId)) {
-            pc.createOffer({ iceRestart: true }).then(async (offer) => {
-              await pc.setLocalDescription(offer);
-              channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
-            }).catch(() => {});
-          }
-          return;
-        }
-        if (!hasTurnConfigured()) {
-          setError("Conexão de voz falhou (NAT restrito?). Sem TURN configurado, alguns pares não conectam — avise o admin.");
-        }
-        pc.close();
-        peersRef.current.delete(peerId);
-        remoteAudiosRef.current.get(peerId)?.remove();
-        remoteAudiosRef.current.delete(peerId);
-        remoteVideosRef.current.get(peerId)?.remove();
-        remoteVideosRef.current.delete(peerId);
-        setRemoteStreams((prev) => {
-          const n = { ...prev };
-          delete n[peerId];
-          return n;
-        });
-        setPeers((p) => p.filter((x) => x.id !== peerId));
-      }
-    };
-
-    if (isInitiator) {
-      pc.createOffer().then(async (offer) => {
-        await pc.setLocalDescription(offer);
-        channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
-      });
-    }
-    return pc;
-  };
 
   const testMic = async () => {
     setError("Testando microfone...");
@@ -401,63 +227,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     }
   };
 
-  // Troca a trilha de áudio enviada sem renegociar (usado pelo toggle de denoise)
-  const swapAudioTrack = async (track: MediaStreamTrack | null) => {
-    if (!track) return;
-    track.enabled = !mutedRef.current;
-    for (const pc of peersRef.current.values()) {
-      const sender = pc.getSenders().find((s) => s.track?.kind === "audio");
-      if (sender) {
-        try { await sender.replaceTrack(track); } catch {}
-      }
-    }
-  };
-
-  const toggleDenoise = async () => {
-    if (!joined || !rawStreamRef.current) {
-      setError("Entre na voz com microfone para usar a supressão de ruído.");
-      return;
-    }
-    // Decisão pelo grafo real (denoiseRef), não por estado visual — nunca trava
-    if (denoiseRef.current) {
-      try { denoiseRef.current.stop(); } catch {}
-      denoiseRef.current = null;
-      const track = rawStreamRef.current.getAudioTracks()[0] || null;
-      if (localStreamRef.current && track) {
-        localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
-        localStreamRef.current.addTrack(track);
-      }
-      await swapAudioTrack(track);
-      setDenoise(false);
-      setDenoiseActive(false);
-      console.log("[voz] RNNoise desativado (mic cru)");
-      return;
-    }
-    setDenoise(true);
-    try {
-      const { createDenoiser } = await import("@/lib/noise");
-      const d = await createDenoiser(rawStreamRef.current);
-      denoiseRef.current = d;
-      const track = d.output.getAudioTracks()[0] || null;
-      if (localStreamRef.current && track) {
-        localStreamRef.current.getAudioTracks().forEach((t) => { try { localStreamRef.current?.removeTrack(t); } catch {} });
-        localStreamRef.current.addTrack(track);
-      }
-      await swapAudioTrack(track);
-      setDenoiseActive(true);
-      console.log("[voz] RNNoise ativado");
-    } catch (e: any) {
-      console.warn("[voz] falha ao ativar RNNoise, mantendo mic cru", e);
-      setDenoise(false);
-      setDenoiseActive(false);
-      setError("RNNoise falhou (" + (e?.message || e) + "). Mic do navegador em uso.");
-    }
-  };
-
   const join = async (asListener = false) => {
     if (joiningRef.current) return;
     joiningRef.current = true;
-    // Já estou em outra chamada? Sai dela primeiro e entra nesta
     if (joined && sessionChannelRef.current && sessionChannelRef.current !== channelId) {
       await leave();
     }
@@ -471,38 +243,20 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       if (!asListener) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("Navegador sem suporte a microfone. Use Chrome/Edge/Firefox em HTTPS.");
         try {
-          // Com RNNoise ativo, desliga o supressor do navegador (duplo = áudio ruim)
           stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: !denoise, autoGainControl: true }, video: false });
         } catch (e: any) {
           if (e.name === "NotFoundError") {
             setError("Sem microfone, entrando como ouvinte. Voce ouve mas nao fala. Plugue um mic para falar.");
-            // entra como ouvinte sem stream
           } else throw e;
         }
       }
       localStreamRef.current = stream;
       rawStreamRef.current = stream;
-      // RNNoise: troca o mic cru pelo tratado antes de negociar com os peers
-      if (stream && denoise) {
-        try {
-          const { createDenoiser } = await import("@/lib/noise");
-          const d = await createDenoiser(stream);
-          denoiseRef.current = d;
-          const clean = d.output.getAudioTracks()[0];
-          if (clean) {
-            localStreamRef.current = d.output;
-            setDenoiseActive(true);
-            console.log("[voz] RNNoise ativado");
-          }
-        } catch (e) {
-          console.warn("[voz] RNNoise indisponível, usando mic do navegador", e);
-          setDenoise(false);
-          setDenoiseActive(false);
-        }
-      } else {
-        setDenoiseActive(false);
+      if (stream) await initDenoise(stream);
+      else {
+        // denoise state managed by hook
       }
-      if (localStreamRef.current) setupAnalyser("local", localStreamRef.current);
+      if (localStreamRef.current) setupSpeakingAnalyser("local", localStreamRef.current, audioContextRef, analysersRef);
       if (channelRef.current) { try { supabase.removeChannel(channelRef.current); } catch {} channelRef.current = null; }
       const ch = supabase.channel(`voice:${channelId}`, { config: { presence: { key: myIdRef.current }, broadcast: { self: false } } });
       channelRef.current = ch;
@@ -510,19 +264,16 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       ch.on("broadcast", { event: "offer" }, async ({ payload }: any) => {
         if (payload.to !== myIdRef.current) return;
         const pc = createPeer(payload.from, false);
-        // Negociação educada: id menor cede (rollback) em caso de oferta simultânea (glare)
         const polite = myIdRef.current < payload.from;
         try {
-          if (pc.signalingState !== "stable") {
+          if (pc!.signalingState !== "stable") {
             if (!polite) return;
-            // Se estamos compartilhando tela, NÃO cedemos — nossa offer tem o track de tela.
-            // Se cedermos, o outro peer recebe offer sem tela e o share some.
-            if (screenOn) return;
-            await pc.setLocalDescription({ type: "rollback" });
+            if (screenShare.screenOn) return;
+            await pc!.setLocalDescription({ type: "rollback" });
           }
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
+          await pc!.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+          const answer = await pc!.createAnswer();
+          await pc!.setLocalDescription(answer);
           ch.send({ type: "broadcast", event: "answer", payload: { from: myIdRef.current, to: payload.from, sdp: answer } });
         } catch (e) {
           console.warn(`[voz] oferta de ${payload.from} ignorada (glare resolvido pelo outro lado)`);
@@ -533,7 +284,6 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         if (payload.to !== myIdRef.current) return;
         const pc = peersRef.current.get(payload.from);
         if (!pc) return;
-        // Resposta tardia/duplicada fora de hora: ignora em vez de estourar
         if (pc.signalingState !== "have-local-offer") return;
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
@@ -548,15 +298,12 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         if (!pc || !payload.candidate) return;
         try {
           await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-        } catch {
-          // Candidato chegou antes da descrição remota; o ICE restart cobre a recuperação
-        }
+        } catch {}
       });
 
       ch.on("presence", { event: "sync" }, () => {
         if (cleanedUpRef.current) return;
         const state: any = ch.presenceState();
-        // Nome E foto vêm do payload de presença (não do prefixo do ID — o ID é estável)
         const seen = new Map<string, { username: string; avatar: string }>();
         Object.values(state).forEach((arr: any) =>
           (arr as any[]).forEach((p: any) => {
@@ -573,17 +320,6 @@ export default function VoiceChannel({ channelId, username, status, channelName,
           if (!ids.includes(id)) {
             peersRef.current.get(id)?.close();
             peersRef.current.delete(id);
-            remoteAudiosRef.current.get(id)?.remove();
-            remoteAudiosRef.current.delete(id);
-            remoteVideosRef.current.get(id)?.remove();
-            remoteVideosRef.current.delete(id);
-            analysersRef.current.delete(id);
-            delete prevSpeakingRef.current[id];
-            setRemoteStreams((prev) => {
-              const n = { ...prev };
-              delete n[id];
-              return n;
-            });
           }
         });
         const peerList = ids.map((id) => ({ id, username: seen.get(id)?.username || id.split("-")[0], avatar: seen.get(id)?.avatar || "😎" }));
@@ -596,9 +332,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
           await ch.track({ id: myIdRef.current, username, avatar: avatar || "😎" });
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            // Remove sessão fantasma anterior
             await supabase.from("voice_sessions").delete().eq("channel_id", channelId).eq("user_id", user.id);
-            // Primeiro a entrar abre a chamada (início do timer); quem chega depois não mexe
             const { count } = await supabase.from("voice_sessions").select("user_id", { count: "exact", head: true }).eq("channel_id", channelId);
             if (!count) {
               await supabase.from("voice_calls").upsert({ channel_id: channelId, started_at: new Date().toISOString() }, { onConflict: "channel_id" });
@@ -606,27 +340,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
             await supabase.from("voice_sessions").upsert({ channel_id: channelId, user_id: user.id, username, joined_at: new Date().toISOString() }, { onConflict: "channel_id,user_id" });
           }
           setJoined(true);
-          // loop de detecção de voz com histerese para não piscar
-          speakingLoopRef.current = true;
-          const checkSpeaking = () => {
-            if (!speakingLoopRef.current || !channelRef.current) return;
-            const next: Record<string, boolean> = {};
-            analysersRef.current.forEach((analyser, id) => {
-              const data = new Uint8Array(analyser.frequencyBinCount);
-              analyser.getByteFrequencyData(data);
-              const avg = data.reduce((a, b) => a + b, 0) / data.length;
-              const wasSpeaking = prevSpeakingRef.current[id] || false;
-              // histerese: 14 para começar a falar, 8 para parar
-              next[id] = wasSpeaking ? avg > 8 : avg > 14;
-            });
-            const changed = Object.keys(next).some((k) => next[k] !== prevSpeakingRef.current[k]) || Object.keys(prevSpeakingRef.current).some((k) => !(k in next));
-            if (changed) {
-              prevSpeakingRef.current = next;
-              setSpeaking(next);
-            }
-            setTimeout(() => requestAnimationFrame(checkSpeaking), 80);
-          };
-          requestAnimationFrame(checkSpeaking);
+          startSpeakingLoop(analysersRef, channelRef);
         }
       });
     } catch (e: any) {
@@ -653,21 +367,13 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     setPeers([]);
     setExpanded(null);
     setCameraOn(false);
-    setScreenOn(false);
-    setScreenQuality("auto");
-    screenQualityRef.current = "auto";
-    setCodecMode("sharp");
-    codecModeRef.current = "sharp";
+    screenShare.cleanupScreen();
     setMuted(false);
     setDeafened(false);
-    setDenoiseActive(false);
-    setSendStats("");
   };
 
-  // Mantém a ref sempre apontando para o `leave` mais recente (usada pelo listener offline)
   useEffect(() => { leaveRef.current = leave; mutedRef.current = muted; });
 
-  // Desktop (.exe): push-to-talk global alterna o mute + menu do tray pode derrubar a call
   useEffect(() => {
     if (!window.wellcord) return;
     const offPtt = window.wellcord.ptt.onPress(() => {
@@ -681,7 +387,6 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       if (action === "leave") leaveRef.current();
     });
     return () => { offPtt(); offCtl(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleHideVideo = (peerId: string) => {
@@ -709,17 +414,14 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const toggleDeafen = () => {
     const v = !deafened;
     setDeafened(v);
-    remoteAudiosRef.current.forEach((a) => (a.muted = v));
     if (localStreamRef.current) localStreamRef.current.getAudioTracks().forEach((t) => (t.enabled = v ? false : !mutedRef.current));
     if (v && !mutedRef.current) { mutedRef.current = true; setMuted(true); }
   };
 
-  // Publica status + controles no contexto (painel de voz no rodapé)
   useEffect(() => {
     controlsRef.current = { toggleMute, toggleDeafen, leave };
   });
   useEffect(() => {
-    // Nomes só quando em tela (navegar manda undefined — mantém os da sessão)
     setVoiceStatus({
       joined,
       channelId: sessionChannel || channelId,
@@ -728,30 +430,15 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       muted,
       deafened,
     } as any);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joined, muted, deafened, sessionChannel, channelId]);
-
-  const renegotiate = async () => {
-    for (const [peerId, pc] of peersRef.current) {
-      if (pc.signalingState !== "stable") continue;
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        channelRef.current?.send({ type: "broadcast", event: "offer", payload: { from: myIdRef.current, to: peerId, sdp: offer } });
-      } catch (e) {
-        console.warn(`[voz] renegotiation with ${peerId} failed:`, e);
-      }
-    }
-  };
 
   const toggleCamera = async () => {
     if (cameraOn) {
-      // Remove apenas tracks de câmera (não de tela)
       localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
       peersRef.current.forEach((pc) => {
         pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
       });
-      if (localVideoRef.current && !screenOn) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
+      if (localVideoRef.current && !screenShare.screenOn) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
       setCameraOn(false);
       await renegotiate();
       return;
@@ -761,168 +448,20 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       const track = stream.getVideoTracks()[0];
       if (!localStreamRef.current) localStreamRef.current = new MediaStream();
       localStreamRef.current.addTrack(track);
-      if (localVideoRef.current && !screenOn) {
+      if (localVideoRef.current && !screenShare.screenOn) {
         localVideoRef.current.srcObject = new MediaStream([track]);
         await localVideoRef.current.play().catch(() => {});
       }
       peersRef.current.forEach((pc) => {
         pc.addTrack(track, localStreamRef.current!);
-        tuneVideoSender(pc, track, { screen: false, maxBitrate: VIDEO_BITRATE.camera }).catch(() => {});
       });
       setCameraOn(true);
       await renegotiate();
     } catch (e: any) { setError(e.message); }
   };
 
-  const applyScreenQuality = async (track: MediaStreamTrack, q: ScreenQuality) => {
-    const dims = qualityDims(q);
-    if (!dims) return;
-    const [w, h, fps] = dims;
-    try {
-      await track.applyConstraints({ width: { ideal: w }, height: { ideal: h }, frameRate: { ideal: fps } });
-      console.log(`[voz] tela em ~${q}`);
-    } catch (e) {
-      console.warn("[voz] navegador recusou a qualidade pedida, mantendo original", e);
-    }
-  };
+  const toggleDenoiseUI = () => toggleDenoiseHook(joined, setError);
 
-  const changeCodecMode = async (mode: CodecMode) => {
-    setCodecMode(mode);
-    codecModeRef.current = mode;
-    const track = localStreamRef.current?.getVideoTracks()[0];
-    if (!screenOn || !track) return;
-    for (const pc of peersRef.current.values()) {
-      await tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: mode, fps: qualityDims(screenQualityRef.current)?.[2] }).catch(() => {});
-    }
-    await renegotiate();
-    console.log(`[voz] codec tela: ${mode}`);
-  };
-
-  const changeScreenQuality = async (q: ScreenQuality) => {
-    setScreenQuality(q);
-    screenQualityRef.current = q;
-    const track = localStreamRef.current?.getVideoTracks()[0];
-    if (screenOn && track) {
-      await applyScreenQuality(track, q);
-      // Reaplica o teto de bitrate + fps nos senders ativos
-      const bitrate = videoBitrateFor(q);
-      const fps = qualityDims(q)?.[2];
-      for (const pc of peersRef.current.values()) {
-        const sender = pc.getSenders().find((s) => s.track === track);
-        if (sender) {
-          try {
-            const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
-            params.encodings[0].maxBitrate = bitrate;
-            if (fps) {
-              (params.encodings[0] as any).maxFramerate = fps;
-              (params.encodings[0] as any).scalabilityMode = "L1T3";
-            }
-            await sender.setParameters(params);
-          } catch {}
-        }
-      }
-    }
-  };
-
-  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
-
-  const stopScreen = async () => {
-    // Remove apenas a track de tela, mantém câmera
-    const screenTrack = screenTrackRef.current;
-    if (screenTrack) {
-      screenTrack.stop();
-      try { localStreamRef.current?.removeTrack(screenTrack); } catch {}
-      peersRef.current.forEach((pc) => {
-        pc.getSenders().filter((s) => s.track === screenTrack).forEach((s) => { try { pc.removeTrack(s); } catch {} });
-      });
-      screenTrackRef.current = null;
-    }
-    // Se câmera está ligada, volta para ela; senão limpa
-    if (cameraOn) {
-      const camTrack = localStreamRef.current?.getVideoTracks()[0];
-      if (camTrack && localVideoRef.current) {
-        localVideoRef.current.srcObject = new MediaStream([camTrack]);
-        localVideoRef.current.play().catch(() => {});
-      }
-    } else if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null;
-      localVideoRef.current.pause();
-    }
-    setScreenOn(false);
-    await renegotiate();
-  };
-
-  // Picker do .exe: avisa o main qual fonte usar e chama o getDisplayMedia padrão
-  // (caminho estável — sem constraints legacy que derrubam o renderer)
-  const pickAndShare = async (sourceId: string) => {
-    setShowScreenPicker(false);
-    try {
-      await window.wellcord?.screens?.pick(sourceId);
-    } catch {}
-    pickedRef.current = true;
-    await toggleScreen();
-  };
-
-  const attachScreenTrack = async (track: MediaStreamTrack, audioTrack: MediaStreamTrack | null) => {
-    await applyScreenQuality(track, screenQualityRef.current);
-    if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-    // Não remove câmera — permite câmera + tela simultâneos
-    screenTrackRef.current = track;
-    localStreamRef.current.addTrack(track);
-    if (audioTrack) { try { localStreamRef.current.addTrack(audioTrack); } catch {} }
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = new MediaStream([track]);
-      await localVideoRef.current.play().catch(() => {});
-    }
-    peersRef.current.forEach((pc) => {
-      pc.addTrack(track, localStreamRef.current!);
-      tuneVideoSender(pc, track, { screen: true, maxBitrate: videoBitrateFor(screenQualityRef.current), codec: codecModeRef.current, fps: qualityDims(screenQualityRef.current)?.[2] }).catch(() => {});
-    });
-    if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
-    track.onended = () => stopScreen();
-    setScreenOn(true);
-    await renegotiate();
-  };
-
-  const toggleScreen = async () => {
-    if (screenOn) {
-      await stopScreen();
-      return;
-    }
-    // No .exe: abre o seletor próprio (o main entrega a fonte ao getDisplayMedia)
-    if (window.wellcord?.screens && !pickedRef.current) {
-      setScreenSources(null);
-      setShowScreenPicker(true);
-      try {
-        const list = await window.wellcord.screens.list();
-        setScreenSources(list);
-      } catch {
-        setScreenSources([]);
-      }
-      return;
-    }
-    pickedRef.current = false;
-    // Navegador: seletor do OS
-    try {
-      // Pede fps já na captura (o navegador reduz sozinho em tela parada)
-      const dims = qualityDims(screenQualityRef.current);
-      const videoReq: any = { displaySurface: "monitor" };
-      if (dims) {
-        videoReq.width = { ideal: dims[0] };
-        videoReq.height = { ideal: dims[1] };
-        videoReq.frameRate = { ideal: dims[2], max: dims[2] };
-      }
-      const stream: any = await (navigator.mediaDevices as any).getDisplayMedia({ video: videoReq, audio: true });
-      const track = stream.getVideoTracks()[0];
-      const audioTrack = stream.getAudioTracks()[0];
-      await attachScreenTrack(track, audioTrack || null);
-    } catch (e: any) {
-      if (e.name !== "NotAllowedError") setError(e.message);
-    }
-  };
-
-  // Vendo outro canal no meio da chamada: oferece trocar (a sessão segue viva)
   if (joined && sessionChannel && sessionChannel !== channelId) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
@@ -964,29 +503,26 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-bold flex items-center gap-2"><Volume2 className="w-5 h-5" /> Conectado — {peers.length + 1} no canal</h2>
         <div className="flex items-center gap-2">
-          {screenOn && (
+          {screenShare.screenOn && (
             <div className="flex items-center gap-1 bg-[#232428] rounded-full p-1 flex-wrap justify-end" title="Qualidade da transmissão de tela (aplica ao vivo)">
               {SCREEN_QUALITIES.map((q) => (
                 <button
                   key={q}
-                  onClick={() => changeScreenQuality(q)}
-                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenQuality === q ? "bg-[#5865F2] text-white" : "text-zinc-400 hover:text-white"}`}
+                  onClick={() => screenShare.changeScreenQuality(q)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenShare.screenQuality === q ? "bg-[#5865F2] text-white" : "text-zinc-400 hover:text-white"}`}
                 >
                   {qualityLabel(q)}
                 </button>
               ))}
               <span className="w-px h-4 bg-[#3F4147] mx-1" />
               <button
-                onClick={() => changeCodecMode(codecMode === "sharp" ? "smooth" : "sharp")}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${codecMode === "smooth" ? "bg-[#23A559] text-white" : "bg-[#2B2D31] text-zinc-400 hover:text-white"}`}
-                title={codecMode === "sharp" ? "VP9 nítido (CPU). Clique p/ H264 fluido (GPU)." : "H264 fluido via hardware. Clique p/ VP9 nítido."}
+                onClick={() => screenShare.changeCodecMode(screenShare.codecMode === "sharp" ? "smooth" : "sharp")}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors whitespace-nowrap ${screenShare.codecMode === "smooth" ? "bg-[#23A559] text-white" : "bg-[#2B2D31] text-zinc-400 hover:text-white"}`}
+                title={screenShare.codecMode === "sharp" ? "VP9 nítido (CPU). Clique p/ H264 fluido (GPU)." : "H264 fluido via hardware. Clique p/ VP9 nítido."}
               >
-                {codecMode === "sharp" ? "Nítido" : "Fluido"}
+                {screenShare.codecMode === "sharp" ? "Nítido" : "Fluido"}
               </button>
             </div>
-          )}
-          {screenOn && sendStats && (
-            <span className="text-[11px] font-mono text-zinc-500 whitespace-nowrap" title="Resolução, fps, bitrate real e gargalo (bandwidth/cpu/rede)">📡 {sendStats}</span>
           )}
           <button onClick={leave} className="bg-[#DA373C] hover:bg-[#A12828] text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2"><PhoneOff className="w-4 h-4" /> Sair</button>
         </div>
@@ -996,7 +532,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         const isLocal = expanded === "local";
         const remote = !isLocal ? remoteStreams[expanded] : null;
         const hasRemoteVideo = !!remote && remote.getVideoTracks().some((t) => t.readyState === "live") && !hiddenVideo[expanded];
-        const showVideo = isLocal ? (cameraOn || screenOn) : hasRemoteVideo;
+        const showVideo = isLocal ? (cameraOn || screenShare.screenOn) : hasRemoteVideo;
         const peer = !isLocal ? peers.find((p) => p.id === expanded) : null;
         return (
           <div ref={expandedRef} className="w-full h-[48vh] min-h-[300px] bg-black rounded-lg overflow-hidden relative group shrink-0">
@@ -1025,12 +561,12 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         return <div className={`grid ${gridClass} gap-3`}>
         <div onClick={() => setExpanded("local")} className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"} ${expanded === "local" ? "ring-2 ring-[#5865F2]" : ""}`}>
           <div className="w-full aspect-video bg-black rounded overflow-hidden relative group">
-            {screenOn ? (
+            {screenShare.screenOn ? (
               <>
                 <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 {cameraOn && <video ref={(el) => {
                   if (el) {
-                    const camTrack = localStreamRef.current?.getVideoTracks().find(t => t !== screenTrackRef.current);
+                    const camTrack = localStreamRef.current?.getVideoTracks().find(t => t !== screenShare.screenTrackRef.current);
                     if (camTrack && (!el.srcObject || (el.srcObject as MediaStream).getVideoTracks()[0] !== camTrack)) {
                       el.srcObject = new MediaStream([camTrack]);
                       el.play().catch(() => {});
@@ -1045,7 +581,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
                 <Avatar src={avatar} name={username} className="w-16 h-16 rounded-full text-3xl" />
               </div>
             )}
-            <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{username} (você) {screenOn && cameraOn ? "• Tela + Câmera" : screenOn ? "• Tela" : cameraOn ? "• Câmera" : ""}</span>
+            <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{username} (você) {screenShare.screenOn && cameraOn ? "• Tela + Câmera" : screenShare.screenOn ? "• Tela" : cameraOn ? "• Câmera" : ""}</span>
             <Maximize2 className="absolute top-1 right-1 w-3 h-3 text-white opacity-0 group-hover:opacity-100" />
           </div>
           <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : speaking["local"] ? "bg-[#23A559] animate-pulse" : "bg-zinc-600"} text-white`}>{muted ? "Mutado" : speaking["local"] ? "Falando..." : "Conectado"}</span>
@@ -1101,23 +637,23 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         <button onClick={toggleCamera} className={`w-11 h-11 rounded-full flex items-center justify-center ${cameraOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={cameraOn ? "Desligar câmera" : "Ligar câmera"}>
           {cameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </button>
-        <button onClick={() => toggleScreen()} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={screenOn ? "Parar tela" : "Compartilhar tela"}>
-          {screenOn ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+        <button onClick={() => screenShare.toggleScreen(cameraOn)} className={`w-11 h-11 rounded-full flex items-center justify-center ${screenShare.screenOn ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={screenShare.screenOn ? "Parar tela" : "Compartilhar tela"}>
+          {screenShare.screenOn ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
         </button>
         <button onClick={toggleDeafen} className={`w-11 h-11 rounded-full flex items-center justify-center ${deafened ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title="Surdo">
           <Headphones className="w-5 h-5" />
         </button>
-        <button onClick={toggleDenoise} className={`w-11 h-11 rounded-full flex items-center justify-center ${denoiseActive ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={denoiseActive ? "Supressão de ruído RNNoise ATIVADA (clique p/ desligar)" : "Supressão de ruído desligada (clique p/ ativar RNNoise)"}>
+        <button onClick={toggleDenoiseUI} className={`w-11 h-11 rounded-full flex items-center justify-center ${denoiseActive ? "bg-[#23A559] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={denoiseActive ? "Supressão de ruído RNNoise ATIVADA (clique p/ desligar)" : "Supressão de ruído desligada (clique p/ ativar RNNoise)"}>
           <Waves className="w-5 h-5" />
         </button>
         <button onClick={leave} className="w-11 h-11 rounded-full bg-[#DA373C] hover:bg-[#A12828] text-white flex items-center justify-center"><PhoneOff className="w-5 h-5" /></button>
       </div>
       <p className="text-xs text-zinc-500 text-center">Dica: mutar/desmutar rápido. P2P mesh — funciona melhor com até 4 pessoas sem servidor TURN.{denoiseActive ? " RNNoise ligado: fundo suprimido por IA local." : ""}</p>
-      {showScreenPicker && (
+      {screenShare.showScreenPicker && (
         <ScreenPickerModal
-          sources={screenSources}
-          onPick={(id) => pickAndShare(id)}
-          onClose={() => setShowScreenPicker(false)}
+          sources={screenShare.screenSources}
+          onPick={(id) => screenShare.pickAndShare(id, cameraOn)}
+          onClose={() => screenShare.setShowScreenPicker(false)}
         />
       )}
     </div>
