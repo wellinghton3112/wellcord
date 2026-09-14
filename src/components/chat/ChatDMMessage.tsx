@@ -3,6 +3,8 @@ import React from "react";
 import { Pencil, Trash2, Smile, Reply } from "lucide-react";
 import type { DMMessage, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
+import { LinkEmbed } from "@/components/LinkEmbed";
+import { extractUrls } from "@/lib/links";
 import { ReactionBar, EmojiPicker, QuoteBlock, AttachmentBlock, mentionize } from "./ChatMessage";
 
 type ChatDMMessageProps = {
@@ -39,6 +41,7 @@ export const ChatDMMessage = React.memo(function ChatDMMessage({ msg, userId, us
         <div className="flex items-baseline gap-2"><button onClick={() => onViewProfile(msg.sender_id)} className="font-medium text-sm hover:underline" style={{ color: isMine ? "#5865F2" : "#FEE75C" }}>{msg.username}</button><span className="text-xs text-zinc-500">{new Date(msg.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span></div>
         <QuoteBlock user={msg.reply_user} content={msg.reply_content} targetId={msg.reply_to} scrollToMsg={scrollToMsg} />
         {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] text-[#DBDEE1] break-words">{searchQuery ? highlight(msg.content) : mentionize(msg.content)}</p>}
+        {editingId !== msg.id && !msg.file_url && extractUrls(msg.content).slice(0, 3).map((url) => <LinkEmbed key={url} url={url} />)}
         {editingId !== msg.id && <AttachmentBlock url={msg.file_url} name={msg.file_name} type={msg.file_type} />}
         {editingId !== msg.id && <ReactionBar list={dmReactions[msg.id]} toggle={(e) => onToggleReaction(msg.id, e)} />}
         {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}

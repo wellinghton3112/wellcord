@@ -3,6 +3,8 @@ import React from "react";
 import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Download } from "lucide-react";
 import type { Message, Reaction, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
+import { LinkEmbed } from "@/components/LinkEmbed";
+import { extractUrls } from "@/lib/links";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 
 type ChatMessageProps = {
@@ -210,6 +212,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
         </div>
         <QuoteBlock user={msg.reply_user} content={msg.reply_content} targetId={msg.reply_to} scrollToMsg={scrollToMsg} />
         {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{searchQuery ? highlight(msg.content) : mentionizeFn(msg.content)}</p>}
+        {editingId !== msg.id && !msg.file_url && extractUrls(msg.content).slice(0, 3).map((url) => <LinkEmbed key={url} url={url} />)}
         {editingId !== msg.id && <AttachmentBlock url={msg.file_url} name={msg.file_name} type={msg.file_type} />}
         {editingId !== msg.id && <ReactionBar list={reactions[msg.id]} toggle={(e) => onToggleReaction(msg.id, e)} />}
         {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
