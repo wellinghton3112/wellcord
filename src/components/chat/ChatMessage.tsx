@@ -4,6 +4,7 @@ import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Downloa
 import type { Message, Reaction, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
 import { LinkEmbed } from "@/components/LinkEmbed";
+import { useLightbox } from "@/components/ImageLightbox";
 import { extractUrls } from "@/lib/links";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 
@@ -98,15 +99,16 @@ export function ReplyPreview({ target, clear }: { target: ReplyTarget | null; cl
 }
 
 export function AttachmentBlock({ url, name, type }: { url?: string | null; name?: string | null; type?: string | null }) {
+  const openLightbox = useLightbox((s) => s.open);
   if (!url) return null;
   const kind = (type || "").toLowerCase();
   const isImage = kind.startsWith("image/");
   const isAudio = kind.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|opus|flac|aac)$/i.test(name || "");
   if (isImage) {
     return (
-      <a href={url} target="_blank" rel="noreferrer" className="mt-1 block max-w-sm">
+      <button type="button" onClick={() => openLightbox([url], 0)} className="mt-1 block max-w-sm cursor-pointer">
         <img src={url} alt={name || "anexo"} className="max-h-64 rounded-lg object-cover border border-[#4A4D53] hover:brightness-110 transition" />
-      </a>
+      </button>
     );
   }
   if (isAudio) {

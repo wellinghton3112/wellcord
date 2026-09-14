@@ -27,6 +27,7 @@ import { useRoles } from "@/hooks/useRoles";
 import Toaster from "@/components/Toaster";
 import { toast as uiToast } from "@/lib/ui";
 import { VoiceProvider } from "@/context/VoiceContext";
+import { ImageLightbox } from "@/components/ImageLightbox";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { usePresence } from "@/hooks/usePresence";
@@ -555,6 +556,7 @@ export default function DiscordClone() {
         />
       )}
       <Toaster />
+      <ImageLightbox />
     </div>
     </VoiceProvider>
   );

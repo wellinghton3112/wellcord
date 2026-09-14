@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { ExternalLink, Globe } from "lucide-react";
+import { useLightbox } from "@/components/ImageLightbox";
 
 type EmbedData = {
   url: string;
@@ -43,28 +44,28 @@ export function useLinkEmbed(url: string | null): EmbedData | null {
 
 export function LinkEmbed({ url }: { url: string }) {
   const data = useLinkEmbed(url);
+  const openLightbox = useLightbox((s) => s.open);
   if (!data || (!data.title && !data.description && !data.image)) return null;
 
   const hostname = (() => { try { return new URL(url).hostname; } catch { return url; } })();
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="mt-1.5 block max-w-md rounded-lg border border-[#4A4D53] bg-[#2B2D31] overflow-hidden hover:bg-[#35373C] transition-colors group"
-    >
+    <div className="mt-1.5 max-w-md rounded-lg border border-[#4A4D53] bg-[#2B2D31] overflow-hidden group">
       {data.image && (
-        <div className="h-36 w-full overflow-hidden bg-[#1E1F22]">
+        <button
+          type="button"
+          onClick={() => openLightbox([data.image!], 0)}
+          className="h-36 w-full overflow-hidden bg-[#1E1F22] block cursor-pointer"
+        >
           <img
             src={data.image}
             alt={data.title || hostname}
             className="w-full h-full object-cover group-hover:brightness-110 transition"
             onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
           />
-        </div>
+        </button>
       )}
-      <div className="px-3 py-2">
+      <a href={url} target="_blank" rel="noreferrer" className="block px-3 py-2 hover:bg-[#35373C] transition-colors">
         {data.siteName && (
           <div className="flex items-center gap-1.5 mb-1">
             {data.favicon ? (
@@ -85,7 +86,7 @@ export function LinkEmbed({ url }: { url: string }) {
           <ExternalLink className="w-3 h-3" />
           <span className="truncate">{hostname}</span>
         </div>
-      </div>
-    </a>
+      </a>
+    </div>
   );
 }
