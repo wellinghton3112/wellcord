@@ -18,6 +18,7 @@ export type Message = {
   file_name?: string | null;
   file_type?: string | null;
   mentions?: string[];
+  metadata?: Record<string, any> | null;
 };
 
 export type Channel = {

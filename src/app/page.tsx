@@ -17,6 +17,7 @@ import MembersModal from "@/components/modals/MembersModal";
 import PinsModal from "@/components/modals/PinsModal";
 import PollModal from "@/components/modals/PollModal";
 import RolesModal from "@/components/modals/RolesModal";
+import WebhooksModal from "@/components/modals/WebhooksModal";
 import ProfileCard, { type CardProfile } from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useFriends } from "@/hooks/useFriends";
@@ -74,6 +75,7 @@ export default function DiscordClone() {
   const { polls, createPoll, toggleVote, deletePoll } = usePolls(supabase, user, username, selectedChannel);
   const [showPollModal, setShowPollModal] = useState(false);
   const [showRolesModal, setShowRolesModal] = useState(false);
+  const [showWebhooksModal, setShowWebhooksModal] = useState(false);
 
   const jumpToMessage = async (id: string) => {
     setShowPinsModal(false);
@@ -352,6 +354,7 @@ export default function DiscordClone() {
         onViewProfile={openProfile}
         onOpenMembers={() => setShowMembersModal(true)}
         onOpenRoles={() => setShowRolesModal(true)}
+        onOpenWebhooks={() => setShowWebhooksModal(true)}
         onLeaveServer={() => leaveServer(user?.id)}
         channelUnread={channelUnread}
       />
@@ -588,6 +591,13 @@ export default function DiscordClone() {
           onUpdateRole={roles.updateRole}
           onDeleteRole={roles.deleteRole}
           onClose={() => setShowRolesModal(false)}
+        />
+      )}
+      {showWebhooksModal && currentServer && selectedChannel && (
+        <WebhooksModal
+          channelId={selectedChannel}
+          serverId={currentServer.id}
+          onClose={() => setShowWebhooksModal(false)}
         />
       )}
       <Toaster />

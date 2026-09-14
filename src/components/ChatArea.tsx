@@ -517,13 +517,25 @@ export default function ChatArea(props: Props) {
     );
   };
 
-  const renderChannelMessage = (msg: Message) => (
+  const renderChannelMessage = (msg: Message) => {
+    const isWebhook = !!(msg as any).metadata?.webhook_id;
+    const webhookName = (msg as any).metadata?.webhook_name;
+    const displayName = isWebhook ? webhookName || msg.user : msg.user;
+    const displayAvatar = (msg as any).metadata?.webhook_avatar || msg.avatar;
+    const displayColor = isWebhook ? "#5865F2" : msg.color;
+    return (
     <div key={msg.id} id={`msg-${msg.id}`} className={`group flex gap-3 px-2 py-1 hover:bg-[#2E3035] rounded scroll-mt-20 ${msg.mentions?.includes(userId || "") ? "bg-[#5865F2]/10 border-l-2 border-[#5865F2]" : ""}`}>
       <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="shrink-0 mt-1 rounded-full" title="Ver perfil">
-        <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${msg.color}33` }}><Avatar src={msg.avatar} name={msg.user} className="w-10 h-10 rounded-full text-lg" /></span>
+        <span className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ background: `${displayColor}33` }}><Avatar src={displayAvatar} name={displayName} className="w-10 h-10 rounded-full text-lg" /></span>
       </button>
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline gap-2 flex-wrap"><button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: msg.color }}>{msg.user}</button><span className="text-xs text-zinc-400">{msg.timestamp}</span>{(msg as any).edited_at && <span className="text-[10px] text-zinc-500">(editado)</span>}{pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}</div>
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <button onClick={() => msg.user_id && onViewProfile(msg.user_id)} className="font-medium hover:underline" style={{ color: displayColor }}>{displayName}</button>
+          {isWebhook && <span className="text-[10px] px-1 py-0.5 rounded bg-[#5865F2] text-white font-medium leading-none">BOT</span>}
+          <span className="text-xs text-zinc-400">{msg.timestamp}</span>
+          {(msg as any).edited_at && <span className="text-[10px] text-zinc-500">(editado)</span>}
+          {pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}
+        </div>
         {quoteBlock(msg.reply_user, msg.reply_content, msg.reply_to)}
         {editingId === msg.id ? editBox(onEditMessage) : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{q ? highlight(msg.content) : mentionize(msg.content)}</p>}
         {editingId !== msg.id && attachmentBlock(msg.file_url, msg.file_name, msg.file_type)}
@@ -552,7 +564,8 @@ export default function ChatArea(props: Props) {
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-[#313338] min-w-0">

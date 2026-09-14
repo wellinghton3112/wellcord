@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
@@ -45,6 +45,7 @@ type Props = {
   onViewProfile: (id: string) => void;
   onOpenMembers: () => void;
   onOpenRoles: () => void;
+  onOpenWebhooks: () => void;
   onLeaveServer: () => void;
   channelUnread?: Record<string, number>;
   setViewModeDM: () => void;
@@ -69,7 +70,7 @@ export default function ChannelSidebar(props: Props) {
     showMobileSidebar, setShowMobileSidebar, viewMode,
     dmConversations, selectedDM, setSelectedDM, unreadDMs, onlineMembers, setNewDMUsername, setShowNewDMModal,
     currentServer, selectedChannel, setSelectedChannel, connected, openEditServer, deleteServer, createChannel, deleteChannel,
-    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onOpenRoles, onLeaveServer, channelUnread, setViewModeDM,
+    username, status, setStatus, showStatusMenu, setShowStatusMenu, setShowUsernameModal, onSignOut, userId, userAvatar, onViewProfile, onOpenMembers, onOpenRoles, onOpenWebhooks, onLeaveServer, channelUnread, setViewModeDM,
     friendsList, incomingRequests, outgoingRequests, sendingFriend, onAddFriend, onAcceptFriend, onRejectFriend, onCancelFriend, onRemoveFriend, onFriendDM,
     activeVoice, onJoinVoice,
   } = props;
@@ -301,6 +302,7 @@ export default function ChannelSidebar(props: Props) {
                 <span className={`text-[10px] px-2 py-0.5 rounded-full ${connected ? "bg-[#23A559] text-white" : "bg-zinc-600 text-zinc-300"}`}>{connected ? "● AO VIVO" : "offline"}</span>
                 {currentServer && <button onClick={onOpenMembers} className="p-1 hover:bg-[#404249] rounded" title="Membros e convites"><Users className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={onOpenRoles} className="p-1 hover:bg-[#404249] rounded" title="Cargos e permissões"><Shield className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
+                {currentServer && canManage && <button onClick={onOpenWebhooks} className="p-1 hover:bg-[#404249] rounded" title="Webhooks"><Webhook className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={() => openEditServer(currentServer)} className="p-1 hover:bg-[#404249] rounded" title="Editar servidor"><Settings className="w-3.5 h-3.5 text-zinc-400 hover:text-white" /></button>}
                 {currentServer && canManage && <button onClick={deleteServer} className="p-1 hover:bg-[#404249] rounded" title="Excluir servidor"><Trash2 className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}
                 {currentServer && !canManage && <button onClick={onLeaveServer} className="p-1 hover:bg-[#404249] rounded" title="Sair do servidor"><DoorOpen className="w-3.5 h-3.5 text-zinc-400 hover:text-red-400" /></button>}

@@ -33,6 +33,7 @@ function toMessage(r: any): Message {
     file_url: r.file_url || null,
     file_name: r.file_name || null,
     file_type: r.file_type || null,
+    metadata: r.metadata || null,
   };
 }
 
