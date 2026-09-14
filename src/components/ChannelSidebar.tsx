@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook, MessageSquare } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
@@ -156,7 +156,13 @@ export default function ChannelSidebar(props: Props) {
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredDMs.length === 0 ? (
-              <p className="text-xs text-zinc-500 px-2">{dmSearch ? "Nenhuma DM encontrada." : "Nenhuma DM ainda. Clique + para iniciar."}</p>
+              <div className="text-center py-8 px-4">
+                <div className="w-14 h-14 rounded-full bg-[#41434A] flex items-center justify-center mx-auto mb-3">
+                  <MessageSquare className="w-6 h-6 text-zinc-500" />
+                </div>
+                <p className="text-sm text-zinc-400 font-medium">{dmSearch ? "Nenhuma DM encontrada" : "Nenhuma conversa ainda"}</p>
+                <p className="text-xs text-zinc-600 mt-1">{dmSearch ? "Tente outro termo" : "Clique + para iniciar"}</p>
+              </div>
             ) : filteredDMs.map((dm) => (
               <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewMode("dm"); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
                 <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">

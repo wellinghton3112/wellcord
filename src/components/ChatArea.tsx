@@ -3,13 +3,14 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
-  Search, Inbox, HelpCircle, Plus, ChevronUp, ChevronDown, Loader2, BarChart3, X, Check,
+  Search, Inbox, HelpCircle, Plus, ChevronUp, ChevronDown, Loader2, BarChart3, X, Check, ArrowDown,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, Poll, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
 import { useVoice } from "@/context/VoiceContext";
 import Avatar from "@/components/Avatar";
 import VoiceChannel from "@/components/VoiceChannel";
+import { MessageSkeleton } from "@/components/Skeleton";
 import { useAppStore } from "@/stores/useAppStore";
 import { useModalStore } from "@/stores/useModalStore";
 import { useProfileStore } from "@/stores/useProfileStore";
@@ -266,18 +267,26 @@ export default function ChatArea(props: Props) {
           <div
             ref={dmScroll.listRef}
             onScroll={(e) => dmScroll.trackScroll(e.currentTarget)}
-            className="flex-1 overflow-y-auto p-4 space-y-1"
+            className="flex-1 overflow-y-auto p-4 space-y-1 relative"
           >
             {dmLoadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
             {!selectedDM ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
-                <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-2xl">💬</div>
-                <p>Selecione uma DM ou crie uma nova com +</p>
+                <div className="w-20 h-20 rounded-full bg-[#41434A] flex items-center justify-center">
+                  <Send className="w-8 h-8 text-zinc-500" />
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold text-zinc-300">Selecione uma conversa</p>
+                  <p className="text-sm text-zinc-500 mt-1">Escolha uma DM ou inicie uma nova</p>
+                </div>
               </div>
             ) : dmMessages.length === 0 ? (
-              <div className="py-8 text-center border-b border-[#3F4147]">
-                <p className="text-zinc-400">Início da DM com {dmOther?.username}</p>
-                <p className="text-xs text-zinc-500 mt-1">Mensagens privadas em tempo real</p>
+              <div className="h-full flex flex-col items-center justify-center text-zinc-500 gap-4">
+                <Avatar src={dmOther?.avatar} name={dmOther?.username} className="w-20 h-20 rounded-full text-3xl" />
+                <div className="text-center">
+                  <p className="text-lg font-bold text-zinc-300">{dmOther?.username}</p>
+                  <p className="text-sm text-zinc-500 mt-1">Início da conversa</p>
+                </div>
               </div>
             ) : (
               dmMessages.map((m) => (
@@ -303,6 +312,15 @@ export default function ChatArea(props: Props) {
                   setPickFor={setPickFor}
                 />
               ))
+            )}
+            {dmScroll.showJumpToBottom && (
+              <button
+                onClick={dmScroll.jumpToBottom}
+                className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-all animate-in fade-in slide-in-from-bottom-2"
+              >
+                <ArrowDown className="w-4 h-4" />
+                Voltar ao final
+              </button>
             )}
           </div>
           {selectedDM && (
@@ -340,9 +358,10 @@ export default function ChatArea(props: Props) {
           <div
             ref={channelScroll.listRef}
             onScroll={(e) => channelScroll.trackScroll(e.currentTarget)}
-            className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col"
+            className="flex-1 overflow-y-auto p-4 space-y-1 flex flex-col relative"
           >
             {loadingOlder && <p className="text-center text-xs text-zinc-500 py-2">Carregando mais...</p>}
+            {channelMessages.length === 0 && !loadingOlder && <MessageSkeleton count={6} />}
             {(inVoiceView || voiceActiveId) ? (
               <div className={inVoiceView ? "contents" : "hidden"}>
                 <VoiceChannel
@@ -356,11 +375,21 @@ export default function ChatArea(props: Props) {
               </div>
             ) : (
               <>
-                <div className="py-8 border-b border-[#3F4147] mb-4">
-                  <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center text-3xl mb-3"><Hash className="w-8 h-8" /></div>
+                <div className="py-12 border-b border-[#3F4147] mb-4 text-center">
+                  <div className="w-20 h-20 rounded-full bg-[#41434A] flex items-center justify-center mx-auto mb-4">
+                    <Hash className="w-10 h-10 text-zinc-300" />
+                  </div>
                   <h1 className="text-3xl font-bold">Bem-vindo(a) ao #{currentChannel?.name}!</h1>
-                  <p className="text-zinc-400 mt-2">Mensagens agora são salvas no Supabase e aparecem em tempo real para todos.</p>
-                  {channelMessages.length === 0 && <p className="text-sm text-zinc-500 mt-2">Nenhuma mensagem ainda. Seja o primeiro a enviar!</p>}
+                  <p className="text-zinc-400 mt-2 max-w-md mx-auto">Este é o início do canal <strong>#{currentChannel?.name}</strong>. Envie uma mensagem para começar a conversa!</p>
+                  {channelMessages.length === 0 && (
+                    <div className="mt-6 flex items-center justify-center gap-4 text-zinc-500">
+                      <div className="flex items-center gap-1.5 text-sm"><span className="text-lg">😀</span> Reações</div>
+                      <div className="w-px h-4 bg-zinc-600" />
+                      <div className="flex items-center gap-1.5 text-sm"><span className="text-lg">📎</span> Anexos</div>
+                      <div className="w-px h-4 bg-zinc-600" />
+                      <div className="flex items-center gap-1.5 text-sm"><span className="text-lg">📊</span> Enquetes</div>
+                    </div>
+                  )}
                 </div>
                 {feed.map((item) =>
                   item.kind === "poll" ? renderPoll(item.poll) : (
@@ -391,6 +420,15 @@ export default function ChatArea(props: Props) {
                   )
                 )}
               </>
+            )}
+            {channelScroll.showJumpToBottom && (
+              <button
+                onClick={channelScroll.jumpToBottom}
+                className="sticky bottom-2 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-full bg-[#5865F2] hover:bg-[#4752C4] text-white text-sm font-medium shadow-lg transition-all animate-in fade-in slide-in-from-bottom-2"
+              >
+                <ArrowDown className="w-4 h-4" />
+                Voltar ao final
+              </button>
             )}
           </div>
           {currentChannel?.type === "text" && (

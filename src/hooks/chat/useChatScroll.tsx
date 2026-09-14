@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ChatScrollOptions = {
   messages: { id: string }[];
@@ -14,10 +14,13 @@ export function useChatScroll({ messages, hasMore, loadingOlder, onLoadOlder, se
   const nearBottom = useRef(true);
   const holding = useRef(false);
   const prevLastId = useRef<string | null>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const trackScroll = (el: HTMLDivElement | null) => {
     if (!el || holding.current || loadingOlder) return;
-    nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    nearBottom.current = distFromBottom < 120;
+    setShowJumpToBottom(distFromBottom > 400);
     if (el.scrollTop < 200 && hasMore) {
       holding.current = true;
       const h0 = el.scrollHeight;
@@ -28,6 +31,15 @@ export function useChatScroll({ messages, hasMore, loadingOlder, onLoadOlder, se
           holding.current = false;
         });
       }).catch(() => { holding.current = false; });
+    }
+  };
+
+  const jumpToBottom = () => {
+    const el = listRef.current;
+    if (el) {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      nearBottom.current = true;
+      setShowJumpToBottom(false);
     }
   };
 
@@ -45,6 +57,7 @@ export function useChatScroll({ messages, hasMore, loadingOlder, onLoadOlder, se
   useEffect(() => {
     nearBottom.current = true;
     prevLastId.current = null;
+    setShowJumpToBottom(false);
     const el = listRef.current;
     if (el) requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
   }, [selectedKey]);
@@ -54,5 +67,5 @@ export function useChatScroll({ messages, hasMore, loadingOlder, onLoadOlder, se
     document.getElementById(`msg-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
-  return { listRef, trackScroll, scrollToMsg };
+  return { listRef, trackScroll, scrollToMsg, showJumpToBottom, jumpToBottom };
 }

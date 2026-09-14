@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Plus, X, BarChart3 } from "lucide-react";
+import { ModalShell } from "@/components/ModalShell";
 
 type Props = {
   onClose: () => void;
@@ -30,8 +31,8 @@ export default function PollModal({ onClose, onCreate }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+    <ModalShell onClose={onClose}>
+      <div className="p-6 max-h-[85vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><BarChart3 className="w-5 h-5" /> Nova enquete</h2>
         <p className="text-sm text-zinc-400 mb-4">Um voto por pessoa (dá pra trocar).</p>
         <input
@@ -70,6 +71,6 @@ export default function PollModal({ onClose, onCreate }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }

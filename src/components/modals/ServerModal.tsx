@@ -1,5 +1,6 @@
 "use client";
 import type { Server } from "@/lib/chat-types";
+import { ModalShell } from "@/components/ModalShell";
 
 type Props = {
   editingServer: Server | null;
@@ -22,8 +23,8 @@ const ICONS = ["🏠","🎮","📚","🔥","⭐","🚀","💬","🎵","🎨","�
 export default function ServerModal(props: Props) {
   const { editingServer, newServerName, setNewServerName, newServerIcon, setNewServerIcon, newServerImage, newServerPreview, setNewServerPreview, setNewServerImage, creatingServer, onClose, onSave } = props;
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
+    <ModalShell onClose={onClose}>
+      <div className="p-6">
         <h2 className="text-xl font-bold mb-1">{editingServer ? "Editar servidor" : "Criar servidor"}</h2>
         <p className="text-sm text-zinc-400 mb-4">{editingServer ? `Editando ${editingServer.name}` : "Um novo espaço para seus amigos"}</p>
         <div className="space-y-4">
@@ -51,6 +52,6 @@ export default function ServerModal(props: Props) {
           <button onClick={onSave} disabled={!newServerName.trim() || creatingServer} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingServer ? "Salvando..." : editingServer ? "Salvar" : "Criar"}</button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }

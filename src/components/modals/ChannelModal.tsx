@@ -1,5 +1,6 @@
 "use client";
 import { Hash, Volume2 } from "lucide-react";
+import { ModalShell } from "@/components/ModalShell";
 
 type Props = {
   serverName?: string;
@@ -24,8 +25,8 @@ const ICONS = ["💬","🔥","🎮","🎵","📚","💡","🚀","😂","❤️",
 export default function ChannelModal(props: Props) {
   const { serverName, newChannelName, setNewChannelName, newChannelType, setNewChannelType, newChannelIcon, setNewChannelIcon, newChannelImage, setNewChannelImage, newChannelPreview, setNewChannelPreview, creatingChannel, onClose, onCreate } = props;
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
+    <ModalShell onClose={onClose}>
+      <div className="p-6">
         <h2 className="text-xl font-bold mb-1">Criar canal</h2>
         <p className="text-sm text-zinc-400 mb-4">Em {serverName}</p>
         <div className="space-y-4">
@@ -59,6 +60,6 @@ export default function ChannelModal(props: Props) {
           <button onClick={onCreate} disabled={!newChannelName.trim() || creatingChannel} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{creatingChannel ? "Criando..." : "Criar canal"}</button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
