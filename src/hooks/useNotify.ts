@@ -5,7 +5,39 @@ import { playPop, unlockAudio } from "@/lib/sound";
 
 export type Toast = NotifyPayload & { key: number; notifId: string };
 
+// Pedir permissão do browser (uma vez)
+function requestBrowserPermission() {
+  if (typeof window === "undefined") return;
+  if (!("Notification" in window)) return;
+  if (Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
+}
+
+// Fire browser Notification (fallback quando não tem Electron)
+function fireBrowserNotification(opts: { title: string; body: string; onClick?: () => void }) {
+  if (typeof window === "undefined") return;
+  if (!("Notification" in window)) return;
+  if (Notification.permission !== "granted") return;
+  try {
+    const n = new Notification(opts.title, {
+      body: opts.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      tag: "wellcord-notif",
+    });
+    if (opts.onClick) {
+      n.onclick = () => {
+        window.focus();
+        opts.onClick!();
+        n.close();
+      };
+    }
+  } catch {}
+}
+
 function fireNative(t: { kind: string; from: string; snippet: string; serverId?: string; channelId?: string; conversationId?: string }) {
+  // Electron native notification
   try {
     window.wellcord?.notify.show({
       title: t.kind === "dm" ? `DM de ${t.from}` : `${t.from} mencionou você`,
@@ -13,6 +45,24 @@ function fireNative(t: { kind: string; from: string; snippet: string; serverId?:
       ref: { kind: t.kind, serverId: t.serverId, channelId: t.channelId, conversationId: t.conversationId },
     });
   } catch {}
+
+  // Browser notification (quando não está no Electron)
+  if (!window.wellcord) {
+    const title = t.kind === "dm" ? `DM de ${t.from}` : `${t.from} mencionou você`;
+    const body = t.snippet || "Nova mensagem";
+    fireBrowserNotification({
+      title,
+      body,
+      onClick: () => {
+        // Navega pro canal/DM ao clicar
+        if (t.kind === "dm" && t.conversationId) {
+          window.location.hash = `#dm-${t.conversationId}`;
+        } else if (t.channelId) {
+          window.location.hash = `#channel-${t.channelId}`;
+        }
+      },
+    });
+  }
 }
 
 // Escuta minhas notificações (tabela + realtime) e toca som.
@@ -22,6 +72,7 @@ export function useNotify(supabase: any, user: any) {
 
   useEffect(() => {
     unlockAudio();
+    requestBrowserPermission();
     if (!user) return;
     // Pendentes que chegaram com o app fechado — só se forem recentes (<2min),
     // resto é passado e apaga silencioso para não ressuscitar
