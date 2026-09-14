@@ -1,6 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
+import { Camera, X, ImagePlus } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import { ModalShell } from "@/components/ModalShell";
 
 type Props = {
   userEmail?: string;
@@ -18,7 +20,6 @@ type Props = {
   onSave: () => void;
 };
 
-// Modal de edição de perfil (nome + foto + bio + recado). Extraído de page.tsx + foto.
 export default function UsernameModal({ userEmail, username, setUsername, avatar, onFile, onRemovePhoto, bio, setBio, statusText, setStatusText, saving, onClose, onSave }: Props) {
   const [preview, setPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -35,28 +36,87 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl">
-        <h2 className="text-xl font-bold mb-2">Editar perfil</h2>
-        <p className="text-sm text-zinc-400 mb-4">Este nome e foto aparecem nas mensagens. Logado como {userEmail}</p>
-        <div className="flex items-center gap-4 mb-4">
-          <Avatar src={preview || avatar} name={username} className="w-16 h-16 rounded-full bg-[#5865F2] text-2xl" />
-          <div className="flex flex-col gap-2">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { pick(e.target.files?.[0] || null); e.target.value = ""; }} />
-            <button onClick={() => fileRef.current?.click()} className="px-4 py-1.5 bg-[#404249] hover:bg-[#4A4D53] rounded text-sm text-white w-fit">Trocar foto</button>
-            {(preview || /^https?:\/\//.test(avatar)) && (
-              <button onClick={remove} className="text-xs text-red-400 hover:underline w-fit">Remover foto</button>
-            )}
+    <ModalShell onClose={onClose}>
+      <div>
+        {/* Banner preview */}
+        <div className="h-24 relative rounded-t-xl" style={{ background: `linear-gradient(135deg, #5865F2, #1E1F22 130%)` }}>
+          <div className="absolute -bottom-8 left-4">
+            <div className="relative">
+              <Avatar src={preview || avatar} name={username} className="w-20 h-20 rounded-full border-[6px] border-[#313338] bg-[#5865F2] text-3xl" />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center border-4 border-[#313338] transition-colors"
+                title="Trocar foto"
+              >
+                <Camera className="w-4 h-4 text-white" />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { pick(e.target.files?.[0] || null); e.target.value = ""; }} />
+            </div>
           </div>
         </div>
-        <input value={username} onChange={(e) => setUsername(e.target.value)} className="w-full bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white" placeholder="Seu nome" autoFocus />
-        <input value={statusText} onChange={(e) => setStatusText(e.target.value)} maxLength={60} className="w-full mt-3 bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white text-sm" placeholder="Recado (ex: Pensamento de chuveiro?)" />
-        <textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={300} rows={3} className="w-full mt-3 bg-[#2B2D31] rounded px-3 py-2 outline-none focus:ring-2 focus:ring-[#5865F2] text-white text-sm resize-none" placeholder="Sobre mim" />
-        <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm hover:underline">Cancelar</button>
-          <button onClick={onSave} disabled={saving} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white">{saving ? "Salvando..." : "Salvar"}</button>
+
+        <div className="p-6 pt-12 space-y-4">
+          <p className="text-xs text-zinc-500">Logado como {userEmail}</p>
+
+          {/* Username */}
+          <div>
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide">Nome de exibição</label>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full mt-1 bg-[#1E1F22] border border-[#3F4147] rounded-lg px-3 py-2 outline-none focus:border-[#5865F2] text-white transition-colors"
+              placeholder="Seu nome"
+              autoFocus
+            />
+          </div>
+
+          {/* Status text */}
+          <div>
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide">Recado</label>
+            <div className="relative mt-1">
+              <input
+                value={statusText}
+                onChange={(e) => setStatusText(e.target.value)}
+                maxLength={60}
+                className="w-full bg-[#1E1F22] border border-[#3F4147] rounded-lg px-3 py-2 pr-12 outline-none focus:border-[#5865F2] text-white text-sm transition-colors"
+                placeholder="Ex: Pensamento de chuveiro?"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-600">{statusText.length}/60</span>
+            </div>
+          </div>
+
+          {/* Bio */}
+          <div>
+            <label className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide">Sobre mim</label>
+            <div className="relative mt-1">
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                maxLength={300}
+                rows={3}
+                className="w-full bg-[#1E1F22] border border-[#3F4147] rounded-lg px-3 py-2 pr-12 outline-none focus:border-[#5865F2] text-white text-sm resize-none transition-colors"
+                placeholder="Conte algo sobre você..."
+              />
+              <span className="absolute right-3 bottom-2 text-[10px] text-zinc-600">{bio.length}/300</span>
+            </div>
+          </div>
+
+          {/* Remove photo */}
+          {(preview || /^https?:\/\//.test(avatar)) && (
+            <button onClick={remove} className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors">
+              <X className="w-3.5 h-3.5" /> Remover foto
+            </button>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-[#3F4147]">
+          <button onClick={onClose} className="px-4 py-2 text-sm hover:underline text-zinc-300">Cancelar</button>
+          <button onClick={onSave} disabled={saving || !username.trim()} className="px-6 py-2 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded-lg text-sm font-medium text-white transition-colors">
+            {saving ? "Salvando..." : "Salvar alterações"}
+          </button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }

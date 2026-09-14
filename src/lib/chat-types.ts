@@ -28,6 +28,7 @@ export type Channel = {
   type: "text" | "voice";
   icon?: string;
   image_url?: string;
+  slow_mode_seconds?: number;
 };
 
 export type Server = {

@@ -59,7 +59,7 @@ export default function DiscordClone() {
   // Hooks
   const { servers: hookServers, selectedServer: hookSelectedServer, setSelectedServer: hookSetSelectedServer, selectedChannel: hookSelectedChannel, setSelectedChannel: hookSetSelectedChannel, currentServer, currentChannel, loading, connected: hookConnected, reload } = useServers(supabase, user);
 
-  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile, hasMore, loadingOlder, loadOlder } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id, avatar);
+  const { channelMessages, input, setInput, handleSend, editMessage, deleteMessage, reactions, toggleReaction, replyTo, setReplyTo, pendingFile, setPendingFile, uploading, attachFile, hasMore, loadingOlder, loadOlder } = useChannelMessages(supabase, user, username, selectedChannel, currentServer?.id, avatar, currentChannel?.slow_mode_seconds || 0);
   const chTyping = useTyping(supabase, user, username, selectedChannel ? `ch-${selectedChannel}` : null);
 
   const sendChannel = () => { chTyping.notifyStop(); handleSend(); };

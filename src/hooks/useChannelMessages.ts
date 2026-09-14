@@ -38,10 +38,11 @@ function toMessage(r: any): Message {
 }
 
 // Mensagens do canal: carga, histórico infinito, realtime, envio, reações, respostas e anexos.
-export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string, avatar: string = "😎") {
+export function useChannelMessages(supabase: any, user: any, username: string, selectedChannel: string, serverId?: string, avatar: string = "😎", slowModeSeconds: number = 0) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [reactions, setReactions] = useState<ReactionMap>({});
+  const lastSendRef = useRef<number>(0);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -183,6 +184,16 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
 
   const handleSend = async () => {
     if ((!input.trim() && !pendingFile) || !selectedChannel || !user || uploading) return;
+    // Slow mode
+    if (slowModeSeconds > 0) {
+      const now = Date.now();
+      const diff = (now - lastSendRef.current) / 1000;
+      if (lastSendRef.current > 0 && diff < slowModeSeconds) {
+        const wait = Math.ceil(slowModeSeconds - diff);
+        toast(`Aguarde ${wait}s para enviar novamente (slow mode)`);
+        return;
+      }
+    }
     const content = input;
     const reply = replyTo;
     const file = pendingFile;
@@ -219,6 +230,7 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
       setPendingFile(file);
       return;
     }
+    lastSendRef.current = Date.now();
     // Notifica mencionados (fire-and-forget)
     if (mentionIds.length > 0) {
       const snippet = content.slice(0, 80);

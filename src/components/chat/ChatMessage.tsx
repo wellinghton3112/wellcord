@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Download } from "lucide-react";
 import type { Message, Reaction, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
@@ -53,18 +53,74 @@ export function ReactionBar({ list, toggle }: { list: Reaction[] | undefined; to
 }
 
 export function EmojiPicker({ messageId, toggle, onClose }: { messageId: string; toggle: (id: string, emoji: string) => void; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(0);
+
+  const EMOJI_CATEGORIES = [
+    { name: "Frequentes", emojis: ["😀", "😂", "😍", "🥺", "😎", "🤔", "👍", "👋", "🔥", "❤️", "💯", "✨", "🎉", "😭", "🤣", "😢", "🥳", "😴", "🤯", "💀"] },
+    { name: "Sorrisos", emojis: ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😚", "😙", "🥲", "😋", "😛", "😜", "🤪", "😝", "🤑", "🤗", "🤭", "🫢", "🤫", "🤔", "🫡", "🤐", "🤨", "😐", "😑", "😶", "🫥", "😏", "😒", "🙄", "😬", "🤥", "😌", "😔", "😪", "🤤", "😴"] },
+    { name: "Gestos", emojis: ["👋", "🤚", "🖐️", "✋", "🖖", "🫱", "🫲", "🫳", "🫴", "👌", "🤌", "🤏", "✌️", "🤞", "🫰", "🤟", "🤘", "🤙", "👈", "👉", "👆", "👇", "☝️", "👍", "👎", "✊", "👊", "🤛", "🤜", "👏", "🙌", "🫶", "👐", "🤲", "🤝", "🙏", "💪", "🦾"] },
+    { name: "Natureza", emojis: ["🐶", "🐱", "🐭", "🐹", "🐰", "🦊", "🐻", "🐼", "🐻‍❄️", "🐨", "🐯", "🦁", "🐮", "🐷", "🐸", "🐵", "🌸", "🌺", "🌻", "🌹", "🌷", "🌱", "🌿", "🍀", "🌵", "🌴", "🌳", "🍂", "🍁", "🍄"] },
+    { name: "Comida", emojis: ["🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍒", "🍑", "🥝", "🍕", "🍔", "🍟", "🌭", "🍿", "🧁", "🍰", "🎂", "☕", "🍵", "🥤", "🍺", "🍷", "🥂"] },
+    { name: "Atividades", emojis: ["⚽", "🏀", "🏈", "⚾", "🎾", "🏐", "🏉", "🎱", "🏓", "🎯", "🎮", "🎲", "🧩", "🎭", "🎨", "🎬", "🎤", "🎧", "🎵", "🎹", "🎸", "🎺", "🎻", "🥁", "🏆", "🥇", "🥈", "🥉"] },
+    { name: "Objetos", emojis: ["⌚", "📱", "💻", "⌨️", "🖥️", "🖨️", "🖱️", "💾", "💿", "📷", "📸", "📹", "🎥", "📺", "📻", "🔋", "🔌", "💡", "🔦", "🔑", "🗝️", "🔒", "🔓", "📦", "📫", "✏️", "📝", "📁", "📂", "🗑️"] },
+    { name: "Símbolos", emojis: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "🤎", "💔", "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "✨", "⭐", "🌟", "💫", "🔥", "💥", "❄️", "🌈", "☀️", "🌙", "💤", "💬"] },
+  ];
+
+  const filteredEmojis = query
+    ? EMOJI_CATEGORIES.flatMap((c) => c.emojis).filter((e) => e.includes(query))
+    : EMOJI_CATEGORIES[selectedCategory].emojis;
+
   return (
-    <div className="mt-1 flex items-center gap-1 bg-[#2B2D31] border border-[#4A4D53] rounded-lg p-1.5 w-fit shadow-lg">
-      {QUICK_EMOJIS.map((e) => (
-        <button
-          key={e}
-          onClick={() => { toggle(messageId, e); onClose(); }}
-          className="text-lg hover:scale-125 transition-transform p-0.5"
-        >
-          {e}
-        </button>
-      ))}
-      <button onClick={onClose} className="p-1 hover:bg-[#35373C] rounded"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
+    <div className="mt-1 bg-[#2B2D31] border border-[#4A4D53] rounded-xl shadow-xl w-72 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      {/* Search */}
+      <div className="p-2 border-b border-[#4A4D53]">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar emoji..."
+          className="w-full bg-[#1E1F22] rounded-md px-3 py-1.5 text-sm outline-none text-zinc-200 placeholder:text-zinc-500"
+          autoFocus
+        />
+      </div>
+
+      {/* Category tabs */}
+      {!query && (
+        <div className="flex gap-0.5 px-2 py-1 border-b border-[#4A4D53] overflow-x-auto">
+          {EMOJI_CATEGORIES.map((cat, i) => (
+            <button
+              key={cat.name}
+              onClick={() => setSelectedCategory(i)}
+              className={`px-2 py-1 rounded text-[10px] font-medium whitespace-nowrap transition-colors ${selectedCategory === i ? "bg-[#5865F2]/20 text-[#5865F2]" : "text-zinc-500 hover:text-zinc-300"}`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Emoji grid */}
+      <div className="p-2 grid grid-cols-8 gap-0.5 max-h-48 overflow-y-auto">
+        {filteredEmojis.map((e, i) => (
+          <button
+            key={`${e}-${i}`}
+            onClick={() => { toggle(messageId, e); onClose(); }}
+            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-[#404249] rounded transition-colors"
+          >
+            {e}
+          </button>
+        ))}
+      </div>
+
+      {/* Quick row */}
+      <div className="flex items-center justify-between px-2 py-1.5 border-t border-[#4A4D53] bg-[#232428]">
+        <div className="flex gap-0.5">
+          {QUICK_EMOJIS.slice(0, 6).map((e) => (
+            <button key={e} onClick={() => { toggle(messageId, e); onClose(); }} className="text-lg hover:scale-125 transition-transform p-0.5">{e}</button>
+          ))}
+        </div>
+        <button onClick={onClose} className="p-1 hover:bg-[#35373C] rounded"><X className="w-3.5 h-3.5 text-zinc-400" /></button>
+      </div>
     </div>
   );
 }
