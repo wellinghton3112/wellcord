@@ -3,6 +3,7 @@ import React from "react";
 import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Download } from "lucide-react";
 import type { Message, Reaction, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
+import { MarkdownText } from "@/lib/markdown";
 import { LinkEmbed } from "@/components/LinkEmbed";
 import { useLightbox } from "@/components/ImageLightbox";
 import { extractUrls } from "@/lib/links";
@@ -213,7 +214,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
           {pinnedIds.has(msg.id) && <span title="Mensagem fixada"><Pin className="w-3 h-3 text-[#F0B132]" /></span>}
         </div>
         <QuoteBlock user={msg.reply_user} content={msg.reply_content} targetId={msg.reply_to} scrollToMsg={scrollToMsg} />
-        {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{searchQuery ? highlight(msg.content) : mentionizeFn(msg.content)}</p>}
+        {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] leading-5 text-[#DBDEE1] break-words whitespace-pre-wrap">{searchQuery ? highlight(msg.content) : <MarkdownText text={msg.content} mentionize={mentionizeFn} />}</p>}
         {editingId !== msg.id && !msg.file_url && extractUrls(msg.content).slice(0, 3).map((url) => <LinkEmbed key={url} url={url} />)}
         {editingId !== msg.id && <AttachmentBlock url={msg.file_url} name={msg.file_name} type={msg.file_type} />}
         {editingId !== msg.id && <ReactionBar list={reactions[msg.id]} toggle={(e) => onToggleReaction(msg.id, e)} />}
