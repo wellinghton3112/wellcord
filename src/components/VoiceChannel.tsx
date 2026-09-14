@@ -49,6 +49,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const codecModeRef = useRef<CodecMode>("sharp");
   const [sendStats, setSendStats] = useState("");
   const statsPrevRef = useRef<{ bytes: number; ts: number } | null>(null);
+  const [peerQuality, setPeerQuality] = useState<Record<string, { fps: number; bytes: number; limitation?: string }>>({});
+  const peerQualityPrevRef = useRef<Map<string, { bytes: number; ts: number }>>(new Map());
   // Supressão de ruído RNNoise (ML local). Ligada por padrão; cai p/ navegador se falhar.
   const [denoise, setDenoise] = useState(true);
   const [denoiseActive, setDenoiseActive] = useState(false);
@@ -148,6 +150,37 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     }, 1000);
     return () => clearInterval(iv);
   }, [screenOn]);
+
+  // Stats de qualidade por peer (2/s)
+  useEffect(() => {
+    if (!joined || peers.length === 0) { setPeerQuality({}); return; }
+    const iv = setInterval(async () => {
+      const next: Record<string, { fps: number; bytes: number; limitation?: string }> = {};
+      for (const [peerId, pc] of peersRef.current) {
+        try {
+          const stats = await pc.getStats();
+          stats.forEach((report: any) => {
+            if (report.type === "inbound-rtp" && report.kind === "video") {
+              const prev = peerQualityPrevRef.current.get(peerId);
+              const now = { bytes: report.bytesReceived || 0, ts: report.timestamp };
+              peerQualityPrevRef.current.set(peerId, now);
+              let fps = report.framesPerSecond || 0;
+              let limitation = report.qualityLimitationReason || undefined;
+              if (prev && now.ts > prev.ts && now.bytes >= prev.bytes) {
+                const mbps = ((now.bytes - prev.bytes) * 8 / ((now.ts - prev.ts) / 1000) / 1e6);
+                next[peerId] = { fps, bytes: Math.round(mbps * 100) / 100, limitation };
+              } else {
+                next[peerId] = { fps, bytes: 0, limitation };
+              }
+            }
+          });
+        } catch {}
+      }
+      setPeerQuality(next);
+    }, 2000);
+    return () => clearInterval(iv);
+  }, [joined, peers.length]);
+
   // Último a sair encerra a chamada (zera o timer). Best-effort: sem await.
   const maybeEndCall = (cid?: string | null) => {
     const target = cid || sessionChannelRef.current || channelId;
@@ -713,11 +746,12 @@ export default function VoiceChannel({ channelId, username, status, channelName,
 
   const toggleCamera = async () => {
     if (cameraOn) {
+      // Remove apenas tracks de câmera (não de tela)
       localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
       peersRef.current.forEach((pc) => {
         pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
       });
-      if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
+      if (localVideoRef.current && !screenOn) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
       setCameraOn(false);
       await renegotiate();
       return;
@@ -727,7 +761,7 @@ export default function VoiceChannel({ channelId, username, status, channelName,
       const track = stream.getVideoTracks()[0];
       if (!localStreamRef.current) localStreamRef.current = new MediaStream();
       localStreamRef.current.addTrack(track);
-      if (localVideoRef.current) {
+      if (localVideoRef.current && !screenOn) {
         localVideoRef.current.srcObject = new MediaStream([track]);
         await localVideoRef.current.play().catch(() => {});
       }
@@ -736,7 +770,6 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         tuneVideoSender(pc, track, { screen: false, maxBitrate: VIDEO_BITRATE.camera }).catch(() => {});
       });
       setCameraOn(true);
-      if (screenOn) setScreenOn(false);
       await renegotiate();
     } catch (e: any) { setError(e.message); }
   };
@@ -792,12 +825,30 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     }
   };
 
+  const screenTrackRef = useRef<MediaStreamTrack | null>(null);
+
   const stopScreen = async () => {
-    localStreamRef.current?.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
-    peersRef.current.forEach((pc) => {
-      pc.getSenders().filter((s) => s.track?.kind === "video").forEach((s) => { try { pc.removeTrack(s); } catch {} });
-    });
-    if (localVideoRef.current) { localVideoRef.current.srcObject = null; localVideoRef.current.pause(); }
+    // Remove apenas a track de tela, mantém câmera
+    const screenTrack = screenTrackRef.current;
+    if (screenTrack) {
+      screenTrack.stop();
+      try { localStreamRef.current?.removeTrack(screenTrack); } catch {}
+      peersRef.current.forEach((pc) => {
+        pc.getSenders().filter((s) => s.track === screenTrack).forEach((s) => { try { pc.removeTrack(s); } catch {} });
+      });
+      screenTrackRef.current = null;
+    }
+    // Se câmera está ligada, volta para ela; senão limpa
+    if (cameraOn) {
+      const camTrack = localStreamRef.current?.getVideoTracks()[0];
+      if (camTrack && localVideoRef.current) {
+        localVideoRef.current.srcObject = new MediaStream([camTrack]);
+        localVideoRef.current.play().catch(() => {});
+      }
+    } else if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+      localVideoRef.current.pause();
+    }
     setScreenOn(false);
     await renegotiate();
   };
@@ -816,8 +867,8 @@ export default function VoiceChannel({ channelId, username, status, channelName,
   const attachScreenTrack = async (track: MediaStreamTrack, audioTrack: MediaStreamTrack | null) => {
     await applyScreenQuality(track, screenQualityRef.current);
     if (!localStreamRef.current) localStreamRef.current = new MediaStream();
-    // remove câmera
-    localStreamRef.current.getVideoTracks().forEach((t) => { t.stop(); try { localStreamRef.current?.removeTrack(t); } catch {} });
+    // Não remove câmera — permite câmera + tela simultâneos
+    screenTrackRef.current = track;
     localStreamRef.current.addTrack(track);
     if (audioTrack) { try { localStreamRef.current.addTrack(audioTrack); } catch {} }
     if (localVideoRef.current) {
@@ -831,7 +882,6 @@ export default function VoiceChannel({ channelId, username, status, channelName,
     if (audioTrack) peersRef.current.forEach((pc) => { try { pc.addTrack(audioTrack, localStreamRef.current!); } catch {} });
     track.onended = () => stopScreen();
     setScreenOn(true);
-    setCameraOn(false);
     await renegotiate();
   };
 
@@ -969,11 +1019,33 @@ export default function VoiceChannel({ channelId, username, status, channelName,
         );
       })()}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {(() => {
+        const count = peers.length + 1;
+        const gridClass = count <= 1 ? "grid-cols-1" : count <= 2 ? "grid-cols-1 md:grid-cols-2" : count <= 4 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3";
+        return <div className={`grid ${gridClass} gap-3`}>
         <div onClick={() => setExpanded("local")} className={`bg-[#232428] rounded-lg p-3 flex flex-col items-center gap-2 border-2 cursor-pointer hover:brightness-110 ${speaking["local"] && !muted ? "border-[#23A559] shadow-lg shadow-[#23A559]/30" : "border-[#23A559]/30"} ${expanded === "local" ? "ring-2 ring-[#5865F2]" : ""}`}>
           <div className="w-full aspect-video bg-black rounded overflow-hidden relative group">
-            {cameraOn || screenOn ? <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" /> : <div className={`w-full h-full flex items-center justify-center ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[#5865F2]`}><Avatar src={avatar} name={username} className="w-16 h-16 rounded-full text-3xl" /></div>}
-            <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{username} (você) {screenOn ? "• Tela" : cameraOn ? "• Câmera" : ""}</span>
+            {screenOn ? (
+              <>
+                <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                {cameraOn && <video ref={(el) => {
+                  if (el) {
+                    const camTrack = localStreamRef.current?.getVideoTracks().find(t => t !== screenTrackRef.current);
+                    if (camTrack && (!el.srcObject || (el.srcObject as MediaStream).getVideoTracks()[0] !== camTrack)) {
+                      el.srcObject = new MediaStream([camTrack]);
+                      el.play().catch(() => {});
+                    }
+                  }
+                }} autoPlay playsInline muted className="absolute bottom-2 right-2 w-1/4 aspect-video rounded border border-white/20 object-cover bg-black" />}
+              </>
+            ) : cameraOn ? (
+              <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            ) : (
+              <div className={`w-full h-full flex items-center justify-center ${speaking["local"] && !muted ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[#5865F2]`}>
+                <Avatar src={avatar} name={username} className="w-16 h-16 rounded-full text-3xl" />
+              </div>
+            )}
+            <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{username} (você) {screenOn && cameraOn ? "• Tela + Câmera" : screenOn ? "• Tela" : cameraOn ? "• Câmera" : ""}</span>
             <Maximize2 className="absolute top-1 right-1 w-3 h-3 text-white opacity-0 group-hover:opacity-100" />
           </div>
           <span className={`text-xs px-2 py-0.5 rounded-full ${muted ? "bg-[#DA373C]" : speaking["local"] ? "bg-[#23A559] animate-pulse" : "bg-zinc-600"} text-white`}>{muted ? "Mutado" : speaking["local"] ? "Falando..." : "Conectado"}</span>
@@ -1000,6 +1072,12 @@ export default function VoiceChannel({ channelId, username, status, channelName,
                   <div className={`w-full h-full flex items-center justify-center ${speaking[p.id] ? "ring-4 ring-[#23A559] animate-pulse" : ""} bg-[#41434A]`}><Avatar src={p.avatar} name={p.username} className="w-16 h-16 rounded-full text-3xl" /></div>
                 )}
                 <span className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">{p.username}</span>
+                {peerQuality[p.id] && (
+                  <span className="absolute top-1 left-1 bg-black/60 text-zinc-300 text-[10px] px-1 py-0.5 rounded font-mono" title={`Recebendo: ${peerQuality[p.id].fps}fps, ${peerQuality[p.id].bytes}Mbps`}>
+                    {peerQuality[p.id].fps > 0 ? `${peerQuality[p.id].fps}fps` : "audio"}
+                    {peerQuality[p.id].limitation && ` • ${peerQuality[p.id].limitation}`}
+                  </span>
+                )}
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleHideVideo(p.id); }}
                   className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100"
@@ -1012,8 +1090,9 @@ export default function VoiceChannel({ channelId, username, status, channelName,
             </div>
           );
         })}
-        {peers.length === 0 && <div className="col-span-1 md:col-span-2 text-zinc-400 text-sm flex items-center justify-center py-8">Nenhum amigo na voz ainda. Compartilhe o link!</div>}
-      </div>
+        {peers.length === 0 && <div className="col-span-full text-zinc-400 text-sm flex items-center justify-center py-8">Nenhum amigo na voz ainda. Compartilhe o link!</div>}
+      </div>;
+      })()}
 
       <div className="mt-auto flex items-center justify-center gap-2 p-3 bg-[#232428] rounded-lg flex-wrap">
         <button onClick={toggleMute} className={`w-11 h-11 rounded-full flex items-center justify-center ${muted ? "bg-[#DA373C] text-white" : "bg-[#2B2D31] hover:bg-[#35373C] text-zinc-200"}`} title={muted ? "Ativar microfone" : "Mutar"}>
