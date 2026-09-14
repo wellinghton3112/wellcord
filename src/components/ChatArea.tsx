@@ -17,6 +17,9 @@ import { useChatSearch } from "@/hooks/chat/useChatSearch";
 import { useChatScroll } from "@/hooks/chat/useChatScroll";
 import { useMessageEdit } from "@/hooks/chat/useMessageEdit";
 import { ChatMessage, ChatDMMessage, ReplyPreview, TypingBar, MentionBox, mentionize, AttachmentBlock } from "@/components/chat";
+import { useDropZone } from "@/hooks/chat/useDropZone";
+import { DropOverlay } from "@/components/DropOverlay";
+import { MAX_FILE_MB } from "@/lib/chat-types";
 
 type Props = {
   dmConversations: DMConversation[];
@@ -109,6 +112,18 @@ export default function ChatArea(props: Props) {
   const channelEdit = useMessageEdit();
   const dmEdit = useMessageEdit();
   const edit = viewMode === "dm" ? dmEdit : channelEdit;
+
+  const dropHandler = useCallback((files: File[]) => {
+    const f = files[0];
+    if (!f) return;
+    if (viewMode === "dm") onAttachDmFile(f);
+    else onAttachFile(f);
+  }, [viewMode, onAttachFile, onAttachDmFile]);
+
+  const dropZone = useDropZone({
+    onDrop: dropHandler,
+    maxSize: MAX_FILE_MB * 1024 * 1024,
+  });
 
   const { status: voiceStatus } = useVoice();
   const inVoiceView = viewMode === "server" && currentChannel?.type === "voice";
@@ -222,7 +237,14 @@ export default function ChatArea(props: Props) {
   }, [polls, userId, isOwner, onToggleVote, onDeletePoll]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#313338] min-w-0">
+    <div
+      className="flex-1 flex flex-col bg-[#313338] min-w-0 relative"
+      onDragOver={dropZone.onDragOver}
+      onDragEnter={dropZone.onDragEnter}
+      onDragLeave={dropZone.onDragLeave}
+      onDrop={dropZone.onDrop}
+    >
+      <DropOverlay visible={dropZone.dragging} />
       {viewMode === "dm" ? (
         <>
           <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
