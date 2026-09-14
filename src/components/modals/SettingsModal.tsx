@@ -8,9 +8,12 @@ type Settings = {
   notifications: boolean;
   sounds: boolean;
   compactMode: boolean;
+  accentColor: string;
 };
 
-const DEFAULT: Settings = { theme: "dark", notifications: true, sounds: true, compactMode: false };
+const DEFAULT: Settings = { theme: "dark", notifications: true, sounds: true, compactMode: false, accentColor: "#5865F2" };
+
+const ACCENT_PRESETS = ["#5865F2", "#ED4245", "#FEE75C", "#57F287", "#EB459E", "#F47B67", "#E9A040", "#3BA55C"];
 
 function loadSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT;
@@ -22,10 +25,10 @@ function loadSettings(): Settings {
 
 function saveSettings(s: Settings) {
   localStorage.setItem("wellcord-settings", JSON.stringify(s));
-  applyTheme(s.theme);
+  applyTheme(s.theme, s.accentColor);
 }
 
-function applyTheme(theme: string) {
+function applyTheme(theme: string, accent?: string) {
   const root = document.documentElement;
   if (theme === "light") {
     root.classList.add("light-theme");
@@ -34,6 +37,7 @@ function applyTheme(theme: string) {
     root.classList.add("dark-theme");
     root.classList.remove("light-theme");
   }
+  if (accent) root.style.setProperty("--accent", accent);
 }
 
 export function useSettings() {
@@ -41,7 +45,7 @@ export function useSettings() {
   useEffect(() => {
     const s = loadSettings();
     setSettings(s);
-    applyTheme(s.theme);
+    applyTheme(s.theme, s.accentColor);
   }, []);
   return { settings, setSettings: (s: Settings) => { setSettings(s); saveSettings(s); } };
 }
@@ -90,7 +94,7 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
                 onClick={() => update({ theme: value })}
                 className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-colors ${
                   local.theme === value
-                    ? "bg-[#5865F2]/15 border-[#5865F2] text-[#5865F2]"
+                    ? "border-[var(--accent)] text-[var(--accent)]"
                     : "bg-[#2B2D31] border-[#3F4147] text-zinc-400 hover:bg-[#35373C]"
                 }`}
               >
@@ -98,6 +102,31 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
                 <span className="text-sm font-medium">{label}</span>
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Cor de destaque */}
+        <section>
+          <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wide mb-3">Cor de destaque</h3>
+          <div className="flex items-center gap-3 flex-wrap">
+            {ACCENT_PRESETS.map((c) => (
+              <button
+                key={c}
+                onClick={() => update({ accentColor: c })}
+                className={`w-10 h-10 rounded-full border-2 transition-all ${local.accentColor === c ? "border-white scale-110" : "border-transparent hover:scale-105"}`}
+                style={{ backgroundColor: c }}
+                title={c}
+              />
+            ))}
+            <label className="w-10 h-10 rounded-full border-2 border-dashed border-zinc-500 hover:border-zinc-300 flex items-center justify-center cursor-pointer transition-colors" title="Cor personalizada">
+              <span className="text-lg text-zinc-400">+</span>
+              <input
+                type="color"
+                value={local.accentColor}
+                onChange={(e) => update({ accentColor: e.target.value })}
+                className="sr-only"
+              />
+            </label>
           </div>
         </section>
 
@@ -156,7 +185,7 @@ function ToggleRow({ icon: Icon, label, desc, checked, onChange }: { icon: any; 
       </div>
       <button
         onClick={() => onChange(!checked)}
-        className={`relative w-10 h-6 rounded-full transition-colors ${checked ? "bg-[#5865F2]" : "bg-zinc-600"}`}
+        className={`relative w-10 h-6 rounded-full transition-colors ${checked ? "bg-[var(--accent)]" : "bg-zinc-600"}`}
       >
         <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? "left-5" : "left-1"}`} />
       </button>

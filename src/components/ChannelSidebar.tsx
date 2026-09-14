@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook, MessageSquare } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook, MessageSquare, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
@@ -57,7 +57,7 @@ export default function ChannelSidebar(props: Props) {
   } = props;
 
   // Stores
-  const { showMobileSidebar, setShowMobileSidebar, viewMode, setViewMode, selectedDM, setSelectedDM, selectedChannel, setSelectedChannel, connected } = useAppStore();
+  const { showMobileSidebar, setShowMobileSidebar, viewMode, setViewMode, selectedDM, setSelectedDM, selectedChannel, setSelectedChannel, connected, sidebarCollapsed, setSidebarCollapsed } = useAppStore();
   const { showStatusMenu, setShowStatusMenu } = useModalStore();
   const { username, avatar: userAvatar, status, setStatus } = useProfileStore();
 
@@ -124,21 +124,22 @@ export default function ChannelSidebar(props: Props) {
   const canManage = !currentServer?.owner_id || currentServer.owner_id === userId;
 
   const channelRow = (ch: Channel, icon: React.ReactNode) => (
-    <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
-      <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
-        {icon}<span className={`truncate ${selectedChannel !== ch.id && (channelUnread?.[ch.id] || 0) > 0 ? "font-bold text-white" : ""}`}>{ch.name}</span>
+    <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"} ${sidebarCollapsed ? "justify-center" : ""}`} title={sidebarCollapsed ? ch.name : undefined}>
+      <button onClick={() => setSelectedChannel(ch.id)} className={`flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden ${sidebarCollapsed ? "justify-center" : ""}`}>
+        {icon}{!sidebarCollapsed && <span className={`truncate ${selectedChannel !== ch.id && (channelUnread?.[ch.id] || 0) > 0 ? "font-bold text-white" : ""}`}>{ch.name}</span>}
       </button>
-      {(channelUnread?.[ch.id] || 0) > 0 && selectedChannel !== ch.id && (
+      {!sidebarCollapsed && (channelUnread?.[ch.id] || 0) > 0 && selectedChannel !== ch.id && (
         <span className="min-w-4 h-4 px-1 rounded-full bg-[#DA373C] text-white text-[10px] font-bold flex items-center justify-center shrink-0">{channelUnread![ch.id] > 9 ? "9+" : channelUnread![ch.id]}</span>
       )}
-      {canManage && <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>}
+      {!sidebarCollapsed && canManage && <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#2B2D31] rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>}
     </div>
   );
 
   return (
-    <div className={`${showMobileSidebar ? "translate-x-0 left-[72px]" : "-translate-x-full left-0"} lg:translate-x-0 lg:inset-y-auto lg:left-0 fixed inset-y-0 lg:relative z-50 lg:z-auto w-60 bg-[#2B2D31] flex lg:flex flex-col shrink-0 h-full transition-transform duration-200`}>
+    <div className={`${showMobileSidebar ? "translate-x-0 left-[72px]" : "-translate-x-full left-0"} lg:translate-x-0 lg:inset-y-auto lg:left-0 fixed inset-y-0 lg:relative z-50 lg:z-auto bg-[#2B2D31] flex lg:flex flex-col shrink-0 h-full transition-all duration-200 ${sidebarCollapsed ? "w-[68px]" : "w-60"}`}>
       {viewMode !== "server" ? (
         <>
+          {!sidebarCollapsed && (
           <div className="h-12 px-3 flex items-center gap-1 border-b border-[#1F2124] shadow-sm shrink-0">
             <button onClick={() => setSideTab("dms")} className={`flex-1 py-1.5 rounded text-[13px] font-semibold transition-colors ${sideTab === "dms" ? "bg-[#404249] text-white" : "text-zinc-400 hover:text-zinc-200"}`}>Conversas</button>
             <button onClick={() => setSideTab("friends")} className={`flex-1 py-1.5 rounded text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${sideTab === "friends" ? "bg-[#404249] text-white" : "text-zinc-400 hover:text-zinc-200"}`}>
@@ -147,6 +148,7 @@ export default function ChannelSidebar(props: Props) {
             </button>
             <button onClick={() => useModalStore.getState().openModal("showNewDMModal")} className="w-7 h-7 rounded bg-[#5865F2] hover:bg-[#4752C4] flex items-center justify-center shrink-0" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
           </div>
+          )}
           {sideTab === "dms" ? (
           <>
           <div className="p-2">
@@ -165,14 +167,16 @@ export default function ChannelSidebar(props: Props) {
                 <p className="text-xs text-zinc-600 mt-1">{dmSearch ? "Tente outro termo" : "Clique + para iniciar"}</p>
               </div>
             ) : filteredDMs.map((dm) => (
-              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewMode("dm"); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"}`}>
+              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewMode("dm"); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-[#404249] text-white" : "text-zinc-400 hover:bg-[#35373C] hover:text-zinc-200"} ${sidebarCollapsed ? "justify-center" : ""}`} title={sidebarCollapsed ? (dm.otherUser?.username || "DM") : undefined}>
                 <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">
                   <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
                 </span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
-                  <div className="text-xs text-zinc-500 truncate">Clique para conversar</div>
-                </div>
+                {!sidebarCollapsed && (
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
+                    <div className="text-xs text-zinc-500 truncate">Clique para conversar</div>
+                  </div>
+                )}
                 {(unreadDMs?.[dm.id] || 0) > 0 && (
                   <span className="min-w-5 h-5 px-1.5 rounded-full bg-[#DA373C] text-white text-[11px] font-bold flex items-center justify-center shrink-0">{unreadDMs![dm.id] > 9 ? "9+" : unreadDMs![dm.id]}</span>
                 )}
@@ -351,13 +355,18 @@ export default function ChannelSidebar(props: Props) {
           <Avatar src={userAvatar || undefined} name={username} className="w-8 h-8 rounded-full bg-[#5865F2] text-sm" />
           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#232428] ${statusConfig[status].color}`} />
         </button>
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
-          <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
-          <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
-        </div>
-        <span className="text-[8px] font-mono bg-[#1E1F22] px-1 py-0.5 rounded text-zinc-500 shrink-0">{APP_VERSION}</span>
-        <button onClick={onOpenSettings} className="p-1 hover:bg-[#35373C] rounded shrink-0"><Settings className="w-4 h-4 text-zinc-400" /></button>
-        <button onClick={onSignOut} className="p-1 hover:bg-[#DA373C] rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>
+        {!sidebarCollapsed && (
+          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+            <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
+            <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
+          </div>
+        )}
+        {!sidebarCollapsed && <span className="text-[8px] font-mono bg-[#1E1F22] px-1 py-0.5 rounded text-zinc-500 shrink-0">{APP_VERSION}</span>}
+        <button onClick={onOpenSettings} className="p-1 hover:bg-[#35373C] rounded shrink-0" title="Configurações"><Settings className="w-4 h-4 text-zinc-400" /></button>
+        <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1 hover:bg-[#35373C] rounded shrink-0" title={sidebarCollapsed ? "Expandir sidebar" : "Recolher sidebar"}>
+          {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4 text-zinc-400" /> : <PanelLeftClose className="w-4 h-4 text-zinc-400" />}
+        </button>
+        {!sidebarCollapsed && <button onClick={onSignOut} className="p-1 hover:bg-[#DA373C] rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-white" /></button>}
         {showStatusMenu && (
           <div className="absolute bottom-full left-2 mb-2 w-52 bg-[#232428] border border-[#1E1F22] rounded-lg shadow-xl overflow-hidden z-50">
             {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map((k) => (

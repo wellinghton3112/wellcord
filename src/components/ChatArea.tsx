@@ -3,11 +3,13 @@ import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import type { RefObject } from "react";
 import {
   Hash, Send, Smile, Gift, Sticker, Phone, Video, Pin, UserPlus, Menu,
-  Search, Inbox, HelpCircle, Plus, ChevronUp, ChevronDown, Loader2, BarChart3, X, Check, ArrowDown,
+  Search, Inbox, HelpCircle, Plus, ChevronUp, ChevronDown, Loader2, BarChart3, X, Check, ArrowDown, Bookmark,
 } from "lucide-react";
 import type { Channel, DMConversation, DMMessage, Message, PendingFile, Poll, PresenceUser, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import type { TypingUser } from "@/hooks/useTyping";
 import { useVoice } from "@/context/VoiceContext";
+import { getCommandSuggestions } from "@/lib/slash-commands";
+import { useBookmarks } from "@/components/modals/BookmarksModal";
 import Avatar from "@/components/Avatar";
 import VoiceChannel from "@/components/VoiceChannel";
 import { MessageSkeleton } from "@/components/Skeleton";
@@ -42,6 +44,7 @@ type Props = {
   onEditDM: (id: string, content: string) => void;
   onDeleteDM: (id: string) => void;
   onInvite: () => void;
+  onShowBookmarks: () => void;
   reactions: ReactionMap;
   onToggleReaction: (id: string, emoji: string) => void;
   dmReactions: ReactionMap;
@@ -85,7 +88,7 @@ export default function ChatArea(props: Props) {
   const {
     dmConversations, dmMessages, dmInput, setDmInput, handleDMSend, onlineMembers,
     currentChannel, serverName, channelMessages, systemMessages = [], input, setInput, handleSend,
-    onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite,
+    onEditMessage, onDeleteMessage, onEditDM, onDeleteDM, onInvite, onShowBookmarks,
     reactions, onToggleReaction, dmReactions, onToggleDMReaction,
     replyTo, setReplyTo, dmReplyTo, setDmReplyTo,
     pendingFile, uploading, onAttachFile, onClearFile,
@@ -103,6 +106,9 @@ export default function ChatArea(props: Props) {
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
 
   const [pickFor, setPickFor] = useState<string | null>(null);
+  const [cmdIdx, setCmdIdx] = useState(0);
+  const slashSuggestions = useMemo(() => getCommandSuggestions(input), [input]);
+  const showSlashMenu = input.startsWith("/") && slashSuggestions.length > 0;
 
   const channelSearch = useChatSearch({ messages: channelMessages, selectedDM, selectedChannel, viewMode });
   const dmSearch = useChatSearch({ messages: dmMessages, selectedDM, selectedChannel, viewMode });
@@ -111,6 +117,8 @@ export default function ChatArea(props: Props) {
   const channelScroll = useChatScroll({ messages: channelMessages, hasMore, loadingOlder, onLoadOlder, selectedKey: selectedChannel || "" });
   const dmScroll = useChatScroll({ messages: dmMessages, hasMore: dmHasMore, loadingOlder: dmLoadingOlder, onLoadOlder: onLoadOlderDM, selectedKey: selectedDM || "" });
   const scroll = viewMode === "dm" ? dmScroll : channelScroll;
+
+  const { toggle: toggleBookmark, isBookmarked } = useBookmarks();
 
   const channelEdit = useMessageEdit();
   const dmEdit = useMessageEdit();
@@ -353,7 +361,7 @@ export default function ChatArea(props: Props) {
             <span className="w-px h-6 bg-[#3F4147] mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo{currentChannel?.slow_mode_seconds ? ` • Slow mode: ${currentChannel.slow_mode_seconds}s` : ""}</span>
               <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={() => useModalStore.getState().openModal("showPinsModal")} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
+                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={() => useModalStore.getState().openModal("showPinsModal")} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onShowBookmarks} title="Mensagens favoritas"><Bookmark className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
                 {searchBox("Buscar")}
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
               </div>
@@ -419,6 +427,8 @@ export default function ChatArea(props: Props) {
                       onReply={setReplyTo}
                       onToggleReaction={onToggleReaction}
                       onTogglePin={onTogglePin}
+                      onBookmark={(id) => { const msg = channelMessages.find((m) => m.id === id); if (msg) toggleBookmark({ id: msg.id, content: msg.content, user: msg.user, channelId: selectedChannel }, currentChannel?.name || ""); }}
+                      isBookmarked={isBookmarked(item.msg.id)}
                       onViewProfile={onViewProfile}
                       scrollToMsg={channelScroll.scrollToMsg}
                       EditBox={channelEdit.EditBox}
@@ -448,11 +458,32 @@ export default function ChatArea(props: Props) {
               <ReplyPreview target={replyTo} clear={() => setReplyTo(null)} />
               {pendingPreview(pendingFile, uploading, onClearFile)}
               <MentionBox value={input} candidates={mentionCandidates} apply={setInput} focusRef={channelInputRef} userId={userId} />
+              {showSlashMenu && (
+                <div className="bg-[#2B2D31] border border-[#1E1F22] rounded-lg shadow-xl mb-1 overflow-hidden max-h-60 overflow-y-auto">
+                  {slashSuggestions.map((cmd, i) => (
+                    <button key={cmd.name} onMouseDown={(e) => { e.preventDefault(); setInput(`/${cmd.name} `); setCmdIdx(0); }} className={`w-full text-left px-3 py-2 flex items-center gap-3 text-sm transition-colors ${i === cmdIdx ? "bg-[#5865F2] text-white" : "text-zinc-300 hover:bg-[#35373C]"}`}>
+                      <span className="font-mono font-bold text-xs w-16 shrink-0">/{cmd.name}</span>
+                      <span className={`text-xs ${i === cmdIdx ? "text-white/70" : "text-zinc-500"}`}>{cmd.description}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAttachFile(f); e.target.value = ""; }} />
               <div className="bg-[#383A40] rounded-lg flex items-center gap-2 px-3 py-2">
                 <button onClick={() => fileInputRef.current?.click()} className="w-7 h-7 rounded-full bg-zinc-500 flex items-center justify-center hover:bg-zinc-400 shrink-0" title="Anexar arquivo"><Plus className="w-4 h-4 text-[#383A40]" /></button>
                 <button onClick={() => useModalStore.getState().openModal("showPollModal")} className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-zinc-500 shrink-0 text-zinc-400 hover:text-[#383A40]" title="Criar enquete"><BarChart3 className="w-4 h-4" /></button>
-                <input ref={channelInputRef} value={input} onChange={(e) => setInput(e.target.value)} onBlur={onBlurChannel} onKeyDown={(e) => e.key === "Enter" && handleSend()} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
+                <input ref={channelInputRef} value={input} onChange={(e) => { setInput(e.target.value); setCmdIdx(0); }} onBlur={onBlurChannel} onKeyDown={(e) => {
+                  if (showSlashMenu) {
+                    if (e.key === "ArrowDown") { e.preventDefault(); setCmdIdx((i) => (i + 1) % slashSuggestions.length); return; }
+                    if (e.key === "ArrowUp") { e.preventDefault(); setCmdIdx((i) => (i - 1 + slashSuggestions.length) % slashSuggestions.length); return; }
+                    if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                      const cmd = slashSuggestions[cmdIdx];
+                      if (cmd) { e.preventDefault(); setInput(`/${cmd.name} `); setCmdIdx(0); return; }
+                    }
+                    if (e.key === "Escape") { setCmdIdx(0); return; }
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) handleSend();
+                }} placeholder={`Conversar em #${currentChannel?.name}`} className="flex-1 bg-transparent outline-none placeholder:text-zinc-400 text-[15px] min-w-0" />
                 <div className="flex items-center gap-2 text-zinc-400 shrink-0">
                   <Gift className="w-5 h-5 hidden sm:block" /><Sticker className="w-5 h-5 hidden sm:block" /><Smile className="w-5 h-5" />
                   <button onClick={handleSend} className="bg-[#5865F2] hover:bg-[#4752C4] text-white p-1.5 rounded-full transition-colors"><Send className="w-4 h-4" /></button>

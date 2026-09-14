@@ -18,6 +18,8 @@ import PinsModal from "@/components/modals/PinsModal";
 import PollModal from "@/components/modals/PollModal";
 import RolesModal from "@/components/modals/RolesModal";
 import WebhooksModal from "@/components/modals/WebhooksModal";
+import { BookmarksModal } from "@/components/modals/BookmarksModal";
+import { useBookmarks } from "@/components/modals/BookmarksModal";
 import ProfileCard from "@/components/ProfileCard";
 import { useInvites } from "@/hooks/useInvites";
 import { useFriends } from "@/hooks/useFriends";
@@ -155,9 +157,11 @@ export default function DiscordClone() {
   }, []);
   const { channelUnread } = useChannelUnread(supabase, user, selectedChannel, viewMode);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsState, setSettingsState] = useState({ theme: "dark" as "dark" | "light" | "system", notifications: true, sounds: true, compactMode: false });
+  const [settingsState, setSettingsState] = useState({ theme: "dark" as "dark" | "light" | "system", notifications: true, sounds: true, compactMode: false, accentColor: "#5865F2" });
   const [systemMessages, setSystemMessages] = useState<SystemMessageData[]>([]);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const { bookmarks: bookmarkEntries, toggle: toggleBookmark, remove: removeBookmark } = useBookmarks();
   const unreadByServer: Record<string, number> = {};
   for (const s of servers) {
     const total = s.channels.reduce((acc, c) => acc + (channelUnread[c.id] || 0), 0);
@@ -399,6 +403,7 @@ export default function DiscordClone() {
         onEditDM={editDMMessage}
         onDeleteDM={deleteDMMessage}
         onInvite={openInviteModal}
+        onShowBookmarks={() => setShowBookmarks(true)}
         reactions={reactions}
         onToggleReaction={toggleReaction}
         dmReactions={dmReactions}
@@ -636,6 +641,13 @@ export default function DiscordClone() {
             }, 200);
           }}
           onClose={() => setShowGlobalSearch(false)}
+        />
+      )}
+      {showBookmarks && (
+        <BookmarksModal
+          bookmarks={bookmarkEntries}
+          onRemove={removeBookmark}
+          onClose={() => setShowBookmarks(false)}
         />
       )}
       <Toaster />

@@ -5,6 +5,7 @@ import { formatTime, groupReactions, MAX_FILE_MB } from "@/lib/chat-types";
 import { extractMentions, sendNotify } from "@/lib/notify";
 import { toast, confirmDialog } from "@/lib/ui";
 import { logger } from "@/lib/logger";
+import { parseSlashCommand, SLASH_COMMANDS } from "@/lib/slash-commands";
 
 const PAGE = 100;
 
@@ -194,7 +195,24 @@ export function useChannelMessages(supabase: any, user: any, username: string, s
         return;
       }
     }
-    const content = input;
+    // Slash commands
+    let content = input;
+    if (content.trim().startsWith("/")) {
+      const { isCommand, content: cmdContent, showHelp } = parseSlashCommand(content, user);
+      if (isCommand) {
+        if (showHelp) {
+          const helpText = SLASH_COMMANDS.map((c) => `\`/${c.name}\` — ${c.description}`).join("\n");
+          toast(helpText, "info");
+          setInput("");
+          return;
+        }
+        if (cmdContent === null) {
+          toast("Comando inválido ou sem argumentos. Use /help para ver os comandos.");
+          return;
+        }
+        content = cmdContent;
+      }
+    }
     const reply = replyTo;
     const file = pendingFile;
     setInput("");

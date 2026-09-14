@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Download } from "lucide-react";
+import { X, Pencil, Trash2, Smile, Reply, Pin, MoreHorizontal, FileText, Download, Bookmark } from "lucide-react";
 import type { Message, Reaction, ReactionMap, ReplyTarget } from "@/lib/chat-types";
 import Avatar from "@/components/Avatar";
 import { MarkdownText } from "@/lib/markdown";
@@ -27,6 +27,8 @@ type ChatMessageProps = {
   onReply: (target: ReplyTarget) => void;
   onToggleReaction: (id: string, emoji: string) => void;
   onTogglePin: (id: string) => void;
+  onBookmark: (id: string) => void;
+  isBookmarked: boolean;
   onViewProfile: (id: string) => void;
   scrollToMsg: (id: string | null | undefined) => void;
   EditBox: React.FC<{ save: (id: string, content: string) => void }>;
@@ -250,7 +252,7 @@ export function mentionize(text: string) {
   );
 }
 
-export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedIds, reactions, editingId, pickFor, searchQuery, highlight, mentionize: mentionizeFn, canPinMsg, onEdit, onDelete, onReply, onToggleReaction, onTogglePin, onViewProfile, scrollToMsg, EditBox, setPickFor, grouped }: ChatMessageProps) {
+export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwner, canModerateMessages, pinnedIds, reactions, editingId, pickFor, searchQuery, highlight, mentionize: mentionizeFn, canPinMsg, onEdit, onDelete, onReply, onToggleReaction, onTogglePin, onBookmark, isBookmarked, onViewProfile, scrollToMsg, EditBox, setPickFor, grouped }: ChatMessageProps) {
   const isWebhook = !!(msg as any).metadata?.webhook_id;
   const webhookName = (msg as any).metadata?.webhook_name;
   const displayName = isWebhook ? webhookName || msg.user : msg.user;
@@ -278,6 +280,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
             {canPinMsg(msg.user_id) && (
               <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
             )}
+            <button onClick={() => onBookmark(msg.id)} title={isBookmarked ? "Desfavoritar" : "Favoritar"}><Bookmark className={`w-4 h-4 ${isBookmarked ? "text-yellow-400" : "text-zinc-400 hover:text-yellow-300"}`} /></button>
             {msg.user_id && msg.user_id === userId ? (
               <>
                 <button onClick={() => onEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
@@ -322,6 +325,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
           {canPinMsg(msg.user_id) && (
             <button onClick={() => onTogglePin(msg.id)} title={pinnedIds.has(msg.id) ? "Desafixar" : "Fixar"}><Pin className={`w-4 h-4 ${pinnedIds.has(msg.id) ? "text-[#F0B132]" : "text-zinc-400 hover:text-white"}`} /></button>
           )}
+          <button onClick={() => onBookmark(msg.id)} title={isBookmarked ? "Desfavoritar" : "Favoritar"}><Bookmark className={`w-4 h-4 ${isBookmarked ? "text-yellow-400" : "text-zinc-400 hover:text-yellow-300"}`} /></button>
           {msg.user_id && msg.user_id === userId ? (
             <>
               <button onClick={() => onEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
