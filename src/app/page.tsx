@@ -168,6 +168,28 @@ export default function DiscordClone() {
     }
   }, []);
 
+  // Auth: buscar usuário logado e carregar perfil
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user: u } }: any) => {
+      if (!u) {
+        router.push("/login");
+        return;
+      }
+      useProfileStore.getState().setUser(u);
+      const { data: profile } = await supabase.from("profiles").select("*").eq("id", u.id).single();
+      if (profile?.username) useProfileStore.getState().setUsername(profile.username);
+      else if (u.user_metadata?.username) useProfileStore.getState().setUsername(u.user_metadata.username);
+      else useProfileStore.getState().setUsername(u.email?.split("@")[0] || "Você");
+      if (profile?.avatar) useProfileStore.getState().setAvatar(profile.avatar);
+      if (profile?.bio) useProfileStore.getState().setBio(profile.bio);
+      if (profile?.status_text) useProfileStore.getState().setStatusText(profile.status_text);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((event: string, session: any) => {
+      if (event === "SIGNED_OUT" || !session) router.push("/login");
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
   // Convite via link (?server=ID): seleciona após a lista carregar
   useEffect(() => {
     const sid = pendingServer.current || new URLSearchParams(window.location.search).get("server");
