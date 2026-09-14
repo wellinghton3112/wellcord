@@ -75,6 +75,7 @@ type Props = {
   onTogglePin: (id: string) => void;
   onOpenPins: () => void;
   isOwner: boolean;
+  canModerateMessages?: boolean;
   polls: Poll[];
   onToggleVote: (pollId: string, optionId: string) => void;
   onDeletePoll: (pollId: string) => void;
@@ -95,7 +96,7 @@ export default function ChatArea(props: Props) {
     typingChannel, typingDM, onBlurChannel, onBlurDM,
     mentionCandidates, dmMentionCandidates, userAvatar, onViewProfile,
     hasMore, loadingOlder, onLoadOlder, dmHasMore, dmLoadingOlder, onLoadOlderDM,
-    pinnedIds, canPinMsg, onTogglePin, onOpenPins, isOwner,
+    pinnedIds, canPinMsg, onTogglePin, onOpenPins, isOwner, canModerateMessages,
     polls, onToggleVote, onDeletePoll, onOpenPollModal,
   } = props;
   const dmOther = dmConversations.find((d) => d.id === selectedDM)?.otherUser;
@@ -541,7 +542,7 @@ export default function ChatArea(props: Props) {
               <button onClick={() => startEdit(msg.id, msg.content)} title="Editar"><Pencil className="w-4 h-4 text-zinc-400 hover:text-white" /></button>
               <button onClick={() => onDeleteMessage(msg.id)} title="Excluir"><Trash2 className="w-4 h-4 text-zinc-400 hover:text-red-400" /></button>
             </>
-          ) : isOwner ? (
+          ) : (isOwner || canModerateMessages) ? (
             <>
               <button onClick={() => startEdit(msg.id, msg.content)} title="Editar (moderação)"><Pencil className="w-4 h-4 text-amber-400 hover:text-white" /></button>
               <button onClick={() => onDeleteMessage(msg.id)} title="Excluir (moderação)"><Trash2 className="w-4 h-4 text-amber-400 hover:text-red-400" /></button>

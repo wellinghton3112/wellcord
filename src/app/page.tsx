@@ -416,6 +416,7 @@ export default function DiscordClone() {
         onTogglePin={togglePin}
         onOpenPins={() => setShowPinsModal(true)}
         isOwner={isOwner}
+        canModerateMessages={isOwner || roles.hasPermission(user?.id || "", "manage_messages")}
         polls={polls}
         onToggleVote={toggleVote}
         onDeletePoll={deletePoll}
@@ -428,8 +429,8 @@ export default function DiscordClone() {
         allProfiles={allProfiles}
         status={status}
         onViewProfile={openProfile}
-        isOwner={isOwner}
-        currentUserId={user?.id}
+        canKick={(uid) => isOwner || roles.hasPermission(user?.id || "", "kick")}
+        canBan={(uid) => isOwner || roles.hasPermission(user?.id || "", "ban")}
         onKick={(userId) => {
           const member = serverMgr.members.find(m => m.user_id === userId);
           if (member) serverMgr.kick(member, user?.id);
@@ -507,14 +508,18 @@ export default function DiscordClone() {
       {showMembersModal && currentServer && (
         <MembersModal
           serverName={currentServer.name}
-          isOwner={!currentServer.owner_id || currentServer.owner_id === user?.id}
+          isOwner={isOwner}
           userId={user?.id}
           members={serverMgr.members}
           invites={serverMgr.invites}
+          roles={roles.roles}
+          memberRoles={roles.memberRoles}
           onKick={(m) => serverMgr.kick(m, user?.id)}
           onBan={(m) => serverMgr.ban(m, user?.id)}
           onRevoke={serverMgr.revokeInvite}
           onCreateInvite={(maxUses, expiresHours) => serverMgr.createInvite(user?.id, maxUses, expiresHours)}
+          onAssignRole={(uid, rid) => roles.assignRole(uid, rid)}
+          onRemoveRole={(uid, rid) => roles.removeRole(uid, rid)}
           onClose={() => setShowMembersModal(false)}
         />
       )}

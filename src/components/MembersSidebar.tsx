@@ -12,19 +12,19 @@ type Props = {
   allProfiles: PresenceUser[];
   status: keyof typeof statusConfig;
   onViewProfile: (id: string) => void;
-  isOwner?: boolean;
-  currentUserId?: string;
+  canKick?: (userId: string) => boolean;
+  canBan?: (userId: string) => boolean;
   onKick?: (userId: string) => void;
   onBan?: (userId: string) => void;
 };
 
 // Coluna de membros online/offline. Extraído de page.tsx sem mudança visual.
-export default function MembersSidebar({ showMobileMembers, onlineMembers, allProfiles, status, onViewProfile, isOwner, currentUserId, onKick, onBan }: Props) {
+export default function MembersSidebar({ showMobileMembers, onlineMembers, allProfiles, status, onViewProfile, canKick, canBan, onKick, onBan }: Props) {
   const offline = allProfiles.filter((p) => !onlineMembers.some((o) => o.id === p.id));
 
   const MemberButton = ({ m, offline: isOffline }: { m: PresenceUser; offline?: boolean }) => {
     const [showActions, setShowActions] = useState(false);
-    const canMod = isOwner && currentUserId && m.id !== currentUserId && m.id !== undefined;
+    const canMod = (canKick?.(m.id) || canBan?.(m.id)) && m.id !== undefined;
 
     return (
       <div
@@ -44,12 +44,16 @@ export default function MembersSidebar({ showMobileMembers, onlineMembers, allPr
         </button>
         {showActions && canMod && (
           <div className="absolute right-1 top-1 flex gap-0.5 z-10">
-            <button onClick={(e) => { e.stopPropagation(); onKick?.(m.id); }} className="p-1 bg-[#2B2D31] hover:bg-[#F0B132] rounded" title="Remover">
-              <UserX className="w-3.5 h-3.5 text-zinc-300" />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onBan?.(m.id); }} className="p-1 bg-[#2B2D31] hover:bg-[#DA373C] rounded" title="Banir">
-              <ShieldBan className="w-3.5 h-3.5 text-zinc-300" />
-            </button>
+            {canKick?.(m.id) && (
+              <button onClick={(e) => { e.stopPropagation(); onKick?.(m.id); }} className="p-1 bg-[#2B2D31] hover:bg-[#F0B132] rounded" title="Remover">
+                <UserX className="w-3.5 h-3.5 text-zinc-300" />
+              </button>
+            )}
+            {canBan?.(m.id) && (
+              <button onClick={(e) => { e.stopPropagation(); onBan?.(m.id); }} className="p-1 bg-[#2B2D31] hover:bg-[#DA373C] rounded" title="Banir">
+                <ShieldBan className="w-3.5 h-3.5 text-zinc-300" />
+              </button>
+            )}
           </div>
         )}
       </div>

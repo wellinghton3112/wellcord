@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
-import { Copy, Check, X, UserX, Link2, Clock, Hash } from "lucide-react";
+import { Copy, Check, X, UserX, Link2, Clock, Hash, Shield } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import type { ServerMember, ServerInvite } from "@/hooks/useServerManager";
+import type { ServerRole, MemberRole } from "@/hooks/useRoles";
 
 type Props = {
   serverName?: string;
@@ -10,56 +11,52 @@ type Props = {
   userId?: string;
   members: ServerMember[];
   invites: ServerInvite[];
+  roles: ServerRole[];
+  memberRoles: MemberRole[];
   onKick: (m: ServerMember) => void;
   onBan: (m: ServerMember) => void;
   onRevoke: (code: string) => void;
   onCreateInvite: (maxUses: number | null, expiresHours: number | null) => Promise<string | null>;
+  onAssignRole: (userId: string, roleId: string) => void;
+  onRemoveRole: (userId: string, roleId: string) => void;
   onClose: () => void;
 };
 
-// Gestão do servidor: membros, kick e convites. Novo (feature membros).
-export default function MembersModal({ serverName, isOwner, userId, members, invites, onKick, onBan, onRevoke, onCreateInvite, onClose }: Props) {
+export default function MembersModal({ serverName, isOwner, userId, members, invites, roles, memberRoles, onKick, onBan, onRevoke, onCreateInvite, onAssignRole, onRemoveRole, onClose }: Props) {
   const [maxUses, setMaxUses] = useState("0");
   const [expires, setExpires] = useState("0");
   const [creating, setCreating] = useState(false);
   const [lastLink, setLastLink] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
+  const [editingRoles, setEditingRoles] = useState<string | null>(null);
 
   const linkFor = (code: string) =>
     typeof window !== "undefined" ? `${window.location.origin}/join/${code}` : code;
 
   const copy = async (code: string) => {
     const link = linkFor(code);
-    try {
-      await navigator.clipboard.writeText(link);
-    } catch {
+    try { await navigator.clipboard.writeText(link); } catch {
       const ta = document.createElement("textarea");
-      ta.value = link;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
+      ta.value = link; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove();
     }
-    setCopied(code);
-    setTimeout(() => setCopied((c) => (c === code ? null : c)), 2000);
+    setCopied(code); setTimeout(() => setCopied((c) => (c === code ? null : c)), 2000);
   };
 
   const create = async () => {
     setCreating(true);
-    const code = await onCreateInvite(
-      maxUses === "0" ? null : Number(maxUses),
-      expires === "0" ? null : Number(expires)
-    );
-    setCreating(false);
-    if (code) setLastLink(linkFor(code));
+    const code = await onCreateInvite(maxUses === "0" ? null : Number(maxUses), expires === "0" ? null : Number(expires));
+    setCreating(false); if (code) setLastLink(linkFor(code));
   };
 
   const fmtExpiry = (iso: string | null) =>
     !iso ? "nunca" : new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
+  const getUserRoleIds = (uid: string) => memberRoles.filter(mr => mr.user_id === uid).map(mr => mr.role_id);
+  const hasRole = (uid: string, rid: string) => getUserRoleIds(uid).includes(rid);
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#313338] rounded-lg w-full max-w-md p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+      <div className="bg-[#313338] rounded-lg w-full max-w-lg p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xl font-bold">Membros de {serverName || "servidor"}</h2>
           <button onClick={onClose} className="p-1 hover:bg-[#404249] rounded"><X className="w-5 h-5 text-zinc-400" /></button>
@@ -67,28 +64,61 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
         <p className="text-sm text-zinc-400 mb-4">{members.length} no servidor</p>
 
         <div className="space-y-1 mb-5">
-          {members.map((m) => (
-            <div key={m.user_id} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-[#35373C] group">
-              <Avatar src={m.avatar} name={m.username} className="w-8 h-8 rounded-full bg-[#41434A] text-sm" />
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate text-zinc-200">
-                  {m.username}
-                  {m.user_id === userId && <span className="text-zinc-500"> (você)</span>}
+          {members.map((m) => {
+            const userRoles = roles.filter(r => hasRole(m.user_id, r.id));
+            const isEditing = editingRoles === m.user_id;
+            return (
+              <div key={m.user_id} className="px-2 py-1.5 rounded hover:bg-[#35373C] group">
+                <div className="flex items-center gap-3">
+                  <Avatar src={m.avatar} name={m.username} className="w-8 h-8 rounded-full bg-[#41434A] text-sm" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate text-zinc-200">
+                      {m.username}
+                      {m.user_id === userId && <span className="text-zinc-500"> (você)</span>}
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {m.role === "owner" ? (
+                        <span className="text-xs text-yellow-400">👑 Dono</span>
+                      ) : userRoles.length > 0 ? (
+                        userRoles.map(r => (
+                          <span key={r.id} className="text-xs px-1.5 py-0.5 rounded" style={{ background: r.color + "33", color: r.color }}>{r.name}</span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-zinc-500">Membro</span>
+                      )}
+                    </div>
+                  </div>
+                  {isOwner && m.user_id !== userId && m.role !== "owner" && (
+                    <div className="flex gap-0.5">
+                      <button onClick={() => setEditingRoles(isEditing ? null : m.user_id)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#5865F2] rounded" title="Gerenciar cargos">
+                        <Shield className="w-4 h-4 text-zinc-400 hover:text-white" />
+                      </button>
+                      <button onClick={() => onBan(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#DA373C] rounded" title={`Banir ${m.username}`}>
+                        <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
+                      </button>
+                      <button onClick={() => onKick(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#F0B132] rounded" title={`Remover ${m.username}`}>
+                        <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div className="text-xs text-zinc-500">{m.role === "owner" ? "👑 Dono" : "Membro"}</div>
+                {isEditing && roles.length > 0 && (
+                  <div className="ml-11 mt-2 flex flex-wrap gap-1.5">
+                    {roles.map(r => (
+                      <button
+                        key={r.id}
+                        onClick={() => hasRole(m.user_id, r.id) ? onRemoveRole(m.user_id, r.id) : onAssignRole(m.user_id, r.id)}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${hasRole(m.user_id, r.id) ? "border-current" : "border-[#3F4147] hover:border-[#5865F2]"}`}
+                        style={{ color: r.color, background: hasRole(m.user_id, r.id) ? r.color + "22" : "transparent" }}
+                      >
+                        {hasRole(m.user_id, r.id) ? "✓ " : ""}{r.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-              {isOwner && m.user_id !== userId && (
-                <>
-                  <button onClick={() => onBan(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#DA373C] rounded" title={`Banir ${m.username}`}>
-                    <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
-                  </button>
-                  <button onClick={() => onKick(m)} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-[#F0B132] rounded" title={`Remover ${m.username}`}>
-                    <UserX className="w-4 h-4 text-zinc-400 hover:text-white" />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
+            );
+          })}
           {members.length === 0 && <p className="text-xs text-zinc-500">Nenhum membro visível.</p>}
         </div>
 
@@ -97,19 +127,13 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
           <label className="flex-1 text-xs text-zinc-400">
             Usos
             <select value={maxUses} onChange={(e) => setMaxUses(e.target.value)} className="w-full mt-1 bg-[#2B2D31] border border-[#1E1F22] rounded px-2 py-1.5 text-white text-sm outline-none">
-              <option value="0">Ilimitado</option>
-              <option value="1">1 uso</option>
-              <option value="5">5 usos</option>
-              <option value="25">25 usos</option>
+              <option value="0">Ilimitado</option><option value="1">1 uso</option><option value="5">5 usos</option><option value="25">25 usos</option>
             </select>
           </label>
           <label className="flex-1 text-xs text-zinc-400">
             Expira em
             <select value={expires} onChange={(e) => setExpires(e.target.value)} className="w-full mt-1 bg-[#2B2D31] border border-[#1E1F22] rounded px-2 py-1.5 text-white text-sm outline-none">
-              <option value="0">Nunca</option>
-              <option value="1">1 hora</option>
-              <option value="24">24 horas</option>
-              <option value="168">7 dias</option>
+              <option value="0">Nunca</option><option value="1">1 hora</option><option value="24">24 horas</option><option value="168">7 dias</option>
             </select>
           </label>
           <button onClick={create} disabled={creating} className="self-end px-4 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] disabled:opacity-50 rounded text-sm font-medium text-white shrink-0">
@@ -119,7 +143,7 @@ export default function MembersModal({ serverName, isOwner, userId, members, inv
         {lastLink && (
           <div className="flex items-center gap-2 mb-3">
             <input value={lastLink} readOnly className="flex-1 bg-[#2B2D31] border border-[#5865F2] rounded px-2 py-1.5 text-white text-xs outline-none min-w-0" />
-            <button onClick={() => copy(lastLink.split("/join/")[1] || "")} className="px-3 py-1.5 bg-[#404249] hover:bg-[#4A4D53] rounded text-xs text-white shrink-0">Copiar</button>
+            <button onClick={() => copy(lastLink.split("/join/")[1] || "")} className="px-3 py-1.5 bg-[#404249] hover:bg-[#4A4D53] rounded-xs text-white shrink-0">Copiar</button>
           </div>
         )}
         <div className="space-y-1">
