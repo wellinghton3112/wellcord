@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook, MessageSquare, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Hash, Volume2, Settings, Plus, Search, Trash2, X, LogOut, Users, DoorOpen, MessageCircle, Check, UserX, UserPlus, Shield, Webhook, MessageSquare } from "lucide-react";
 import type { Server, Channel, DMConversation, PresenceUser } from "@/lib/chat-types";
 import { statusConfig } from "@/lib/chat-types";
 import { APP_VERSION } from "@/lib/version";
@@ -57,7 +57,7 @@ export default function ChannelSidebar(props: Props) {
   } = props;
 
   // Stores
-  const { showMobileSidebar, setShowMobileSidebar, viewMode, setViewMode, selectedDM, setSelectedDM, selectedChannel, setSelectedChannel, connected, sidebarCollapsed, setSidebarCollapsed } = useAppStore();
+  const { showMobileSidebar, setShowMobileSidebar, viewMode, setViewMode, selectedDM, setSelectedDM, selectedChannel, setSelectedChannel, connected } = useAppStore();
   const { showStatusMenu, setShowStatusMenu } = useModalStore();
   const { username, avatar: userAvatar, status, setStatus } = useProfileStore();
 
@@ -124,22 +124,21 @@ export default function ChannelSidebar(props: Props) {
   const canManage = !currentServer?.owner_id || currentServer.owner_id === userId;
 
   const channelRow = (ch: Channel, icon: React.ReactNode) => (
-    <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-surface-active text-foreground" : "text-zinc-400 hover:bg-surface-hover hover:text-foreground"} ${sidebarCollapsed ? "justify-center" : ""}`} title={sidebarCollapsed ? ch.name : undefined}>
-      <button onClick={() => setSelectedChannel(ch.id)} className={`flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden ${sidebarCollapsed ? "justify-center" : ""}`}>
-        {icon}{!sidebarCollapsed && <span className={`truncate ${selectedChannel !== ch.id && (channelUnread?.[ch.id] || 0) > 0 ? "font-bold text-white" : ""}`}>{ch.name}</span>}
+    <div key={ch.id} className={`group flex items-center gap-1 px-2 py-1 rounded mt-0.5 ${selectedChannel === ch.id ? "bg-surface-active text-foreground" : "text-zinc-400 hover:bg-surface-hover hover:text-foreground"}`}>
+      <button onClick={() => setSelectedChannel(ch.id)} className="flex-1 flex items-center gap-2 text-[15px] font-medium overflow-hidden">
+        {icon}<span className={`truncate ${selectedChannel !== ch.id && (channelUnread?.[ch.id] || 0) > 0 ? "font-bold text-foreground" : ""}`}>{ch.name}</span>
       </button>
-      {!sidebarCollapsed && (channelUnread?.[ch.id] || 0) > 0 && selectedChannel !== ch.id && (
+      {(channelUnread?.[ch.id] || 0) > 0 && selectedChannel !== ch.id && (
         <span className="min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center shrink-0">{channelUnread![ch.id] > 9 ? "9+" : channelUnread![ch.id]}</span>
       )}
-      {!sidebarCollapsed && canManage && <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>}
+      {canManage && <button onClick={() => deleteChannel(ch.id, ch.name)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-surface rounded" title="Excluir canal"><X className="w-3 h-3 hover:text-red-400" /></button>}
     </div>
   );
 
   return (
-    <div className={`${showMobileSidebar ? "translate-x-0 left-[72px]" : "-translate-x-full left-0"} lg:translate-x-0 lg:inset-y-auto lg:left-0 fixed inset-y-0 lg:relative z-50 lg:z-auto bg-surface flex lg:flex flex-col shrink-0 h-full transition-all duration-200 ${sidebarCollapsed ? "w-[68px]" : "w-60"}`}>
+    <div className={`${showMobileSidebar ? "translate-x-0 left-[72px]" : "-translate-x-full left-0"} lg:translate-x-0 lg:inset-y-auto lg:left-0 fixed inset-y-0 lg:relative z-50 lg:z-auto bg-surface flex lg:flex flex-col shrink-0 h-full transition-all duration-200 w-60`}>
       {viewMode !== "server" ? (
         <>
-          {!sidebarCollapsed && (
           <div className="h-12 px-3 flex items-center gap-1 border-b border-border-strong shadow-sm shrink-0">
             <button onClick={() => setSideTab("dms")} className={`flex-1 py-1.5 rounded text-[13px] font-semibold transition-colors ${sideTab === "dms" ? "bg-surface-active text-foreground" : "text-zinc-400 hover:text-foreground"}`}>Conversas</button>
             <button onClick={() => setSideTab("friends")} className={`flex-1 py-1.5 rounded text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 ${sideTab === "friends" ? "bg-surface-active text-foreground" : "text-zinc-400 hover:text-foreground"}`}>
@@ -148,7 +147,6 @@ export default function ChannelSidebar(props: Props) {
             </button>
             <button onClick={() => useModalStore.getState().openModal("showNewDMModal")} className="w-7 h-7 rounded bg-accent hover:bg-accent-hover flex items-center justify-center shrink-0" title="Nova DM"><Plus className="w-4 h-4 text-white" /></button>
           </div>
-          )}
           {sideTab === "dms" ? (
           <>
           <div className="p-2">
@@ -167,16 +165,14 @@ export default function ChannelSidebar(props: Props) {
                 <p className="text-xs text-zinc-600 mt-1">{dmSearch ? "Tente outro termo" : "Clique + para iniciar"}</p>
               </div>
             ) : filteredDMs.map((dm) => (
-              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewMode("dm"); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-surface-active text-foreground" : "text-zinc-400 hover:bg-surface-hover hover:text-foreground"} ${sidebarCollapsed ? "justify-center" : ""}`} title={sidebarCollapsed ? (dm.otherUser?.username || "DM") : undefined}>
+              <button key={dm.id} onClick={() => { setSelectedDM(dm.id); setViewMode("dm"); }} className={`w-full flex items-center gap-3 px-2 py-2 rounded text-left ${selectedDM === dm.id ? "bg-surface-active text-foreground" : "text-zinc-400 hover:bg-surface-hover hover:text-foreground"}`}>
                 <span onClick={(e) => { e.stopPropagation(); if (dm.otherUser) onViewProfile(dm.otherUser.id); }} title="Ver perfil">
                   <Avatar src={dm.otherUser?.avatar} name={dm.otherUser?.username} className="w-8 h-8 rounded-full bg-accent text-sm" />
                 </span>
-                {!sidebarCollapsed && (
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
-                    <div className="text-xs text-zinc-400 truncate">Clique para conversar</div>
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium truncate">{dm.otherUser?.username || "Desconhecido"}</div>
+                  <div className="text-xs text-zinc-400 truncate">Clique para conversar</div>
+                </div>
                 {(unreadDMs?.[dm.id] || 0) > 0 && (
                   <span className="min-w-5 h-5 px-1.5 rounded-full bg-danger text-white text-[11px] font-bold flex items-center justify-center shrink-0">{unreadDMs![dm.id] > 9 ? "9+" : unreadDMs![dm.id]}</span>
                 )}
@@ -184,7 +180,7 @@ export default function ChannelSidebar(props: Props) {
               </button>
             ))}
             <div className="mt-4 p-2 bg-surface rounded">
-              <p className="text-xs font-bold text-zinc-300">Amigos Online — {onlineMembers.length}</p>
+              <p className="text-xs font-bold text-foreground">Amigos Online — {onlineMembers.length}</p>
               <div className="mt-2 space-y-1">
                   {onlineMembers.slice(0, 5).map((m) => (
                     <button key={m.id} onClick={() => { setNewDMUsername(m.username); useModalStore.getState().openModal("showNewDMModal"); }} className="w-full flex items-center gap-2 px-2 py-1 rounded hover:bg-surface-hover text-left">
@@ -355,22 +351,17 @@ export default function ChannelSidebar(props: Props) {
           <Avatar src={userAvatar || undefined} name={username} className="w-8 h-8 rounded-full bg-accent text-sm" />
           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${statusConfig[status].color}`} />
         </button>
-        {!sidebarCollapsed && (
-          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
-            <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
-            <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
-          </div>
-        )}
-        {!sidebarCollapsed && <span className="text-[8px] font-mono bg-input-bg px-1 py-0.5 rounded text-zinc-400 shrink-0">{APP_VERSION}</span>}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowStatusMenu(!showStatusMenu)}>
+          <div className="text-sm font-semibold leading-none truncate flex items-center gap-1">{username} <span className={`w-2 h-2 rounded-full ${statusConfig[status].color}`} /></div>
+          <div className="text-xs text-zinc-400 leading-none truncate">{statusConfig[status].label}</div>
+        </div>
+        <span className="text-[8px] font-mono bg-input-bg px-1 py-0.5 rounded text-zinc-400 shrink-0">{APP_VERSION}</span>
         <button onClick={onOpenSettings} className="p-1 hover:bg-surface-hover rounded shrink-0" title="Configurações"><Settings className="w-4 h-4 text-zinc-400" /></button>
-        <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="p-1 hover:bg-surface-hover rounded shrink-0" title={sidebarCollapsed ? "Expandir sidebar" : "Recolher sidebar"}>
-          {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4 text-zinc-400" /> : <PanelLeftClose className="w-4 h-4 text-zinc-400" />}
-        </button>
-        {!sidebarCollapsed && <button onClick={onSignOut} className="p-1 hover:bg-danger rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-foreground" /></button>}
+        <button onClick={onSignOut} className="p-1 hover:bg-danger rounded group shrink-0" title="Sair"><LogOut className="w-4 h-4 text-zinc-400 group-hover:text-foreground" /></button>
         {showStatusMenu && (
           <div className="absolute bottom-full left-2 mb-2 w-52 bg-surface border border-input-bg rounded-lg shadow-xl overflow-hidden z-50">
             {(Object.keys(statusConfig) as Array<keyof typeof statusConfig>).map((k) => (
-              <button key={k} onClick={() => { setStatus(k); setShowStatusMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-hover ${status === k ? "bg-surface-hover text-white" : "text-zinc-300"}`}>
+              <button key={k} onClick={() => { setStatus(k); setShowStatusMenu(false); }} className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-surface-hover ${status === k ? "bg-surface-hover text-foreground" : "text-zinc-400"}`}>
                 <span className={`w-3 h-3 rounded-full ${statusConfig[k].color}`} /> {statusConfig[k].label}
               </button>
             ))}
