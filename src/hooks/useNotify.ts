@@ -5,6 +5,21 @@ import { playPop, unlockAudio } from "@/lib/sound";
 
 export type Toast = NotifyPayload & { key: number; notifId: string };
 
+function getSettings() {
+  if (typeof window === "undefined") return { notifications: true, sounds: true };
+  try {
+    const raw = localStorage.getItem("wellcord-settings");
+    if (!raw) return { notifications: true, sounds: true };
+    const parsed = JSON.parse(raw);
+    return {
+      notifications: parsed.notifications ?? true,
+      sounds: parsed.sounds ?? true,
+    };
+  } catch {
+    return { notifications: true, sounds: true };
+  }
+}
+
 // Pedir permissão do browser (uma vez)
 function requestBrowserPermission() {
   if (typeof window === "undefined") return;
@@ -90,25 +105,30 @@ export function useNotify(supabase: any, user: any) {
           supabase.from("notifications").delete().eq("user_id", user.id).then(() => {});
           return;
         }
-        playPop();
-        fireNative({
-          kind: data.kind,
-          from: data.sender,
-          snippet: data.snippet,
-          serverId: data.server_id || undefined,
-          channelId: data.channel_id || undefined,
-          conversationId: data.conversation_id || undefined,
-        });
-        setToast({
-          key: Date.now(),
-          notifId: data.id,
-          kind: data.kind,
-          from: data.sender,
-          snippet: data.snippet,
-          serverId: data.server_id || undefined,
-          channelId: data.channel_id || undefined,
-          conversationId: data.conversation_id || undefined,
-        });
+        const st = getSettings();
+        if (st.sounds) playPop();
+        if (st.notifications) {
+          fireNative({
+            kind: data.kind,
+            from: data.sender,
+            snippet: data.snippet,
+            serverId: data.server_id || undefined,
+            channelId: data.channel_id || undefined,
+            conversationId: data.conversation_id || undefined,
+          });
+        }
+        if (st.notifications) {
+          setToast({
+            key: Date.now(),
+            notifId: data.id,
+            kind: data.kind,
+            from: data.sender,
+            snippet: data.snippet,
+            serverId: data.server_id || undefined,
+            channelId: data.channel_id || undefined,
+            conversationId: data.conversation_id || undefined,
+          });
+        }
       });
     const ch = supabase
       .channel(`notifications-${user.id}`)
@@ -118,25 +138,30 @@ export function useNotify(supabase: any, user: any) {
         (payload: any) => {
           const r = payload.new;
           if (!r) return;
-          playPop();
-          fireNative({
-            kind: r.kind,
-            from: r.sender,
-            snippet: r.snippet,
-            serverId: r.server_id || undefined,
-            channelId: r.channel_id || undefined,
-            conversationId: r.conversation_id || undefined,
-          });
-          setToast({
-            key: Date.now(),
-            notifId: r.id,
-            kind: r.kind,
-            from: r.sender,
-            snippet: r.snippet,
-            serverId: r.server_id || undefined,
-            channelId: r.channel_id || undefined,
-            conversationId: r.conversation_id || undefined,
-          });
+          const st = getSettings();
+          if (st.sounds) playPop();
+          if (st.notifications) {
+            fireNative({
+              kind: r.kind,
+              from: r.sender,
+              snippet: r.snippet,
+              serverId: r.server_id || undefined,
+              channelId: r.channel_id || undefined,
+              conversationId: r.conversation_id || undefined,
+            });
+          }
+          if (st.notifications) {
+            setToast({
+              key: Date.now(),
+              notifId: r.id,
+              kind: r.kind,
+              from: r.sender,
+              snippet: r.snippet,
+              serverId: r.server_id || undefined,
+              channelId: r.channel_id || undefined,
+              conversationId: r.conversation_id || undefined,
+            });
+          }
         }
       )
       .subscribe((status: string) => {
