@@ -78,13 +78,13 @@ export default function RolesModal({ roles, onCreateRole, onUpdateRole, onDelete
                 <div className="w-4 h-4 rounded-full" style={{ background: role.color }} />
                 <span className="font-medium text-white">{role.name}</span>
                 <span className="text-xs text-zinc-400">{role.position}</span>
-                <button onClick={() => onDeleteRole(role.id)} className="ml-auto p-1 hover:bg-[#DA373C] rounded" title="Excluir cargo">
-                  <Trash2 className="w-4 h-4 text-zinc-400 hover:text-white" />
+                <button onClick={() => onDeleteRole(role.id)} className="ml-auto p-1 hover:bg-danger rounded" title="Excluir cargo">
+                  <Trash2 className="w-4 h-4 text-zinc-400 hover:text-foreground" />
                 </button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(PERMISSION_LABELS).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 text-sm text-zinc-300 cursor-pointer hover:text-white">
+                  <label key={key} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
                     <input
                       type="checkbox"
                       checked={(role.permissions as any)[key] || false}
@@ -100,7 +100,7 @@ export default function RolesModal({ roles, onCreateRole, onUpdateRole, onDelete
         </div>
 
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="px-6 py-2 bg-surface-active hover:bg-[#4A4D53] rounded text-sm font-medium text-white">Fechar</button>
+          <button onClick={onClose} className="px-6 py-2 bg-surface-active hover:bg-border rounded text-sm font-medium text-foreground">Fechar</button>
         </div>
       </div>
     </div>

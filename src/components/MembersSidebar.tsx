@@ -34,11 +34,11 @@ export default function MembersSidebar({ showMobileMembers, onlineMembers, allPr
       >
         <button onClick={() => onViewProfile(m.id)} className="w-full flex items-center gap-3 px-2 py-1 rounded hover:bg-surface-hover cursor-pointer group text-left">
           <div className="relative">
-            <Avatar src={m.avatar} name={m.username} className={`w-8 h-8 rounded-full bg-[#41434A] text-sm ${isOffline ? "grayscale" : ""}`} />
-            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#2B2D31] ${isOffline ? "bg-zinc-500" : statusConfig[m.status as keyof typeof statusConfig]?.color || "bg-[#23A559]"}`} />
+            <Avatar src={m.avatar} name={m.username} className={`w-8 h-8 rounded-full bg-surface-active text-sm ${isOffline ? "grayscale" : ""}`} />
+            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface ${isOffline ? "bg-zinc-500" : statusConfig[m.status as keyof typeof statusConfig]?.color || "bg-success"}`} />
           </div>
           <div className="flex-1 min-w-0">
-            <div className={`text-sm font-medium truncate group-hover:text-white ${isOffline ? "text-zinc-400 group-hover:text-zinc-300" : "text-zinc-300"}`}>{m.username}</div>
+            <div className={`text-sm font-medium truncate group-hover:text-foreground ${isOffline ? "text-zinc-400 group-hover:text-foreground" : "text-foreground"}`}>{m.username}</div>
             <div className={`text-xs ${isOffline ? "text-zinc-600" : "text-zinc-400 truncate"}`}>{isOffline ? "Offline" : statusConfig[m.status as keyof typeof statusConfig]?.label || m.status}</div>
           </div>
         </button>
@@ -46,12 +46,12 @@ export default function MembersSidebar({ showMobileMembers, onlineMembers, allPr
           <div className="absolute right-1 top-1 flex gap-0.5 z-10">
             {canKick?.(m.id) && (
               <button onClick={(e) => { e.stopPropagation(); onKick?.(m.id); }} className="p-1 bg-surface hover:bg-[#F0B132] rounded" title="Remover">
-                <UserX className="w-3.5 h-3.5 text-zinc-300" />
+                <UserX className="w-3.5 h-3.5 text-foreground" />
               </button>
             )}
             {canBan?.(m.id) && (
-              <button onClick={(e) => { e.stopPropagation(); onBan?.(m.id); }} className="p-1 bg-surface hover:bg-[#DA373C] rounded" title="Banir">
-                <ShieldBan className="w-3.5 h-3.5 text-zinc-300" />
+              <button onClick={(e) => { e.stopPropagation(); onBan?.(m.id); }} className="p-1 bg-surface hover:bg-danger rounded" title="Banir">
+                <ShieldBan className="w-3.5 h-3.5 text-foreground" />
               </button>
             )}
           </div>
@@ -75,10 +75,10 @@ export default function MembersSidebar({ showMobileMembers, onlineMembers, allPr
           ))}
           {offline.length === 0 && <p className="text-xs text-zinc-600 px-2">Nenhum offline</p>}
         </div>
-        <div className="bg-[#232428] rounded-lg p-3 mt-4">
+        <div className="bg-surface rounded-lg p-3 mt-4">
           <h4 className="font-bold text-sm mb-1">✅ Presença Ativa</h4>
           <p className="text-xs text-zinc-400">Seu status: {statusConfig[status].label}</p>
-          <p className="text-xs text-[#23A559] mt-1">● {onlineMembers.length} online agora</p>
+          <p className="text-xs text-success mt-1">● {onlineMembers.length} online agora</p>
           <p className="text-[10px] text-zinc-400 mt-2 font-mono">{APP_VERSION}</p>
         </div>
       </div>

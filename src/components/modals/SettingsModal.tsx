@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { X, Monitor, Moon, Sun, Bell, BellOff, Keyboard, Volume2, VolumeX } from "lucide-react";
 import { ModalShell } from "@/components/ModalShell";
+import { APP_VERSION } from "@/lib/version";
 
 type Settings = {
   theme: "dark" | "light" | "system";
@@ -11,15 +12,22 @@ type Settings = {
   accentColor: string;
 };
 
-const DEFAULT: Settings = { theme: "dark", notifications: true, sounds: true, compactMode: false, accentColor: "var(--accent)" };
+export const DEFAULT_ACCENT = "#5865F2";
 
-const ACCENT_PRESETS = ["var(--accent)", "#ED4245", "#FEE75C", "#57F287", "#EB459E", "#F47B67", "#E9A040", "#3BA55C"];
+const DEFAULT: Settings = { theme: "dark", notifications: true, sounds: true, compactMode: false, accentColor: DEFAULT_ACCENT };
 
-function loadSettings(): Settings {
+const ACCENT_PRESETS = [DEFAULT_ACCENT, "#ED4245", "#FEE75C", "#57F287", "#EB459E", "#F47B67", "#E9A040", "#3BA55C"];
+
+export function loadSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT;
   try {
     const raw = localStorage.getItem("wellcord-settings");
-    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
+    const s: Settings = raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT;
+    // Normaliza accent legado inválido (ex: "var(--accent)") para o padrão
+    if (typeof s.accentColor !== "string" || !/^#[0-9a-fA-F]{6}$/.test(s.accentColor)) {
+      s.accentColor = DEFAULT_ACCENT;
+    }
+    return s;
   } catch { return DEFAULT; }
 }
 
@@ -28,15 +36,18 @@ function saveSettings(s: Settings) {
   applyTheme(s.theme, s.accentColor);
 }
 
-function applyTheme(theme: string, accent?: string) {
+function resolveTheme(theme: string): "light" | "dark" {
+  if (theme === "light") return "light";
+  if (theme === "dark") return "dark";
+  if (typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+  return "dark";
+}
+
+export function applyTheme(theme: string, accent?: string) {
   const root = document.documentElement;
-  if (theme === "light") {
-    root.classList.add("light-theme");
-    root.classList.remove("dark-theme");
-  } else {
-    root.classList.add("dark-theme");
-    root.classList.remove("light-theme");
-  }
+  const resolved = resolveTheme(theme);
+  root.classList.toggle("light-theme", resolved === "light");
+  root.classList.toggle("dark-theme", resolved !== "light");
   if (accent) root.style.setProperty("--accent", accent);
 }
 
@@ -46,6 +57,14 @@ export function useSettings() {
     const s = loadSettings();
     setSettings(s);
     applyTheme(s.theme, s.accentColor);
+    // Reage a mudança do tema do SO quando "system" está ativo
+    const mq = window.matchMedia?.("(prefers-color-scheme: light)");
+    const onChange = () => {
+      const cur = loadSettings();
+      if (cur.theme === "system") applyTheme("system", cur.accentColor);
+    };
+    mq?.addEventListener?.("change", onChange);
+    return () => mq?.removeEventListener?.("change", onChange);
   }, []);
   return { settings, setSettings: (s: Settings) => { setSettings(s); saveSettings(s); } };
 }
@@ -166,7 +185,7 @@ export default function SettingsModal({ settings, onChange, onClose }: Props) {
 
         {/* Info */}
         <section className="text-center text-xs text-zinc-600 pt-2 border-t border-border">
-          WellCORD • BETA 0.1.96 • Feito com Next.js + Supabase
+          WellCORD • {APP_VERSION} • Feito com Next.js + Supabase
         </section>
       </div>
     </ModalShell>
@@ -179,7 +198,7 @@ function ToggleRow({ icon: Icon, label, desc, checked, onChange }: { icon: any; 
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5 text-zinc-400" />
         <div>
-          <p className="text-sm text-zinc-200">{label}</p>
+          <p className="text-sm text-foreground">{label}</p>
           <p className="text-xs text-zinc-400">{desc}</p>
         </div>
       </div>

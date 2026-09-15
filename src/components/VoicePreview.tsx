@@ -56,12 +56,12 @@ export default function VoicePreview({ channelId }: Props) {
   return (
     <div className="ml-6 mt-1 mb-1 space-y-1">
       <div className="flex items-center gap-2 text-xs text-zinc-400">
-        <span className="w-2 h-2 rounded-full bg-[#23A559] animate-pulse" />
+        <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
         <span>{duration}</span>
       </div>
       {peers.map((p) => (
         <div key={p.id} className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-surface-hover">
-          <Avatar src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.username)}`} name={p.username} className="w-5 h-5 rounded-full bg-[#41434A]" />
+          <Avatar src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.username)}`} name={p.username} className="w-5 h-5 rounded-full bg-surface-active" />
           <span className="text-xs text-zinc-300 truncate">{p.username}</span>
           <span className="ml-auto text-[10px] text-zinc-400">🔊</span>
         </div>

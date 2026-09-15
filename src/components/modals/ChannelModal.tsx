@@ -51,8 +51,8 @@ export default function ChannelModal(props: Props) {
           </div>
           <div>
             <label className="text-xs font-bold text-zinc-300 uppercase">Ou imagem do computador</label>
-            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewChannelImage(f); if (f) setNewChannelPreview(URL.createObjectURL(f)); else setNewChannelPreview(""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-active file:text-white hover:file:bg-[#4A4D53]" />
-            {newChannelPreview && <img src={newChannelPreview} alt="preview" className="w-12 h-12 rounded object-cover mt-2 border border-[#404249]" />}
+            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewChannelImage(f); if (f) setNewChannelPreview(URL.createObjectURL(f)); else setNewChannelPreview(""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-active file:text-foreground hover:file:bg-border" />
+            {newChannelPreview && <img src={newChannelPreview} alt="preview" className="w-12 h-12 rounded object-cover mt-2 border border-border" />}
           </div>
         </div>
         <div className="flex justify-end gap-3 mt-6">

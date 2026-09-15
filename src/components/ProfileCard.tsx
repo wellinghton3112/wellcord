@@ -60,11 +60,11 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
           </button>
         </div>
         {/* Avatar + recado */}
-        <div className="bg-[#232428] px-4 pb-4">
+        <div className="bg-surface px-4 pb-4">
           <div className="flex items-end gap-3 -mt-10 mb-2">
             <div className="relative shrink-0">
-              <Avatar src={profile.avatar} name={profile.username} className="w-20 h-20 rounded-full border-[6px] border-[#232428] bg-accent text-3xl" />
-              <span className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-[#232428] ${statusColor}`} title={statusLabel} />
+              <Avatar src={profile.avatar} name={profile.username} className="w-20 h-20 rounded-full border-[6px] border-surface bg-accent text-3xl" />
+              <span className={`absolute bottom-1 right-1 w-6 h-6 rounded-full border-4 border-surface ${statusColor}`} title={statusLabel} />
             </div>
             {profile.status_text ? (
               <div className="mb-4 bg-[#111214] border border-black/30 rounded-xl px-3 py-1.5 text-xs text-zinc-200 shadow-lg max-w-[190px] truncate">
@@ -72,7 +72,7 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
               </div>
             ) : null}
           </div>
-          <div className="bg-[#111214] rounded-xl p-3 space-y-3">
+          <div className="bg-input-bg rounded-xl p-3 space-y-3">
             <div>
               <div className="text-xl font-bold text-white leading-tight break-words">{profile.username}</div>
               <div className="text-sm text-zinc-400 flex items-center gap-1">
@@ -111,15 +111,15 @@ export default function ProfileCard({ profile, status, isSelf, onClose, onEdit, 
             </div>
             <div className="border-t border-white/10 pt-3 space-y-1">
               {isSelf ? (
-                <button onClick={onEdit} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-white/10 text-sm text-zinc-200 text-left">
+                <button onClick={onEdit} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-hover text-sm text-foreground text-left">
                   <Pencil className="w-4 h-4 text-zinc-400" /> Editar perfil
                 </button>
               ) : (
-                <button onClick={onSendDM} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-white/10 text-sm text-zinc-200 text-left">
+                <button onClick={onSendDM} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-hover text-sm text-foreground text-left">
                   <MessageCircle className="w-4 h-4 text-zinc-400" /> Enviar DM
                 </button>
               )}
-              <button onClick={copyId} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-white/10 text-sm text-zinc-200 text-left">
+              <button onClick={copyId} className="w-full flex items-center gap-3 px-2 py-2 rounded hover:bg-surface-hover text-sm text-foreground text-left">
                 {copied ? <Check className="w-4 h-4 text-green-400" /> : <Hash className="w-4 h-4 text-zinc-400" />}
                 {copied ? "ID copiado!" : "Copiar ID do usuário"}
               </button>

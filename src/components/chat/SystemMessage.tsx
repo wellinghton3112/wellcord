@@ -30,13 +30,13 @@ const LABELS: Record<string, string> = {
 };
 
 const COLORS: Record<string, string> = {
-  join: "text-[#23A559]",
-  leave: "text-[#DA373C]",
+  join: "text-success",
+  leave: "text-danger",
   pin: "text-[#F0B132]",
   channel_create: "text-accent",
   role_assign: "text-accent",
-  kick: "text-[#DA373C]",
-  ban: "text-[#DA373C]",
+  kick: "text-danger",
+  ban: "text-danger",
 };
 
 export function SystemMessage({ data }: { data: SystemMessageData }) {
@@ -50,7 +50,7 @@ export function SystemMessage({ data }: { data: SystemMessageData }) {
         <Icon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <span className="text-zinc-200 font-medium">{data.username}</span>
+        <span className="text-foreground font-medium">{data.username}</span>
         {" "}
         <span className="text-zinc-400">{label}</span>
         {data.target && (

@@ -1,7 +1,7 @@
 "use client";
 
 function SkeletonLine({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-[#3F4147] ${className}`} />;
+  return <div className={`animate-pulse rounded bg-border ${className}`} />;
 }
 
 export function MessageSkeleton({ count = 6 }: { count?: number }) {

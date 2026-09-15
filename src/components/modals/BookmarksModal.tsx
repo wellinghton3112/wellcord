@@ -90,7 +90,7 @@ export function BookmarksModal({ bookmarks, onRemove, onClose }: Props) {
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button onClick={() => { setSelectedChannel(b.channelId); setViewMode("server"); onClose(); }} className="p-1 hover:bg-surface rounded" title="Ir para o canal"><ExternalLink className="w-3.5 h-3.5 text-zinc-400" /></button>
-                <button onClick={() => onRemove(b.id)} className="p-1 hover:bg-[#DA373C]/20 rounded" title="Remover"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                <button onClick={() => onRemove(b.id)} className="p-1 hover:bg-danger/20 rounded" title="Remover"><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
               </div>
             </div>
             <p className="text-sm text-zinc-300"><MarkdownText text={b.content} /></p>

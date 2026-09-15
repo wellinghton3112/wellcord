@@ -30,7 +30,7 @@ export default function PinsModal({ channelName, pins, onJump, onUnpin, canManag
                 {(p.username || "?")[0]?.toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-sm font-semibold text-zinc-200">{p.username}</span>
+                <span className="text-sm font-semibold text-foreground">{p.username}</span>
                 <span className="text-[10px] text-zinc-400 ml-2">
                   {new Date(p.created_at).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
@@ -51,7 +51,7 @@ export default function PinsModal({ channelName, pins, onJump, onUnpin, canManag
         ))}
         {pins.length === 0 && (
           <div className="py-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-[#41434A] flex items-center justify-center mx-auto mb-3">
+            <div className="w-16 h-16 rounded-full bg-surface-active flex items-center justify-center mx-auto mb-3">
               <Pin className="w-7 h-7 text-zinc-600" />
             </div>
             <p className="text-sm text-zinc-400 font-medium">Nada fixado</p>

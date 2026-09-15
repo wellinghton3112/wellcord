@@ -27,7 +27,7 @@ import { useActiveNow } from "@/hooks/useActiveNow";
 import { useServerManager } from "@/hooks/useServerManager";
 import { useRoles } from "@/hooks/useRoles";
 import Toaster from "@/components/Toaster";
-import SettingsModal from "@/components/modals/SettingsModal";
+import SettingsModal, { useSettings } from "@/components/modals/SettingsModal";
 import GlobalSearch from "@/components/modals/GlobalSearch";
 import type { SystemMessageData } from "@/components/chat";
 import { toast as uiToast } from "@/lib/ui";
@@ -157,7 +157,7 @@ export default function DiscordClone() {
   }, []);
   const { channelUnread } = useChannelUnread(supabase, user, selectedChannel, viewMode);
   const [showSettings, setShowSettings] = useState(false);
-  const [settingsState, setSettingsState] = useState({ theme: "dark" as "dark" | "light" | "system", notifications: true, sounds: true, compactMode: false, accentColor: "var(--accent)" });
+  const { settings: settingsState, setSettings: setSettingsState } = useSettings();
   const [systemMessages, setSystemMessages] = useState<SystemMessageData[]>([]);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
@@ -316,25 +316,25 @@ export default function DiscordClone() {
   const signOut = async () => { await supabase.auth.signOut(); router.push("/login"); };
 
   if (loading) {
-    return <div className="h-screen w-screen bg-background flex items-center justify-center text-zinc-300">Carregando seu Discord... ⏳ {APP_VERSION}</div>;
+    return <div className="h-screen w-screen bg-background flex items-center justify-center text-foreground">Carregando seu Discord... ⏳ {APP_VERSION}</div>;
   }
 
   return (
     <VoiceProvider>
-    <div className="h-screen w-screen bg-background text-zinc-100 overflow-hidden">
+    <div className="h-screen w-screen bg-background text-foreground overflow-hidden">
 
       {showMobileSidebar && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowMobileSidebar(false)} />}
       {showMobileMembers && <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setShowMobileMembers(false)} />}
 
       {!showMobileSidebar && (
         <button onClick={() => setShowMobileSidebar(true)} className="fixed top-3 left-3 z-30 lg:hidden p-3 bg-accent hover:bg-accent-hover rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
-          <Menu className="w-6 h-6 text-white" />
+          <Menu className="w-6 h-6 text-foreground" />
         </button>
       )}
 
       {!showMobileMembers && (
-        <button onClick={() => setShowMobileMembers(true)} className="fixed top-3 right-3 z-30 lg:hidden p-3 bg-surface-active hover:bg-[#4A4D53] rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
-          <Users className="w-6 h-6 text-white" />
+        <button onClick={() => setShowMobileMembers(true)} className="fixed top-3 right-3 z-30 lg:hidden p-3 bg-surface-active hover:bg-border rounded-xl shadow-lg shadow-black/40 active:scale-95 transition-all">
+          <Users className="w-6 h-6 text-foreground" />
         </button>
       )}
 
@@ -559,10 +559,10 @@ export default function DiscordClone() {
           onClick={openToast}          className="fixed bottom-4 right-4 z-[60] w-80 max-w-[calc(100vw-2rem)] bg-surface border border-accent rounded-lg p-3 shadow-2xl flex items-start gap-3 text-left hover:brightness-110 transition"
         >
           <span className="w-9 h-9 rounded-full bg-accent flex items-center justify-center shrink-0">
-            <Bell className="w-4 h-4 text-white" />
+            <Bell className="w-4 h-4 text-foreground" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-sm font-semibold text-white truncate">
+            <span className="block text-sm font-semibold text-foreground truncate">
               {toast.kind === "dm" ? `DM de ${toast.from}` : `${toast.from} mencionou você`}
             </span>
             <span className="block text-xs text-zinc-400 truncate">{toast.snippet || "Nova mensagem"}</span>

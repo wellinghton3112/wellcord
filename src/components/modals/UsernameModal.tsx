@@ -42,10 +42,10 @@ export default function UsernameModal({ userEmail, username, setUsername, avatar
         <div className="h-24 relative rounded-t-xl" style={{ background: `linear-gradient(135deg, var(--accent), #1E1F22 130%)` }}>
           <div className="absolute -bottom-8 left-4">
             <div className="relative">
-              <Avatar src={preview || avatar} name={username} className="w-20 h-20 rounded-full border-[6px] border-[#313338] bg-accent text-3xl" />
+              <Avatar src={preview || avatar} name={username} className="w-20 h-20 rounded-full border-[6px] border-background bg-accent text-3xl" />
               <button
                 onClick={() => fileRef.current?.click()}
-                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-accent hover:bg-accent-hover flex items-center justify-center border-4 border-[#313338] transition-colors"
+                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-accent hover:bg-accent-hover flex items-center justify-center border-4 border-background transition-colors"
                 title="Trocar foto"
               >
                 <Camera className="w-4 h-4 text-white" />

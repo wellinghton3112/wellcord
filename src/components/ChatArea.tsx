@@ -183,7 +183,7 @@ export default function ChatArea(props: Props) {
         onChange={(e) => search.runSearch(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") search.stepMatch(e.shiftKey ? -1 : 1); if (e.key === "Escape") search.runSearch(""); }}
         placeholder={placeholder}
-        className="bg-surface rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-zinc-400 text-zinc-200"
+        className="bg-surface rounded pl-7 pr-14 py-1 text-sm w-44 focus:outline-none focus:ring-1 focus:ring-accent placeholder:text-zinc-400 text-foreground"
       />
       {search.q && (
         <span className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 text-[11px] text-zinc-400">
@@ -207,7 +207,7 @@ export default function ChatArea(props: Props) {
     const time = new Date(poll.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     return (
       <div key={`poll-${poll.id}`} id={`poll-${poll.id}`} className="my-1 ml-14 mr-2 max-w-md rounded-lg bg-surface p-2.5 scroll-mt-20">
-        <div className="text-[14px] font-medium text-[#DBDEE1] break-words">{poll.question}</div>
+        <div className="text-[14px] font-medium text-foreground break-words">{poll.question}</div>
         <div className="mt-1.5">
           {poll.options.map((o) => {
             const pct = total > 0 ? Math.round((o.votes / total) * 100) : 0;
@@ -220,11 +220,11 @@ export default function ChatArea(props: Props) {
                   <span className={`w-4 h-4 rounded-[4px] border flex items-center justify-center shrink-0 transition-colors ${o.mine ? "bg-accent border-accent" : "border-zinc-500 group-hover/opt:border-zinc-300"}`}>
                     {o.mine && <Check className="w-3 h-3 text-white" />}
                   </span>
-                  <span className="flex-1 truncate text-[13px] text-zinc-200">{o.label}</span>
+                  <span className="flex-1 truncate text-[13px] text-foreground">{o.label}</span>
                   <span className="flex items-center shrink-0">
                     <span className="flex -space-x-1.5">
                       {o.voters.slice(0, 3).map((v) => (
-                        <Avatar key={v.id} src={v.avatar} name={v.username} className="w-4 h-4 rounded-full border border-[#2B2D31] text-[8px]" />
+                        <Avatar key={v.id} src={v.avatar} name={v.username} className="w-4 h-4 rounded-full border border-surface text-[8px]" />
                       ))}
                     </span>
                     <span className="ml-1 text-[11px] text-zinc-400 font-semibold w-4 text-right">{o.votes}</span>
@@ -259,13 +259,13 @@ export default function ChatArea(props: Props) {
       <DropOverlay visible={dropZone.dragging} />
       {viewMode === "dm" ? (
         <>
-          <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
+          <div className="h-12 flex items-center px-4 gap-3 border-b border-border-strong shadow-sm shrink-0">
             <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-surface hover:bg-surface-active rounded-lg"><Menu className="w-5 h-5" /></button>
             {selectedDM ? (
               <>
                 <Avatar src={dmOther?.avatar} name={dmOther?.username} className="w-8 h-8 rounded-full bg-accent text-sm" />
                 <span className="font-bold">{dmOther?.username || "DM"}</span>
-                <span className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dmOther?.id) ? "bg-[#23A559]" : "bg-zinc-500"}`} />
+                <span className={`w-2 h-2 rounded-full ${onlineMembers.some((m) => m.id === dmOther?.id) ? "bg-success" : "bg-zinc-500"}`} />
               </>
             ) : (
               <span className="font-bold text-zinc-400">Selecione uma conversa</span>
@@ -283,7 +283,7 @@ export default function ChatArea(props: Props) {
             {dmLoadingOlder && <p className="text-center text-xs text-zinc-400 py-2">Carregando mais...</p>}
             {!selectedDM ? (
               <div className="h-full flex flex-col items-center justify-center text-zinc-400 gap-4">
-                <div className="w-20 h-20 rounded-full bg-[#41434A] flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-surface-active flex items-center justify-center">
                   <Send className="w-8 h-8 text-zinc-400" />
                 </div>
                 <div className="text-center">
@@ -355,13 +355,13 @@ export default function ChatArea(props: Props) {
         </>
       ) : (
         <>
-          <div className="h-12 flex items-center px-4 gap-3 border-b border-[#1F2124] shadow-sm shrink-0">
+          <div className="h-12 flex items-center px-4 gap-3 border-b border-border-strong shadow-sm shrink-0">
             <button onClick={() => setShowMobileSidebar(true)} className="lg:hidden p-2 -ml-2 bg-surface hover:bg-surface-active rounded-lg"><Menu className="w-5 h-5" /></button>
             <Hash className="w-5 h-5 text-zinc-400" /><span className="font-bold">{currentChannel?.name}</span>
-            <span className="w-px h-6 bg-[#3F4147] mx-2" />
+            <span className="w-px h-6 bg-border mx-2" />
             <span className="text-sm text-zinc-400 truncate hidden sm:block">Canal de texto • Supabase Realtime ativo{currentChannel?.slow_mode_seconds ? ` • Slow mode: ${currentChannel.slow_mode_seconds}s` : ""}</span>
               <div className="ml-auto flex items-center gap-2 sm:gap-4 text-zinc-400">
-                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={() => useModalStore.getState().openModal("showPinsModal")} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onShowBookmarks} title="Mensagens favoritas"><Bookmark className="w-5 h-5 hidden md:block hover:text-white" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-white" /></button>
+                <span title="Chamada de voz (em breve)"><Phone className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><span title="Chamada de vídeo (em breve)"><Video className="w-5 h-5 hidden md:block cursor-not-allowed opacity-50" /></span><button onClick={() => useModalStore.getState().openModal("showPinsModal")} title="Ver fixados"><Pin className="w-5 h-5 hidden md:block hover:text-foreground" /></button><button onClick={onShowBookmarks} title="Mensagens favoritas"><Bookmark className="w-5 h-5 hidden md:block hover:text-foreground" /></button><button onClick={onInvite} title="Convidar amigos"><UserPlus className="w-5 h-5 hover:text-foreground" /></button>
                 {searchBox("Buscar")}
                 <Inbox className="w-5 h-5" /><HelpCircle className="w-5 h-5" />
               </div>
@@ -387,7 +387,7 @@ export default function ChatArea(props: Props) {
             ) : (
               <>
                 <div className="py-12 border-b border-border mb-4 text-center">
-                  <div className="w-20 h-20 rounded-full bg-[#41434A] flex items-center justify-center mx-auto mb-4">
+                  <div className="w-20 h-20 rounded-full bg-surface-active flex items-center justify-center mx-auto mb-4">
                     <Hash className="w-10 h-10 text-zinc-300" />
                   </div>
                   <h1 className="text-3xl font-bold">Bem-vindo(a) ao #{currentChannel?.name}!</h1>

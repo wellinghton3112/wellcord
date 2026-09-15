@@ -4,7 +4,7 @@
   --background: #313338;
   --foreground: #dbdee1;
   --accent: #5865F2;
-  --accent-hover: #4752C4;
+  --accent-hover: color-mix(in srgb, var(--accent) 80%, black);
   --surface: #2B2D31;
   --surface-hover: #35373C;
   --surface-active: #404249;
@@ -18,6 +18,8 @@
   --danger: #DA373C;
   --danger-hover: #A12828;
   --success: #23A559;
+  --success-hover: #1A7F44;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -30,9 +32,11 @@
   --color-surface-active: var(--surface-active);
   --color-input-bg: var(--input-bg);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-danger: var(--danger);
   --color-danger-hover: var(--danger-hover);
   --color-success: var(--success);
+  --color-success-hover: var(--success-hover);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -55,6 +59,7 @@
 
 /* ========== LIGHT THEME ========== */
 .light-theme {
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #313338;
   --surface: #f2f3f5;

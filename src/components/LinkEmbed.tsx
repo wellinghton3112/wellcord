@@ -50,7 +50,7 @@ export function LinkEmbed({ url }: { url: string }) {
   const hostname = (() => { try { return new URL(url).hostname; } catch { return url; } })();
 
   return (
-    <div className="mt-1.5 max-w-md rounded-lg border border-[#4A4D53] bg-surface overflow-hidden group">
+    <div className="mt-1.5 max-w-md rounded-lg border border-border bg-surface overflow-hidden group">
       {data.image && (
         <button
           type="button"
@@ -77,7 +77,7 @@ export function LinkEmbed({ url }: { url: string }) {
           </div>
         )}
         {data.title && (
-          <div className="text-sm font-semibold text-zinc-200 truncate group-hover:text-white">{data.title}</div>
+          <div className="text-sm font-semibold text-foreground truncate">{data.title}</div>
         )}
         {data.description && (
           <div className="text-xs text-zinc-400 mt-0.5 line-clamp-2">{data.description}</div>

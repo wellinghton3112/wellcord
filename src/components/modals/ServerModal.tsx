@@ -42,8 +42,8 @@ export default function ServerModal(props: Props) {
           </div>
           <div>
             <label className="text-xs font-bold text-zinc-300 uppercase">Ou imagem do computador</label>
-            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewServerImage(f); if (f) setNewServerPreview(URL.createObjectURL(f)); else setNewServerPreview(editingServer?.image_url || ""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-active file:text-white hover:file:bg-[#4A4D53]" />
-            {newServerPreview && <img src={newServerPreview} alt="preview" className="w-16 h-16 rounded-2xl object-cover mt-2 border border-[#404249]" />}
+            <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0] || null; setNewServerImage(f); if (f) setNewServerPreview(URL.createObjectURL(f)); else setNewServerPreview(editingServer?.image_url || ""); }} className="w-full mt-1 text-sm text-zinc-400 file:mr-3 file:py-2 file:px-3 file:rounded file:border-0 file:bg-surface-active file:text-foreground hover:file:bg-border" />
+            {newServerPreview && <img src={newServerPreview} alt="preview" className="w-16 h-16 rounded-2xl object-cover mt-2 border border-border" />}
             {newServerPreview && <button onClick={() => { setNewServerImage(null); setNewServerPreview(""); }} className="text-xs text-red-400 hover:underline ml-2">Remover imagem</button>}
           </div>
         </div>

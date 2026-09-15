@@ -52,8 +52,8 @@ export default function PollModal({ onClose, onCreate }: Props) {
                 className="flex-1 bg-surface border border-input-bg rounded px-3 py-2 text-white text-sm outline-none focus:border-accent min-w-0"
               />
               {options.length > 2 && (
-                <button onClick={() => delOpt(i)} className="p-1.5 hover:bg-[#DA373C] rounded shrink-0" title="Remover opção">
-                  <X className="w-4 h-4 text-zinc-400 hover:text-white" />
+                <button onClick={() => delOpt(i)} className="p-1.5 hover:bg-danger rounded shrink-0" title="Remover opção">
+                  <X className="w-4 h-4 text-zinc-400 hover:text-foreground" />
                 </button>
               )}
             </div>

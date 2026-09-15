@@ -18,10 +18,10 @@ export default function Toaster() {
             key={t.id}
             className={`pointer-events-auto w-full flex items-start gap-2.5 rounded-lg px-3.5 py-2.5 shadow-2xl border text-sm animate-[slideUp_.2s_ease-out] ${
               t.kind === "error"
-                ? "bg-[#DA373C] text-white border-[#A12828]"
+                ? "bg-danger text-white border-danger"
                 : t.kind === "success"
-                  ? "bg-[#23A559] text-white border-[#1A7F44]"
-                  : "bg-surface text-zinc-200 border-[#4A4D53]"
+                  ? "bg-success text-white border-success"
+                  : "bg-surface text-foreground border-border"
             }`}
           >
             {t.kind === "error" ? <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" /> : t.kind === "success" ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <Info className="w-4 h-4 mt-0.5 shrink-0" />}
@@ -35,10 +35,10 @@ export default function Toaster() {
           <div className="bg-background rounded-lg w-full max-w-sm p-5 shadow-2xl">
             <p className="text-[15px] text-zinc-100 whitespace-pre-wrap">{confirm.message}</p>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => resolveConfirm(false)} className="px-4 py-2 text-sm text-zinc-300 hover:text-white">Cancelar</button>
+              <button onClick={() => resolveConfirm(false)} className="px-4 py-2 text-sm text-foreground">Cancelar</button>
               <button
                 onClick={() => resolveConfirm(true)}
-                className={`px-5 py-2 rounded text-sm font-semibold text-white ${confirm.danger ? "bg-[#DA373C] hover:bg-[#A12828]" : "bg-accent hover:bg-accent-hover"}`}
+                className={`px-5 py-2 rounded text-sm font-semibold text-white ${confirm.danger ? "bg-danger hover:bg-danger-hover" : "bg-accent hover:bg-accent-hover"}`}
               >
                 {confirm.confirmLabel}
               </button>

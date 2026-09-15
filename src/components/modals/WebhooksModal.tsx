@@ -61,13 +61,13 @@ export default function WebhooksModal({ channelId, serverId, onClose }: { channe
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#232428] rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-background rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-zinc-700">
           <div className="flex items-center gap-2">
             <Webhook className="w-5 h-5 text-accent" />
             <h2 className="text-white font-bold text-lg">Webhooks</h2>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-foreground"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-4 border-b border-zinc-700">
@@ -105,21 +105,21 @@ export default function WebhooksModal({ channelId, serverId, onClose }: { channe
                 <div className="flex gap-1">
                   <button
                     onClick={() => copyUrl(wh.token, wh.id)}
-                    className="text-zinc-400 hover:text-white p-1.5 rounded hover:bg-zinc-700"
+                    className="text-zinc-400 hover:text-foreground p-1.5 rounded hover:bg-surface-active"
                     title="Copiar URL"
                   >
                     {copiedId === wh.id ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => remove(wh.id)}
-                    className="text-zinc-400 hover:text-red-400 p-1.5 rounded hover:bg-zinc-700"
+                    className="text-zinc-400 hover:text-red-400 p-1.5 rounded hover:bg-surface-active"
                     title="Excluir"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <div className="bg-[#111214] rounded px-2 py-1.5 text-xs text-zinc-400 font-mono break-all">
+              <div className="bg-input-bg rounded px-2 py-1.5 text-xs text-zinc-400 font-mono break-all">
                 {webhookUrl(wh.token)}
               </div>
               <p className="text-zinc-600 text-xs mt-1">
@@ -132,12 +132,12 @@ export default function WebhooksModal({ channelId, serverId, onClose }: { channe
         <div className="p-4 border-t border-zinc-700">
           <details className="text-xs text-zinc-400">
             <summary className="cursor-pointer hover:text-zinc-300">Exemplo de uso (curl)</summary>
-            <pre className="mt-2 bg-[#111214] rounded p-2 overflow-x-auto text-zinc-400">
+            <pre className="mt-2 bg-input-bg rounded p-2 overflow-x-auto text-zinc-400">
 {`curl -X POST "${webhookUrl("SEU_TOKEN")}" \\
   -H "Content-Type: application/json" \\
   -d '{"content": "Olá do webhook!"}'`}
             </pre>
-            <pre className="mt-2 bg-[#111214] rounded p-2 overflow-x-auto text-zinc-400">
+            <pre className="mt-2 bg-input-bg rounded p-2 overflow-x-auto text-zinc-400">
 {`// Com embed
 curl -X POST "${webhookUrl("SEU_TOKEN")}" \\
   -H "Content-Type: application/json" \\
