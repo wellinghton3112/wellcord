@@ -19,6 +19,25 @@ export type Message = {
   file_type?: string | null;
   mentions?: string[];
   metadata?: Record<string, any> | null;
+  embeds?: WebhookEmbed[] | null;
+};
+
+// Embed estilo Discord (usado por webhooks/integrações externas)
+export type EmbedField = {
+  name: string;
+  value: string;
+  inline?: boolean;
+};
+
+export type WebhookEmbed = {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number;
+  author?: { name?: string; url?: string };
+  fields?: EmbedField[];
+  footer?: { text?: string };
+  timestamp?: string;
 };
 
 export type Channel = {

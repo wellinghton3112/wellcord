@@ -35,6 +35,7 @@ function toMessage(r: any): Message {
     file_name: r.file_name || null,
     file_type: r.file_type || null,
     metadata: r.metadata || null,
+    embeds: r.embeds || null,
   };
 }
 

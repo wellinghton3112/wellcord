@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { ReactionBar, TypingBar, mentionize } from "./ChatMessage";
+import { EmbedList } from "./WebhookEmbed";
 
 describe("ReactionBar", () => {
   it("renders nothing when list is empty", () => {
@@ -99,5 +100,45 @@ describe("mentionize", () => {
     expect(result[2].props.children).toBe(" and ");
     expect(result[3].props.children).toBe("@bob");
     expect(result[4].props.children).toBe("");
+  });
+});
+
+describe("EmbedList", () => {
+  it("renders nothing when embeds is empty or undefined", () => {
+    const { container: c1 } = render(<EmbedList embeds={[]} />);
+    expect(c1.firstChild).toBeNull();
+    const { container: c2 } = render(<EmbedList embeds={undefined} />);
+    expect(c2.firstChild).toBeNull();
+  });
+
+  it("renders title, description and color bar", () => {
+    const { container } = render(
+      <EmbedList embeds={[{ title: "Deploy OK", description: "v1.0 publicado", color: 3066993 }]} />
+    );
+    expect(screen.getByText("Deploy OK")).toBeInTheDocument();
+    expect(screen.getByText("v1.0 publicado")).toBeInTheDocument();
+    const bar = container.querySelector('[style*="background"]');
+    // 3066993 = 0x2ECC71 = rgb(46, 204, 113) (jsdom normaliza hex para rgb)
+    expect(bar?.getAttribute("style")).toContain("rgb(46, 204, 113)");
+  });
+
+  it("renders fields and footer", () => {
+    render(
+      <EmbedList
+        embeds={[{
+          title: "Build",
+          fields: [{ name: "Status", value: "passou" }, { name: "Tempo", value: "42s", inline: false }],
+          footer: { text: "CI • agora" },
+        }]}
+      />
+    );
+    expect(screen.getByText("Status")).toBeInTheDocument();
+    expect(screen.getByText("passou")).toBeInTheDocument();
+    expect(screen.getByText("CI • agora")).toBeInTheDocument();
+  });
+
+  it("ignores malformed embeds", () => {
+    const { container } = render(<EmbedList embeds={[{} as any, null as any]} />);
+    expect(container.textContent).toBe("");
   });
 });

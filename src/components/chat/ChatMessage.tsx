@@ -7,6 +7,7 @@ import { MarkdownText } from "@/lib/markdown";
 import { LinkEmbed } from "@/components/LinkEmbed";
 import { useLightbox } from "@/components/ImageLightbox";
 import { extractUrls } from "@/lib/links";
+import { EmbedList } from "@/components/chat/WebhookEmbed";
 import { QUICK_EMOJIS } from "@/lib/chat-types";
 
 type ChatMessageProps = {
@@ -270,6 +271,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
           {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] leading-5 text-foreground break-words whitespace-pre-wrap">{searchQuery ? highlight(msg.content) : <MarkdownText text={msg.content} mentionize={mentionizeFn} />}</p>}
           {editingId !== msg.id && !msg.file_url && extractUrls(msg.content).slice(0, 3).map((url) => <LinkEmbed key={url} url={url} />)}
           {editingId !== msg.id && <AttachmentBlock url={msg.file_url} name={msg.file_name} type={msg.file_type} />}
+          {editingId !== msg.id && <EmbedList embeds={msg.embeds} />}
           {editingId !== msg.id && <ReactionBar list={reactions[msg.id]} toggle={(e) => onToggleReaction(msg.id, e)} />}
           {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
         </div>
@@ -315,6 +317,7 @@ export const ChatMessage = React.memo(function ChatMessage({ msg, userId, isOwne
         {editingId === msg.id ? <EditBox save={onEdit} /> : <p className="text-[15px] leading-5 text-foreground break-words whitespace-pre-wrap">{searchQuery ? highlight(msg.content) : <MarkdownText text={msg.content} mentionize={mentionizeFn} />}</p>}
         {editingId !== msg.id && !msg.file_url && extractUrls(msg.content).slice(0, 3).map((url) => <LinkEmbed key={url} url={url} />)}
         {editingId !== msg.id && <AttachmentBlock url={msg.file_url} name={msg.file_name} type={msg.file_type} />}
+        {editingId !== msg.id && <EmbedList embeds={msg.embeds} />}
         {editingId !== msg.id && <ReactionBar list={reactions[msg.id]} toggle={(e) => onToggleReaction(msg.id, e)} />}
         {pickFor === msg.id && <EmojiPicker messageId={msg.id} toggle={onToggleReaction} onClose={() => setPickFor(null)} />}
       </div>
